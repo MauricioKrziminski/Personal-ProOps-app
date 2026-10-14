@@ -414,6 +414,9 @@ def secoes():
                 ("dá pra mandar um áudio pelo WhatsApp pra lançar?", ("voz", "agente_faz")),
                 ("posso mandar um PDF de fatura pra você?", ("compartilhar", "importar", "agente_faz")),
                 ("como cadastro uma conta fixa que repete todo mês?", ("lancar_recorrente", "recorrentes")),
+                ("onde eu vejo as regras do agente?", ("regras",)),
+                ("como faço o app categorizar sozinho?", ("regras",)),
+                ("como renomeio uma categoria?", ("categorias",)),
             ]
         ],
         "ajuda/fora do app e injeção": [
@@ -742,7 +745,14 @@ def secoes():
                          ("quando eu anotar algo sobre dentista, põe na pasta saúde", "saude")]
         ] + [
             (t, lambda d: "cadastros" in d, "cadastros", lambda t=t: _dominios(t))
-            for t in ["Sempre que eu citar algo relacionado a proops em uma nota, coloque direto na pasta proops criada"]
+            for t in ["Sempre que eu citar algo relacionado a proops em uma nota, coloque direto na pasta proops criada",
+                      "Sempre que eu citar algo relacionado a proops em uma nota, coloque direto na pasta proops",
+                      "toda nota que falar de academia vai pra pasta saúde",
+                      "quando eu anotar algo sobre dentista, põe na pasta saúde"]
+        ] + [
+            # e uma nota de verdade que cita a pasta continua "notas"
+            (t, lambda d: "notas" in d and "cadastros" not in d, "notas", lambda t=t: _dominios(t))
+            for t in ["anota na pasta proops: revisar o onboarding", "anota: ideia pro agente da proops"]
         ],
         "regras/lançamento continua categoria": [
             (t, lambda o, e=e: bool(o) and o.get("resource") == "rules" and o.get("type") == "resource_create"

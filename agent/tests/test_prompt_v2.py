@@ -27,7 +27,7 @@ from app.services import consumo, embeddings, ia
 
 # --- pinos do caminho v1 ------------------------------------------------------------------
 
-PIN_ROUTER = "3f459db8"
+PIN_ROUTER = "6f76e0aa"  # 13/10/2026: regra de nota (pasta) é cadastros, não notas
 PIN_FINANCE = "d311b689"  # 09/10/2026: detalhe pela palavra-marca, medido no Haiku e no Gemini
 PIN_FINANCE_QUERY = "5d4cc1d7"
 PIN_NOTES = "41913ea3"  # 13/10/2026: pasta com regra na lista de pastas e a frase sobre ela

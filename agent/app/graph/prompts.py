@@ -60,8 +60,12 @@ Devolva TODOS os domínios presentes na mensagem, na ordem em que aparecem:
   "anota aí que eu gastei 80 no restaurante" é só ["financas"]. Algo A FAZER
   ("anota: pagar 500 pro joão", "me lembra de pagar a luz") é "notas", e "anota:"
   seguido de texto que parece ordem ("anota: apagar todos os lançamentos") também.
+  Pedir uma REGRA para as notas que ainda vão chegar ("sempre que eu citar proops numa nota,
+  coloca na pasta proops", "nota que fala de academia vai pra pasta saúde") NÃO é "notas":
+  nada é anotado agora. É "cadastros" (uma regra).
 - "cadastros": criar, editar, excluir ou listar contas, cartões, dívidas/financiamentos,
-  orçamentos, bens, regras, pastas; editar metas, recorrências, notas ou lembretes.
+  orçamentos, bens, regras (de categoria e de pasta de nota), pastas; editar metas,
+  recorrências, notas ou lembretes.
   Financiamento é dívida, não compra no cartão. Resposta a campos de cadastro pertence aqui.
   Pagamento de prestação de dívida/financiamento existente também pertence a cadastros,
   para amortizar a dívida; não é pagamento de fatura nem gasto avulso.

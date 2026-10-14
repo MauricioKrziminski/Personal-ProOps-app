@@ -614,6 +614,9 @@ vez e saiba que sessões e confirmações pendentes daquele ambiente recomeçam.
   pasta vem vazia ou NÃO existe; pasta existente escolhida pelo modelo fica. O bloco de pastas do `user_turn` leva
   " · notas que citam: ..." (dentro do envelope `folder_names`). `resource_create rules` aceita `folder_id` (nome) OU `category`.
 - `ajuda.responder`: o TEXTO é só o da melhor entrada; os LINKS continuam de todas (até 3). Entrada nova do catálogo: curta.
+- **Pedir a regra é `cadastros`, nunca `notas`** (linha no `ROUTER`): "sempre que eu citar proops numa nota, põe na
+  pasta proops" foi para `notas` no Haiku (uma de várias tentativas), o parse de notas não achou nota e a ajuda
+  respondeu "não sei". Sem `notas_actions` nada é anotado: a frase fala de notas FUTURAS.
 
 ## Qualidade
 

@@ -229,13 +229,20 @@ CATALOGO: tuple[Entrada, ...] = (
         "/finance/transactions", "Lançamentos",
     ),
     Entrada(
-        "categorias", "Categorias e regras",
-        ("como crio uma categoria?", "como renomeio uma categoria?", "como faço o app categorizar sozinho?",
-         "como junto duas categorias?"),
-        "*Perfil → Categorias* para criar, renomear, trocar ícone e cor ou juntar. "
-        "*Perfil → Regras* categoriza sozinho por palavra (ex.: tudo com \"uber\" vira transporte) e "
-        "manda a nota que cita uma palavra para a pasta que você escolher.",
+        "categorias", "Categorias",
+        ("como crio uma categoria?", "como renomeio uma categoria?", "como junto duas categorias?",
+         "como troco o ícone de uma categoria?"),
+        "*Perfil → Categorias* para criar, renomear, trocar ícone e cor ou juntar.",
         "/finance/categories", "Categorias",
+    ),
+    Entrada(
+        "regras", "Regras",
+        ("onde vejo as regras do agente?", "como faço o app categorizar sozinho?",
+         "como faço a nota ir direto para uma pasta?", "como apago uma regra?"),
+        "*Perfil → Regras*: por palavra, o lançamento ganha a categoria (tudo com \"uber\" vira "
+        "transporte) e a nota vai para a pasta. Comigo: \"sempre que eu citar proops numa nota, "
+        "põe na pasta proops\".",
+        "/finance/rules", "Regras",
     ),
     Entrada(
         "relatorios", "Relatórios e Imposto de Renda",
