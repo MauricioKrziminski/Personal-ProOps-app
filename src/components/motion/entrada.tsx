@@ -117,7 +117,9 @@ export function useRelogioDeEntrada(atrasoMs: number, duracaoMs: number, nascerN
       relogio.set(0);
       return;
     }
-    if (geracao === noLugarNaGeracao) {
+    // Já entrou nesta geração: o efeito só roda de novo porque a árvore foi ESCONDIDA e revelada
+    // (Suspense do `Freeze` de uma aba). Revelar não é o app ficar visível: a entrada não repete.
+    if (geracao === noLugarNaGeracao || assentadoEm === geracao) {
       relogio.set(1);
       return;
     }
@@ -132,7 +134,7 @@ export function useRelogioDeEntrada(atrasoMs: number, duracaoMs: number, nascerN
     );
     const teto = setTimeout(() => setAssentadoEm(geracao), atraso + duracao + FOLGA_DO_TETO_MS);
     return () => clearTimeout(teto);
-  }, [liberada, geracao, reduzir, tempo, relogio, noLugarNaGeracao]);
+  }, [liberada, geracao, reduzir, tempo, relogio, noLugarNaGeracao, assentadoEm]);
 
   return { relogio, assentado: liberada && assentadoEm === geracao };
 }

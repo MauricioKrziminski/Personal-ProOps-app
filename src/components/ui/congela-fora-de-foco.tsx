@@ -1,6 +1,8 @@
-import { useIsFocused } from 'expo-router';
+import { useIsFocused, usePathname } from 'expo-router';
 import { createContext, useEffect, useState } from 'react';
 import { Freeze } from 'react-freeze';
+
+import { ehRaizDeAba } from '@/lib/abas';
 
 /** Verdadeiro dentro da raiz de uma aba: quem esconde o que está nela, ao sair, é o `Freeze`. */
 export const DentroDeAbaCongelavel = createContext(false);
@@ -28,22 +30,30 @@ export const DentroDeAbaCongelavel = createContext(false);
 export function CongelaForaDeFoco({ children }: { children: React.ReactNode }) {
   const focada = useIsFocused();
   /*
+    ⚠️ **Congela só quando OUTRA ABA está à vista** (13/10/2026). Uma tela empilhada por cima
+    (Categorias aberta do Perfil) também tira o foco, e congelada a aba de baixo SUMIA: o `Freeze`
+    a esconde por Suspense, a volta deslizava sobre o vazio e, ao revelar, o React reexecutava os
+    layout effects e a cascata entrava de novo do invisível ("a tela fica preta e depois mostra").
+  */
+  const caminho = usePathname();
+  const outraAba = !focada && ehRaizDeAba(caminho);
+  /*
     O render a mais vem de um estado comum num timeout, NÃO de `useDeferredValue`: suspender
     (`Freeze`) dentro de um render de transição deixava a rolagem de TODAS as outras abas morta no
     iOS — tocava, não rolava (06/10/2026, medido: sem o adiamento, Perfil e Finanças rolam).
   */
   const [congelar, setCongelar] = useState(false);
   useEffect(() => {
-    if (focada) return;
+    if (!outraAba) return;
     const t = setTimeout(() => setCongelar(true), 0);
     return () => {
       clearTimeout(t);
       setCongelar(false);
     };
-  }, [focada]);
+  }, [outraAba]);
   return (
     <DentroDeAbaCongelavel.Provider value>
-      <Freeze freeze={!focada && congelar}>{children}</Freeze>
+      <Freeze freeze={outraAba && congelar}>{children}</Freeze>
     </DentroDeAbaCongelavel.Provider>
   );
 }

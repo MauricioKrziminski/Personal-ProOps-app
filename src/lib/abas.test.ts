@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-import { ROTULO_DA_ABA, tituloDaAba } from './abas.ts';
+import { ROTULO_DA_ABA, ehRaizDeAba, tituloDaAba } from './abas.ts';
 
 test('A rota (tabs) tem o título da aba ativa — é o que o "voltar" do iOS lê', () => {
   // Sem título, o sistema caía no nome da ROTA: o VoiceOver lia "(tabs)" no voltar de toda tela
@@ -21,4 +21,10 @@ test('As duas tab bars leem o rótulo da mesma lista', () => {
       assert.match(fonte, new RegExp(`label: ROTULO_DA_ABA\\.${nome}`), `${arquivo}: ${nome}`);
     }
   }
+});
+
+test('só a raiz de uma aba congela a aba de baixo; tela empilhada não', () => {
+  for (const raiz of ['/today', '/notes', '/finance', '/agent', '/profile']) assert.equal(ehRaizDeAba(raiz), true, raiz);
+  for (const empilhada of ['/finance/categories', '/finance/rules', '/notes/abc', '/', '/compartilhado'])
+    assert.equal(ehRaizDeAba(empilhada), false, empilhada);
 });

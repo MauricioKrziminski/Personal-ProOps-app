@@ -12,6 +12,8 @@ function montar() {
   let efeitos: (() => void)[] = [];
   let cursor = 0;
   let focada = true;
+  // Onde a navegação está quando a aba perde o foco: outra aba (congela) ou tela empilhada (não).
+  let caminho = '/notes';
   let precisaRenderizar = true;
   const react = {
     createContext: () => ({ Provider: 'Provider' }),
@@ -37,7 +39,8 @@ function montar() {
   const clearTimeoutFalso = (id: number) => { timeouts[id - 1] = () => {}; };
   new Function('require', 'module', 'exports', 'setTimeout', 'clearTimeout', code)((nome: string) => {
     if (nome === 'react') return react;
-    if (nome === 'expo-router') return { useIsFocused: () => focada };
+    if (nome === 'expo-router') return { useIsFocused: () => focada, usePathname: () => caminho };
+    if (nome === '@/lib/abas') return { ehRaizDeAba: (p: string) => ['/today', '/notes', '/finance', '/agent', '/profile'].includes(p) };
     if (nome === 'react-freeze') return { Freeze: 'Freeze' };
     if (nome === 'react/jsx-runtime') return { jsx: (type: any, props: any) => ({ type, props }), jsxs: (type: any, props: any) => ({ type, props }) };
     throw new Error(nome);
@@ -56,7 +59,7 @@ function montar() {
   return {
     historico,
     assentar,
-    mudarFoco(valor: boolean) { focada = valor; precisaRenderizar = true; },
+    mudarFoco(valor: boolean, para = '/notes') { focada = valor; caminho = para; precisaRenderizar = true; },
   };
 }
 
@@ -86,4 +89,14 @@ test('a folha na raiz de uma aba não depende do foco que o render a mais enxerg
   const folha = readFileSync('src/components/ui/sheet.tsx', 'utf8');
   assert.match(folha, /const dentroDeAba = useContext\(DentroDeAbaCongelavel\)/);
   assert.match(folha, /const focused = dentroDeAba \|\| focoDaTela/);
+});
+
+test('tela empilhada por cima (Categorias aberta do Perfil) NÃO congela a aba de baixo', () => {
+  // 13/10/2026: congelada, a aba sumia atrás da volta e a cascata entrava de novo do invisível.
+  const aba = montar();
+  aba.assentar();
+  aba.historico.length = 0;
+  aba.mudarFoco(false, '/finance/categories');
+  aba.assentar();
+  assert.ok(aba.historico.every((f) => f === false), `nunca congela: ${aba.historico}`);
 });

@@ -1473,7 +1473,7 @@ test('o conteúdo que substitui o esqueleto nasce no lugar, sem voltar ao invis�
   assert.match(tela, /<Cascata noLugar=\{nasceuSemCascata\}>/);
   const entrada = readFileSync(join(SRC, 'components/motion/entrada.tsx'), 'utf8');
   assert.match(entrada, /export function useRelogioDeEntrada\(atrasoMs: number, duracaoMs: number, nascerNoLugar = false\)/);
-  assert.match(entrada, /if \(geracao === noLugarNaGeracao\) \{\s*relogio\.set\(1\);\s*return;/);
+  assert.match(entrada, /if \(geracao === noLugarNaGeracao \|\| assentadoEm === geracao\) \{\s*relogio\.set\(1\);\s*return;/);
 });
 
 test('as conversas do Agente são buscadas ao entrar na conta, com as MESMAS opções da aba', () => {
@@ -1546,7 +1546,6 @@ const VAZIO_GRANDE_PERMITIDO: Record<string, string[]> = {
   'app/finance/invoices.tsx': ['Nenhum cartão cadastrado', 'Nenhuma fatura ainda'], // tablet: outro painel
   'app/finance/recurring.tsx': ['Nada se repete ainda'],
   'app/finance/reports.tsx': ['Nada lançado em'],
-  'app/finance/rules.tsx': ['Nenhuma regra ainda'],
   'app/finance/transactions.tsx': ['Nenhum lançamento ainda', 'Nada em'],
   'app/finance/wallet.tsx': ['Nenhum cartão cadastrado'],
   'app/import-history.tsx': ['Importar precisa de uma assinatura', 'Nenhuma importação ainda'],
@@ -1930,5 +1929,7 @@ test('toda pilha de aba congela quando a aba não está em foco (ocultar valores
   const prim = readFileSync(join(SRC, 'components', 'ui', 'congela-fora-de-foco.tsx'), 'utf8');
   // O congelamento chega um render DEPOIS da perda de foco (as consultas saem do cache antes), por
   // estado num timeout: `useDeferredValue` suspendia em render de transição e matava a rolagem no iOS.
-  assert.match(prim, /<Freeze freeze=\{!focada && congelar\}>/);
+  // Só quando OUTRA aba está à vista: tela empilhada por cima deixa a de baixo desenhada (13/10/2026).
+  assert.match(prim, /const outraAba = !focada && ehRaizDeAba\(caminho\)/);
+  assert.match(prim, /<Freeze freeze=\{outraAba && congelar\}>/);
 });

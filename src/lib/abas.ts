@@ -25,3 +25,11 @@ export function tituloDaAba(segments: readonly string[]): string {
   const aba = segments.find((s): s is Aba => s in ROTULO_DA_ABA);
   return ROTULO_DA_ABA[aba ?? 'today'];
 }
+
+/**
+ * O caminho é a RAIZ de uma aba (`/finance`), e não uma tela empilhada por cima delas
+ * (`/finance/categories`)? É o que decide congelar a aba de baixo (`CongelaForaDeFoco`).
+ */
+export function ehRaizDeAba(pathname: string): boolean {
+  return Object.keys(ROTULO_DA_ABA).some((aba) => pathname === `/${aba}`);
+}
