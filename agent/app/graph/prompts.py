@@ -426,6 +426,9 @@ Regras:
 - folder é curta e minúscula (vira a pasta da nota). Quando a mensagem trouxer a
   lista de pastas que já existem, REUSE o nome exato de uma delas em vez de criar
   outra parecida — "mercado" e "compras" para a mesma coisa é o defeito a evitar.
+  Na lista, o nome da pasta é só o que vem antes de " · "; o que vem depois ("notas que
+  citam: ...") são regras do usuário que mandam a nota para aquela pasta: se a nota cita uma
+  dessas palavras, use essa pasta.
   Sem pasta óbvia, deixe vazio: nota sem pasta é melhor que nota na pasta errada.
 - Não invente conteúdo que o usuário não escreveu.
 

@@ -98,6 +98,7 @@ abaixo, seção atualizada. `update_transaction_scoped` continua existindo para 
 |---|---|
 | escolher "esta e as futuras" no formulário, numa compra parcelada | `update_transaction` sobre a compra parcelada → `update_installment_plan` (valor/nome/categoria) ou UPDATE direto (uma parcela) |
 | "Editar" no menu do plano | idem — a âncora é a primeira parcela EM ABERTO nos dois |
+| Regra de nota no Perfil → Regras (palavra → pasta, 13/10/2026) | `resource_create rules` com `folder_id` = nome da pasta (inexistente nasce junto); `resource_list rules` mostra as de lançamento e as de nota. A regra vale quando o agente cria a nota com pasta vazia ou inventada |
 | "Editar" numa recorrência | `resource_update recurring` — roteado para `update_recurring_series` (isto não mudou) |
 | "Só esta \| Esta e as próximas" no topo do lançamento de uma série (26/09/2026) | "Só esta": `update_transaction` sobre a ocorrência. "Esta e as próximas": `resource_update recurring` — valor/título/categoria/conta propagam pela RPC, e regra ou início pelo calendário da mesma `update_recurring_series`, que move a primeira em aberto de data (mesmo id) em vez de apagá-la |
 

@@ -74,7 +74,7 @@ CATALOG = {
         "categorization_rules",
         "pattern",
         None,
-        "match_type pattern category subcategory_id account_id priority",
+        "match_type pattern category folder_id subcategory_id account_id priority",
     ),
     "notes": (
         "notes",
@@ -111,7 +111,8 @@ REQUIRED = {
     "budgets": ("category", "limit_cents"),
     "assets": ("name", "class", "current_value_cents"),
     "recurring": ("kind", "amount_cents", "description", "rrule", "dtstart"),
-    "rules": ("pattern", "category", "match_type"),
+    # Regra de nota (folder_id) não tem categoria: o "category ou folder_id" é conferido em `validate_fields`.
+    "rules": ("pattern", "match_type"),
     "notes": ("content",),
     "reminders": ("title", "next_run_at"),
     "folders": ("name",),
@@ -136,7 +137,7 @@ LABELS = {
     "budgets": "orçamento",
     "assets": "bem/investimento",
     "recurring": "lançamento recorrente",
-    "rules": "regra de categoria",
+    "rules": "regra",
     "notes": "nota",
     "reminders": "lembrete",
     "folders": "pasta",
@@ -609,6 +610,15 @@ def validate_fields(action: ResourceAction) -> dict:
     elif action.resource == "recurring" and values.get("counterparty_account_id") is not None \
             and values.get("kind") != "transfer" and action.type == Op.CREATE:
         _error("Só a transferência tem conta de destino. Ainda não salvei nada.")
+    if action.resource == "rules":
+        # Duas regras na mesma tabela: lançamento -> categoria/conta, nota -> pasta. Nunca as duas.
+        if values.get("folder_id") and (values.get("category") or values.get("account_id")
+                                        or values.get("subcategory_id")):
+            _error("Uma regra é de nota (vai para uma pasta) ou de lançamento (vai para uma categoria). "
+                   "Qual das duas? Nada foi alterado.")
+        if action.type == Op.CREATE and not (values.get("category") or values.get("folder_id")):
+            _error("Para cadastrar regra, informe a categoria (regra de lançamento) ou a pasta "
+                   "(regra de nota). Ainda não salvei nada.")
     if action.resource == "folders":
         if "name" in values:
             values["name"] = normalize(values["name"])
@@ -1680,7 +1690,7 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
                 values[key],
                 values[key],
             )
-            if (not rows and key == "folder_id" and action.resource == "notes"
+            if (not rows and key == "folder_id" and action.resource in {"notes", "rules"}
                     and action.type == Op.CREATE and not _parece_id(values[key])):
                 if not 1 <= len(normalize(values[key])) <= 40:
                     _error("Nome de pasta deve ter entre 1 e 40 caracteres.")
@@ -1895,6 +1905,20 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
             "; o que já aconteceu e o que está atrasado ficam, mas as ocorrências futuras "
             "ainda em aberto saem junto"
         )
+    if action.resource == "rules" and action.type == Op.CREATE:
+        # A frase do SIM diz o efeito da regra, não a lista de campos crus.
+        quem = ("lançamento do estabelecimento" if values.get("match_type") == "merchant"
+                else "lançamento que cita")
+        if values.get("folder_id"):
+            nova = prepared.get("pasta_nova")
+            pasta = f"*{nova}* (vai ser criada)" if nova else f"*{display.get('folder_id', '?')}*"
+            efeito = f"nota que cita *{values['pattern']}* vai para a pasta {pasta}"
+        else:
+            efeito = f"{quem} *{values['pattern']}* vai para a categoria *{values.get('category')}*"
+        prepared["summary"] = "criar a regra: " + efeito
+        if values.get("folder_id"):
+            efeito = f"nota que cita *{values['pattern']}* vai para a pasta *{prepared.get('pasta_nova') or display.get('folder_id', '?')}*"
+        prepared["concluido"] = "✅ Regra criada: " + efeito + "."
     if len(prepared["summary"]) > 3500:
         _error(
             "Essa alteração é longa demais para revisar em uma confirmação. Peça uma alteração menor ou edite o conteúdo completo no app."
@@ -2045,6 +2069,22 @@ async def execute(ctx: ExecContext, action: ResourceAction) -> ToolResult:
         return await _corrigir_aporte(ctx, proposal)
     if proposal.get("simulacao"):
         return ToolResult(proposal["simulacao"], read_only=True)
+    if action.type == Op.LIST and action.resource == "rules":
+        rows = await db.fetch(
+            "select r.pattern, r.category, f.name as pasta from public.categorization_rules r "
+            "left join public.note_folders f on f.id = r.folder_id "
+            "where r.workspace_id = %s order by (r.folder_id is not null), r.pattern limit 50",
+            ctx.workspace_id,
+        )
+        if not rows:
+            return ToolResult("Nenhuma regra cadastrada.", read_only=True)
+        lanc = [f"• {r['pattern']} → {r['category'] or 'sem categoria'}" for r in rows if not r["pasta"]]
+        nota = [f"• {r['pattern']} → pasta {r['pasta']}" for r in rows if r["pasta"]]
+        blocos = ([("Lançamentos (categoria)", lanc)] if lanc else []) + ([("Notas (pasta)", nota)] if nota else [])
+        return ToolResult(
+            "📋 Suas regras:\n" + "\n\n".join(f"*{t}*\n" + "\n".join(ls) for t, ls in blocos),
+            read_only=True,
+        )
     if action.type == Op.LIST:
         rows = await db.fetch(
             f"select {identity} as label from public.{table} where workspace_id = %s"
@@ -2209,7 +2249,10 @@ async def execute(ctx: ExecContext, action: ResourceAction) -> ToolResult:
         await _definir_conta_padrao(ctx, proposal["id"], proposal["set_default"])
     if proposal.get("marcos") is not None:
         await lote_d.gravar_marcos(ctx, row["id"], proposal["marcos"])
-    return ToolResult("Concluído: " + proposal["summary"] + "." + (row.get("aviso") or ""), result_id=row["id"])
+    return ToolResult(
+        proposal.get("concluido") or "Concluído: " + proposal["summary"] + "." + (row.get("aviso") or ""),
+        result_id=row["id"],
+    )
 
 
 # Editar o saldo de uma conta que já existe é dizer o saldo de HOJE, não o inicial (28/09/2026,
@@ -2394,5 +2437,5 @@ def prompt_catalogue() -> str:
         + "\nTRANSFERÊNCIA RECORRENTE (dinheiro que passa de uma conta para outra sozinho, todo mês/semana): resource_create, resource=recurring, name=o título, kind=transfer, amount_cents, rrule, dtstart, account_id = conta de ORIGEM e counterparty_account_id = conta de DESTINO (os dois pelo NOME; o destino nunca é cartão), sem category. 'todo dia 5 passo 500 da Nubank para a poupança' -> kind=transfer, account_id=Nubank, counterparty_account_id=poupança, rrule=FREQ=MONTHLY;BYMONTHDAY=5. Salário e aluguel NÃO são transferência (kind=income/expense). ⚠️ SÓ quando a pessoa pediu REPETIÇÃO (todo mês, toda semana, todo dia N): 'transferi 500 da nubank para a poupança' ou 'passa 200 pra reserva' (uma vez só) NÃO é série — não crie recurring nem invente rrule para encaixar."
         + "\nENCERRAR OU REABRIR UMA SÉRIE (assinatura cancelada, contrato que acabou): resource_update, resource=recurring, name=a série, UM campo. 'cancela a assinatura da netflix', 'não pago mais a academia', 'encerra o aluguel em dezembro' -> encerrar_em = a data da ÚLTIMA cobrança em YYYY-MM-DD (só o mês, 'em dezembro': o ÚLTIMO dia desse mês, porque o fim é um teto e a cobrança de dezembro ainda vale) ou o campo encerrar_em com valor VAZIO ("") quando a pessoa não disser até quando — o CAMPO vai sempre, é ele que diz que é para encerrar (o sistema usa a última que já venceu). 'reabre a netflix', 'voltei a assinar' (série encerrada) -> reabrir=true. Encerrar NÃO é pausar (active=false) nem apagar (resource_delete): encerrar mantém o histórico e tira só as cobranças futuras."
         + "\nRETIRAR DINHEIRO DE UMA META (o contrário de guardar): resource_update, resource=goals, name=a meta, retirar_cents = o valor em centavos. 'tirei 200 da meta viagem', 'libera 300 da meta reserva' -> retirar_cents. Se disser DE QUAL CONTA o dinheiro estava separado ('da conta nubank'), retirar_da_conta = o nome da conta (o dinheiro continua na conta, só volta a ficar livre). Se disser que o dinheiro VAI para outra conta ('passa 300 da meta para a poupança', 'transfere da meta pra corrente'), retirar_da_conta = conta onde estava e retirar_para_conta = a conta que recebe (aí é transferência de verdade). retirar_data só se a pessoa disser o dia. retirar_da_conta e retirar_para_conta são CONTAS: nunca ponha o nome da meta neles, e se a pessoa não citar conta, deixe-os fora. GUARDAR é outra coisa: é goal_deposit em finanças.\nINVESTIMENTO (conta de tipo investimento, ex.: CDB, Tesouro): resource_update, resource=accounts, name=a conta de investimento, UM campo. 'meu CDB está valendo 10.500', 'o tesouro hoje vale 8 mil' -> valor_atual_cents (só atualiza o valor, nenhum dinheiro se move). 'recebi 85 de rendimento do CDB', 'o CDB rendeu 85' -> rendimento_cents (é receita de verdade); rendimento_na_conta só se a pessoa disser em qual conta o rendimento caiu. data_do_valor só se disser o dia. Aplicar ou resgatar dinheiro NÃO é isto: é create_transfer.\nPLANO PERCENTUAL DO ORÇAMENTO: 'como está meu plano', 'o que planejei e o que gastei' -> resource_list, resource=plano. 'aplica o plano nos meus orçamentos', 'usa o plano como limite' -> resource_update, resource=plano, aplicar_categorias = nomes separados por vírgula ou 'todas' (vazio = todas), aplicar_alcance = 'padrao' (limite padrão, é o normal) ou 'mes' (só neste mês, 'só novembro' -> aplicar_mes=YYYY-MM-01). Montar ou editar o plano é no app.\nFAVORITOS E REPETIR LANÇAMENTO: 'lança meu favorito Almoço', 'usa o favorito academia' -> resource_update, resource=favoritos, name=o nome do favorito, lancar=true (amount_cents só se a pessoa disser o valor; conta e categoria só se disser: 'na conta nubank'). 'quais são meus favoritos' -> resource_list, resource=favoritos. 'repete o lançamento do mercado de ontem', 'duplica a conta de luz', 'lança de novo o último' -> resource_create, resource=duplicar, name=o que a pessoa chamou o lançamento (vazio em 'o último'), data_do_original = a data do ORIGINAL em YYYY-MM-DD só se ela disser ('de ontem'); conta, categoria e amount_cents (centavos) SÓ se ela disser que a cópia é diferente do original ('mas na conta nubank', 'mas foi 120'). Favorito pago no crédito pede o cartão: 'no cartão X' vai em conta. Não é lançamento novo (create_expense): é cópia de um que já existe, sempre com a data de hoje. Salvar, renomear ou apagar favorito é no app.\nMETA POR PRAZO OU POR MÊS, MARCOS, ÍCONE E COR: criar com prazo ('quero juntar 10 mil até dezembro de 2027') é resource_create goals com target_cents e deadline (o sistema calcula quanto dá por mês). Criar ou editar dizendo quanto guarda por mês ('quero juntar 10 mil guardando 500 por mês') usa mensal_cents (centavos) em vez de deadline (o sistema calcula quando chega). Se a meta JÁ EXISTE e a pessoa só pergunta ou diz quanto guarda por mês ('e se eu guardar 500 por mês na viagem?'): resource_list, resource=goals, name=a meta, mensal_cents. marcos (resource_update goals): lista separada por ponto e vírgula, cada item em porcentagem com % ('25%; 50%; 75%') ou em centavos ('250000'); lista completa que SUBSTITUI os atuais, ou 'nenhum' para tirar todos; para só acrescentar, cada item com + ('+90%'). icone: o nome do ícone em português ('avião', 'casa', 'carro'); cor: o nome da cor ('azul', 'verde'). Vazio ou 'padrão' remove. Nunca invente ícone: se não souber qual, deixe fora.\nRESERVA DE EMERGÊNCIA E PLANO DE METAS (só consulta): quando a pessoa chama de META ('quanto falta pra minha meta reserva?') não é este recurso: é consulta da meta, deixe fora daqui. 'minha reserva cobre quantos meses?', 'quanto falta pra minha reserva?' -> resource_list, resource=reserva. 'cabe no meu plano de metas?', 'quando o plano de metas aperta?' -> resource_list, resource=plano_metas. Nunca resource_create/update nesses dois: configurar é no app.\nDETALHE DA CATEGORIA (subcategoria) em recurring, rules e debts: subcategory_id é o NOME do detalhe que a pessoa disse ('feira', 'supermercado'); o sistema procura dentro da categoria e pergunta se não achar ou se houver dois parecidos. Nunca invente id; 'sem detalhe' ou vazio remove."
-        + "\nFAVORITO E CÓPIA DE LANÇAMENTO: o NOME vai SEMPRE em name (nunca em fields, nunca vazio quando a pessoa o disse). 'lança meu favorito Almoço' -> resource_update, resource=favoritos, name=Almoço, lancar=true; 'lança o favorito café da manhã de 12 reais' -> name=café da manhã, lancar=true, amount_cents=1200. 'repete o lançamento do mercado de ontem' -> resource_create, resource=duplicar, name=mercado, data_do_original=ontem; 'duplica a conta de luz' -> name=luz; 'lança de novo o aluguel' -> name=aluguel. Só 'repete o último lançamento' (sem nome) deixa name vazio. Gasto ou receita NOVO ('gastei 45 no mercado', 'paguei 30 de uber') NUNCA é duplicar nem favorito: duplicar só quando a pessoa pede para REPETIR um que já existe ('repete', 'duplica', 'de novo', 'igual ao de')."
+        + "\nREGRA DE NOTA x REGRA DE LANÇAMENTO (recurso rules): 'sempre que eu falar/citar X numa nota, põe na pasta Y', 'nota que fala de X vai pra pasta Y', 'tudo que citar X em nota coloca na pasta Y' -> resource_create, resource=rules, match_type=contains, pattern=X, folder_id=o NOME da pasta Y (sem category). 'tudo com uber vira transporte', 'gasto no ifood é alimentação' -> resource_create, resource=rules, match_type=contains, pattern, category (regra de lançamento, sem folder_id). Regra é uma coisa ou a outra, nunca as duas. Nota ou pasta NUNCA vira category. Listar regras mostra as duas.\nFAVORITO E CÓPIA DE LANÇAMENTO: o NOME vai SEMPRE em name (nunca em fields, nunca vazio quando a pessoa o disse). 'lança meu favorito Almoço' -> resource_update, resource=favoritos, name=Almoço, lancar=true; 'lança o favorito café da manhã de 12 reais' -> name=café da manhã, lancar=true, amount_cents=1200. 'repete o lançamento do mercado de ontem' -> resource_create, resource=duplicar, name=mercado, data_do_original=ontem; 'duplica a conta de luz' -> name=luz; 'lança de novo o aluguel' -> name=aluguel. Só 'repete o último lançamento' (sem nome) deixa name vazio. Gasto ou receita NOVO ('gastei 45 no mercado', 'paguei 30 de uber') NUNCA é duplicar nem favorito: duplicar só quando a pessoa pede para REPETIR um que já existe ('repete', 'duplica', 'de novo', 'igual ao de')."
     )

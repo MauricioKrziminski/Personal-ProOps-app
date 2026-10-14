@@ -83,10 +83,14 @@ def rota_interna(rota: str | None) -> bool:
 
 
 def responder(entradas: list[Entrada]) -> tuple[str, list[dict]]:
-    """(texto, links). Sem entrada: a resposta fixa do suporte."""
+    """(texto, links). Sem entrada: a resposta fixa do suporte.
+
+    O TEXTO é só o da melhor entrada (a primeira): juntar até três era o "muro de texto"; os
+    links continuam de todas, para quem quiser ir adiante.
+    """
     if not entradas:
         return SUPORTE, []
-    texto = "\n\n".join(e.resposta for e in entradas)
+    texto = entradas[0].resposta
     links: list[dict] = []
     for e in entradas:
         if rota_interna(e.rota) and all(l["rota"] != e.rota for l in links):

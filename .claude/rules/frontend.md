@@ -530,6 +530,11 @@ tela. Entradas sem rota órfã: todo ponto tem caminho a partir de Hoje, Finanç
 - Corrija o defeito, depois reconfira no MESMO aparelho: o passo errado do F21 e a celebração do F19
   só apareceram em vídeo quadro a quadro, não em captura parada.
 
+## Regras (`/finance/rules`, 13/10/2026)
+
+Duas seções, "Lançamentos" (palavra -> categoria) e "Notas" (palavra -> pasta), cada uma com vazio compacto; o formulário abre com
+`Segmented` Lançamento | Nota e, em Nota, só palavra e pasta (`SelectField`). Separação em `src/lib/regras.ts`.
+
 ## Estado local
 
 - Preferir estado de servidor (Query) + `useState`. Zustand só se estado global de UI real aparecer (hoje não há nenhum) — não criar store "por via das dúvidas".

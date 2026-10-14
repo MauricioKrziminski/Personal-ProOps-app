@@ -1721,8 +1721,9 @@ export type ImportItem = Pick<
 
 export type CategorizationRule = Pick<
   Tables['categorization_rules']['Row'],
-  'id' | 'pattern' | 'category' | 'account_id' | 'priority' | 'hits'
+  'id' | 'pattern' | 'category' | 'account_id' | 'priority' | 'hits' | 'folder_id'
 > & SubcategoryMetadata & { workspace_id?: string; subcategories?: { name: string } | null;
+  note_folders?: { name: string } | null;
   match_type: 'contains' | 'merchant' | 'regex'; source: 'user' | 'learned' };
 
 export interface ImportResult {
@@ -2026,7 +2027,7 @@ export function useRules() {
     queryFn: async (): Promise<CategorizationRule[]> => {
       const { data, error } = await supabase
         .from('categorization_rules')
-        .select('id, workspace_id, subcategory_id, subcategories!categorization_rules_subcategory_id_fkey(name), match_type, pattern, category, account_id, priority, hits, source')
+        .select('id, workspace_id, subcategory_id, subcategories!categorization_rules_subcategory_id_fkey(name), note_folders(name), match_type, pattern, category, folder_id, account_id, priority, hits, source')
         .order('priority')
         .order('hits', { ascending: false });
       if (error) throw error;
@@ -2053,18 +2054,22 @@ export function useSaveRule() {
     mutationFn: async (input: {
       id?: string;
       pattern: string;
-      category: string;
+      /** Regra de lançamento: a categoria. Regra de nota: `null` e `folderId`. */
+      category: string | null;
+      /** Regra de nota (palavra -> pasta): sem categoria, detalhe nem conta (o banco confere). */
+      folderId?: string | null;
       accountId?: string | null;
       workspaceId?: string;
     } & SubcategoryMetadata) => {
+      const alvo = input.folderId
+        ? { folder_id: input.folderId, category: null, account_id: null, subcategory_id: null }
+        : { folder_id: null, category: input.category, account_id: input.accountId ?? null, ...detalheDaEscrita(input) };
       if (input.id) {
         let request = supabase
           .from('categorization_rules')
           .update({
             pattern: input.pattern,
-            category: input.category,
-            account_id: input.accountId ?? null,
-            ...detalheDaEscrita(input),
+            ...alvo,
           })
           .eq('id', input.id);
         if (input.workspaceId) request = request.eq('workspace_id', input.workspaceId);
@@ -2077,10 +2082,8 @@ export function useSaveRule() {
           workspace_id: input.workspaceId ?? await workspaceId(),
           match_type: 'contains',
           pattern: input.pattern,
-          category: input.category,
-          account_id: input.accountId ?? null,
           source: 'user',
-          ...detalheDaEscrita(input),
+          ...alvo,
         });
         if (error) throw error;
       }

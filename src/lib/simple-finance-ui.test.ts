@@ -455,6 +455,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
       // A preferência gravada vale como `useState` dentro de uma visita; o disco tem teste próprio
       // (`use-preferencia.test.ts`).
       if (name === '@/lib/subcategories') return load('src/lib/subcategories.ts');
+      if (name === '@/lib/regras') return load('src/lib/regras.ts');
       if (name === '@/lib/category-detail-breakdown') return load('src/lib/category-detail-breakdown.ts');
       if (name === '@/hooks/use-category-details') return { useSubcategoryFilterOptions: () => ({ data: [], isError: false, isPending: false, isLoading: false, refetch: async () => {} }) };
       if (name === '@/hooks/use-subcategories') return { useSubcategories: () => ({ data: { workspace_id: '10000000-0000-4000-8000-000000000001', items: [] }, isError: false, isPending: false, isLoading: false, refetch: async () => {} }) };
@@ -3094,6 +3095,16 @@ test('Parcelada aberta: a paga com outro valor diz a diferença, e só ela', () 
   const apoio = (t: string) => itens.find((i: any) => i.titulo === t).apoio;
   assert.match(apoio('1ª parcela'), /pagou R\$ 10\.00 a menos/);
   assert.doesNotMatch(apoio('2ª parcela'), /pagou/);
+});
+
+test('Regras: regra de nota (palavra -> pasta) tem a sua seção, e cada seção sem regra tem vazio compacto', () => {
+  const ui = screen('src/app/finance/rules.tsx', { rules: [{ id: 'n1', pattern: 'proops', category: null, folder_id: 'f1', note_folders: { name: 'proops' }, match_type: 'contains', account_id: null, hits: 0, source: 'user' }] });
+  const linha = ui.nodes().find((n: any) => n.type === 'Row' && n.props.icon === 'folder' && /proops/.test(n.props.title));
+  assert.ok(linha, 'a regra de nota aparece como linha com a pasta');
+  assert.match(linha.props.title, /pasta proops/);
+  const vazios = ui.nodes().filter((n: any) => n.type === 'EmptyState');
+  assert.equal(vazios.length, 1, 'só a seção de lançamentos está vazia');
+  assert.ok(vazios.every((n: any) => n.props.compacto));
 });
 
 test('Regras: a lista vem aos poucos, com "Ver mais"', () => {

@@ -724,14 +724,20 @@ async def _pastas_do_workspace(workspace_id) -> list[str]:
 
     try:
         linhas = await db.fetch(
-            "select name from public.note_folders where workspace_id = %s "
-            "and archived_at is null order by pinned desc, name limit 40",
+            "select f.name, (select string_agg(r.pattern, ', ' order by r.priority, r.pattern) "
+            "from public.categorization_rules r where r.folder_id = f.id) as palavras "
+            "from public.note_folders f where f.workspace_id = %s "
+            "and f.archived_at is null order by f.pinned desc, f.name limit 40",
             workspace_id,
         )
     except Exception:  # noqa: BLE001 — contexto opcional nunca derruba o turno
         log.warning("não consegui listar as pastas; o turno segue sem elas")
         return []
-    return [linha["name"] for linha in linhas if linha.get("name")]
+    # " · notas que citam: ..." são as regras do usuário (o sistema já as aplica; o modelo só enxerga)
+    return [
+        linha["name"] + (f" · notas que citam: {linha['palavras']}" if linha.get("palavras") else "")
+        for linha in linhas if linha.get("name")
+    ]
 
 
 async def notes_node(state: AgentState) -> dict:

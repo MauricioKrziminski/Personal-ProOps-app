@@ -68,9 +68,47 @@ async def ensure_folder(
         return None
 
 
+async def _pasta_da_regra(ctx: ExecContext, conteudo: str, folder: str | None) -> dict | None:
+    """A pasta que a regra "nota que cita X vai para Y" manda, ou None.
+
+    Vale com pasta vazia OU com um nome que ainda não existe (o modelo inventou); pasta que já
+    existe e foi escolhida pelo modelo fica. Sob `AGENTE_RLS` a versão que confere a posse.
+    """
+    nome = normalize_folder(folder)
+    if nome and await db.fetch_one(
+        "select 1 as ok from public.note_folders where workspace_id = %s and name = %s",
+        ctx.workspace_id, nome,
+    ):
+        return None
+    funcao = "private.match_note_rule_do_membro" if db.rls_ativo() else "public._match_note_rule"
+    try:
+        regra = await db.fetch_one(
+            f"select rule_id, folder_id from {funcao}(%s, %s)",  # noqa: S608 — nome fixo acima
+            ctx.workspace_id, conteudo,
+        )
+        if not regra:
+            return None
+        pasta = await db.fetch_one(
+            "select id, name from public.note_folders where id = %s and workspace_id = %s",
+            regra["folder_id"], ctx.workspace_id,
+        )
+        if pasta:
+            # direto na tabela (a RPC de contador não é do `authenticated`); a RLS já escopa
+            await db.execute(
+                "update public.categorization_rules set hits = hits + 1 where id = %s and workspace_id = %s",
+                regra["rule_id"], ctx.workspace_id,
+            )
+        return pasta
+    except Exception as err:  # noqa: BLE001 — a regra nunca derruba a nota
+        log.warning("regra de nota ignorada: %s", err)
+        return None
+
+
 async def create_note(ctx: ExecContext, action: NotesAction) -> ToolResult:
     conteudo = guards.require_text(action.content, o_que="o que anotar", maximo=20_000)
-    pasta = await ensure_folder(ctx.workspace_id, ctx.user_id, action.folder)
+    pasta = await _pasta_da_regra(ctx, conteudo, action.folder)
+    if not pasta:
+        pasta = await ensure_folder(ctx.workspace_id, ctx.user_id, action.folder)
 
     row = await db.fetch_one(
         """
@@ -81,7 +119,7 @@ async def create_note(ctx: ExecContext, action: NotesAction) -> ToolResult:
         """,
         ctx.user_id, ctx.workspace_id, conteudo,
         # grava os DOIS durante a transição da 0038: binário antigo ainda lê `category`
-        normalize_folder(action.folder), pasta["id"] if pasta else None,
+        pasta["name"] if pasta else normalize_folder(action.folder), pasta["id"] if pasta else None,
     )
     onde = f" em *{pasta['name']}*" if pasta else ""
     return ToolResult(

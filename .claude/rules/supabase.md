@@ -88,6 +88,11 @@ obrigatório). Não reintroduza `service_role` no app: a RLS é o que protege o 
 CORPO e confiava neles — qualquer autenticado escrevia no workspace de outro.
 `src/lib/anti-slop.test.ts` quebra o build se isso voltar.
 
+## Regra de nota (`20261013150000`)
+
+`categorization_rules.folder_id` (cascade com a pasta); `check` de exclusividade com categoria/conta/detalhe; o unique agora
+inclui `(folder_id is null)`, então o mesmo termo pode ser regra de lançamento E de nota. Teste: `supabase/tests/regra_de_nota.sql`.
+
 ## Segredos
 
 - Segredos (Gemini, Groq, WhatsApp, hooks, DATABASE_URL, THREAD_SALT) no **GCP Secret Manager**,

@@ -606,6 +606,15 @@ pede confirmação explícita.
 dentro de um banco, e os bancos são outros), mas se um dia for rotacionado, rotacione um de cada
 vez e saiba que sessões e confirmações pendentes daquele ambiente recomeçam.
 
+## Regra de nota -> pasta e ajuda curta (13/10/2026)
+
+- `categorization_rules.folder_id` (regra "nota que cita X vai para a pasta Y"; sem categoria/conta, o `check` confere)
+  mora na MESMA tabela das regras de lançamento. `_match_rule` ignora regras com pasta; `_match_note_rule` (e o
+  `private.match_note_rule_do_membro` sob `AGENTE_RLS`) acha a de nota. `notes.create_note` aplica a regra quando a
+  pasta vem vazia ou NÃO existe; pasta existente escolhida pelo modelo fica. O bloco de pastas do `user_turn` leva
+  " · notas que citam: ..." (dentro do envelope `folder_names`). `resource_create rules` aceita `folder_id` (nome) OU `category`.
+- `ajuda.responder`: o TEXTO é só o da melhor entrada; os LINKS continuam de todas (até 3). Entrada nova do catálogo: curta.
+
 ## Qualidade
 
 `.venv/bin/pytest` verde antes de commitar. Teste que fala com rede ou banco não entra: os nós que

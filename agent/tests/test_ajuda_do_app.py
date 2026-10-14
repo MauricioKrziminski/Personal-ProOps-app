@@ -29,7 +29,10 @@ def _modelo(monkeypatch, **kw):
 async def test_ids_validos_viram_texto_do_catalogo(monkeypatch):
     _modelo(monkeypatch, ids=["cartoes", "fatura"])
     r = await nodes.general_node({"text": "como cadastro um cartão?", "domains": ["geral"]})
-    assert r["results"] == [POR_ID["cartoes"].resposta + "\n\n" + POR_ID["fatura"].resposta]
+    # o TEXTO é só o da melhor entrada; os links continuam de todas (até 3)
+    assert r["results"] == [POR_ID["cartoes"].resposta]
+    assert [l["rota"] for l in ajuda.responder([POR_ID["cartoes"], POR_ID["fatura"]])[1]] == [
+        POR_ID["cartoes"].rota, POR_ID["fatura"].rota]
     assert r["llm_calls"] == 1
 
 

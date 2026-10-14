@@ -50,6 +50,7 @@ from app.tools import movimentos, resources  # noqa: E402
 from app.tools.guards import Level1Error  # noqa: E402
 
 PASTAS = ["mercado", "trabalho", "ideias"]
+PALAVRAS = {"trabalho": "reunião, cliente"}  # regras de nota (palavra -> pasta) da pasta
 WS = "20000000-0000-0000-0000-000000000001"
 BASE = {"timezone": "America/Sao_Paulo", "workspace_id": WS, "user_id": WS,
         "phone": None, "source_message_id": "avaliacao", "results": []}
@@ -63,7 +64,7 @@ async def _sem_banco(sql, *a, **kw):
     comportamento que a lista existe para substituir.
     """
     if "note_folders" in sql and "name" in sql:
-        return [{"name": nome} for nome in PASTAS]
+        return [{"name": nome, "palavras": PALAVRAS.get(nome)} for nome in PASTAS]
     return []
 
 
@@ -525,6 +526,13 @@ def secoes():
             for t, e in [("anota na pasta do mercado: comprar pão", "mercado"),
                          ("põe na pasta de ideias: app de receitas", "ideias")]
         ],
+        # A linha da pasta traz as regras ("trabalho · notas que citam: reunião, cliente"): o nome é só o
+        # que vem antes do " · " e a regra manda a nota, mesmo sem o usuário citar a pasta.
+        "notas/pasta com regra": [
+            (t, lambda a: bool(a) and (a.get("folder") or "").lower() == "trabalho", "pasta=trabalho (exato)",
+             lambda t=t: _nota(t))
+            for t in ["anota: reunião com o cliente sexta às 10", "anota que o cliente pediu desconto"]
+        ],
         "notas/fixar": [
             (t, _campo("notes", "pinned", "true"), "notes.pinned=true",
              lambda t=t: _recurso(t))
@@ -721,6 +729,27 @@ def secoes():
             (t, lambda o: not (o and "encerrar_em" in o), "não encerra", lambda t=t: _recurso(t))
             for t in ["pausa a netflix por um tempo", "muda o valor da netflix para 55,90",
                       "quanto falta pra acabar a série do aluguel?"]
+        ],
+        # Regra de NOTA (pasta) x regra de LANÇAMENTO (categoria): mesma tabela, destinos diferentes.
+        # O erro de 13/10/2026: "sempre que eu citar proops numa nota, põe na pasta proops" virou
+        # regra de categoria "proops".
+        "regras/nota vai para pasta": [
+            (t, lambda o, e=e: bool(o) and o.get("resource") == "rules" and o.get("type") == "resource_create"
+             and e in str(o.get("folder_id", "")).lower().replace("ú", "u") and not o.get("category"),
+             f"folder_id~{e}, sem categoria", lambda t=t: _recurso(t))
+            for t, e in [("Sempre que eu citar algo relacionado a proops em uma nota, coloque direto na pasta proops criada", "proops"),
+                         ("nota que falar de academia vai pra pasta saúde", "saude"),
+                         ("quando eu anotar algo sobre dentista, põe na pasta saúde", "saude")]
+        ] + [
+            (t, lambda d: "cadastros" in d, "cadastros", lambda t=t: _dominios(t))
+            for t in ["Sempre que eu citar algo relacionado a proops em uma nota, coloque direto na pasta proops criada"]
+        ],
+        "regras/lançamento continua categoria": [
+            (t, lambda o, e=e: bool(o) and o.get("resource") == "rules" and o.get("type") == "resource_create"
+             and e in str(o.get("category", "")).lower() and not o.get("folder_id"),
+             f"category~{e}, sem pasta", lambda t=t: _recurso(t))
+            for t, e in [("tudo com uber vira transporte", "transporte"),
+                         ("cria uma regra: ifood é alimentação", "alimenta")]
         ],
         # Detalhe pelo NOME: nunca um id inventado. "Tira o detalhe" é vazio, não um nome.
         "loteA/detalhe pelo nome": [

@@ -5,6 +5,7 @@ import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import * as preview from './import-preview.ts';
 import * as subcategories from './subcategories.ts';
+import * as regras from './regras.ts';
 import * as escrita from './escrita.ts';
 import * as categories from './categories-merge.ts';
 const ws='10000000-0000-4000-8000-000000000001';
@@ -31,6 +32,7 @@ function mount(screen:'rules'|'import', options:{missingWorkspace?:boolean;legac
   if(name==='react-native-reanimated')return {default:{View:'Animated.View'},FadeInDown:{duration:()=>({delay:()=>null})}};
   if(name==='expo-haptics')return {notificationAsync:()=>{},NotificationFeedbackType:{Success:'success'}};
   if(name==='@/hooks/use-finance')return new Proxy(hooks,{get:(h,key)=>h[String(key)]??(()=>mutation(String(key)))});
+  if(name==='@/hooks/use-notes')return {useNoteFolders:()=>query([])};
   if(name==='@/hooks/use-subcategories')return {useSubcategories:()=>query({workspace_id:ws,items:[]})};
   if(name==='@/hooks/use-adaptive-window')return {useAdaptiveWindow:()=>({windowClass:'compact'})};
   if(name==='@/hooks/use-lock')return {useLock:()=>({semTrancar:(fn:any)=>fn()})};
@@ -38,6 +40,7 @@ function mount(screen:'rules'|'import', options:{missingWorkspace?:boolean;legac
   if(name==='@/hooks/use-items')return {formatDateBR:(x:any)=>x};
   if(name==='@/lib/import-preview')return preview;
   if(name==='@/lib/subcategories')return subcategories;
+  if(name==='@/lib/regras')return regras;
   if(name==='@/lib/escrita')return escrita;
   if(name==='@/lib/categories-merge')return categories;
   if(name==='@/lib/item-actions')return {showItemActions:(_t:any,list:any[])=>{actions=list;},confirmDestructive:()=>{}};

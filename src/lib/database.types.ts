@@ -1250,6 +1250,7 @@ export type Database = {
           account_id: string | null
           category: string | null
           created_at: string
+          folder_id: string | null
           hits: number
           id: string
           match_type: string
@@ -1266,6 +1267,7 @@ export type Database = {
           account_id?: string | null
           category?: string | null
           created_at?: string
+          folder_id?: string | null
           hits?: number
           id?: string
           match_type?: string
@@ -1282,6 +1284,7 @@ export type Database = {
           account_id?: string | null
           category?: string | null
           created_at?: string
+          folder_id?: string | null
           hits?: number
           id?: string
           match_type?: string
@@ -1300,6 +1303,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "categorization_rules_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "note_folders"
             referencedColumns: ["id"]
           },
           {
@@ -4443,6 +4453,13 @@ export type Database = {
         }[]
       }
       _liquidar_faturas_vencidas: { Args: never; Returns: number }
+      _match_note_rule: {
+        Args: { texto: string; ws: string }
+        Returns: {
+          folder_id: string
+          rule_id: string
+        }[]
+      }
       _match_rule: {
         Args: { texto: string; ws_id: string }
         Returns: {

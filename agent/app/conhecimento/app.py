@@ -31,15 +31,9 @@ CATALOGO: tuple[Entrada, ...] = (
         "agente_faz", "O que o agente faz",
         ("o que você consegue fazer?", "como você funciona?", "me ajuda", "quem é você?",
          "você lança parcelado?", "o que posso pedir pra você?"),
-        "👋 Eu organizo suas finanças e suas notas por aqui. Manda coisas como:\n"
-        "  • \"gastei 45 no mercado\"\n"
-        "  • \"recebi 500 de freela\"\n"
-        "  • \"comprei um celular em 10x de 300 no nubank\"\n"
-        "  • \"me lembra de pagar o aluguel todo dia 5\"\n"
-        "  • \"anota: ligar pro dentista\"\n"
-        "  • \"quanto gastei esse mês?\" ou \"qual a fatura do nubank?\"\n"
-        "Também corrijo, apago, cadastro conta, cartão, meta e orçamento. Tudo que muda algo "
-        "eu confirmo com você antes (responda *sim*).",
+        "👋 Eu lanço gastos, guardo notas e crio lembretes por mensagem. Ex.: \"gastei 45 no mercado\", "
+        "\"anota: ligar pro dentista\", \"quanto gastei esse mês?\". Antes de mudar algo eu confirmo "
+        "(responda *sim*).",
     ),
     Entrada(
         "agente_nao_faz", "O que o agente não faz",
@@ -239,7 +233,8 @@ CATALOGO: tuple[Entrada, ...] = (
         ("como crio uma categoria?", "como renomeio uma categoria?", "como faço o app categorizar sozinho?",
          "como junto duas categorias?"),
         "*Perfil → Categorias* para criar, renomear, trocar ícone e cor ou juntar. "
-        "*Perfil → Regras* categoriza sozinho por palavra (ex.: tudo com \"uber\" vira transporte).",
+        "*Perfil → Regras* categoriza sozinho por palavra (ex.: tudo com \"uber\" vira transporte) e "
+        "manda a nota que cita uma palavra para a pasta que você escolher.",
         "/finance/categories", "Categorias",
     ),
     Entrada(

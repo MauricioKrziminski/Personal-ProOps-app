@@ -40,8 +40,8 @@ class Banco:
         if "from public.note_folders" in sql and "(id::text = %s or name = %s)" in sql:
             nome = args[2]
             return [{"id": self.pastas[nome], "name": nome}] if nome in self.pastas else []
-        if "select name from public.note_folders" in sql:
-            return [{"name": n} for n in self.pastas]
+        if "from public.note_folders f" in sql:
+            return [{"name": n, "palavras": None} for n in self.pastas]
         return []
 
     async def fetch_one(self, sql, *args):

@@ -1045,7 +1045,7 @@ async def set_rule(ctx: ExecContext, action: FinanceAction) -> ToolResult:
         insert into public.categorization_rules
           (workspace_id, user_id, match_type, pattern, category, source)
         values (%s, %s, 'contains', %s, %s, 'user')
-        on conflict (workspace_id, match_type, pattern)
+        on conflict (workspace_id, match_type, pattern, (folder_id is null))
           do update set category = excluded.category
         returning id
         """,

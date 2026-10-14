@@ -8,6 +8,10 @@ import { ErrorCard } from '@/components/error-card';
 import { CategoryPicker } from '@/components/finance/category-picker';
 import { SubcategoryField } from '@/components/finance/subcategory-field';
 import { useSubcategories } from '@/hooks/use-subcategories';
+import { useNoteFolders } from '@/hooks/use-notes';
+import { Segmented } from '@/components/ui/segmented';
+import { SelectField } from '@/components/ui/select-field';
+import { separaRegras, tipoDaRegra, type TipoDeRegra } from '@/lib/regras';
 import { subcategoryAfterParentChange } from '@/lib/subcategories';
 import { detalheDaEscrita } from '@/lib/escrita';
 import { foldCategory } from '@/lib/categories-merge';
@@ -42,7 +46,7 @@ import { AccountPicker } from '@/components/finance/account-picker';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { transicaoDeLayout } from '@/components/motion/transicao';
 
-/** Postgres: violação de unique. Aqui só pode ser `(workspace_id, match_type, pattern)` da `0017`. */
+/** Postgres: violação de unique. Aqui só pode ser `categorization_rules_ws_tipo_pattern_uq` (o termo, por lançamento ou nota). */
 const UNIQUE_VIOLATION = '23505';
 
 function ehGatilhoRepetido(err: unknown): boolean {
@@ -58,9 +62,12 @@ interface Rascunho {
   pattern: string;
   category: string | null;
   accountId: string | null;
+  /** Regra de nota (palavra -> pasta) ou de lançamento (palavra -> categoria): mesma tabela. */
+  tipo: TipoDeRegra;
+  folderId: string | null;
 }
 
-const VAZIO: Rascunho = { pattern: '', category: null, accountId: null };
+const VAZIO: Rascunho = { pattern: '', category: null, accountId: null, tipo: 'lancamento', folderId: null };
 
 /**
  * Regras de categoria — a resposta do produto à queixa nº1 contra os concorrentes:
@@ -76,6 +83,7 @@ export default function RulesScreen() {
   const tablet = windowClass !== 'compact';
   const { data: rules, isLoading, isError, refetch } = useRules();
   const { data: accounts } = useAccounts();
+  const { data: pastas } = useNoteFolders();
   const save = useSaveRule();
   const remove = useDeleteRule();
 
@@ -102,12 +110,14 @@ export default function RulesScreen() {
   const lista = isError ? [] : (rules ?? []);
   const totalHits = lista.reduce((soma, r) => soma + (r.hits ?? 0), 0);
   const ativas = lista.filter((r) => (r.hits ?? 0) > 0).length;
-  const podeSalvar = (rascunho?.pattern.trim().length ?? 0) >= 2 && Boolean(rascunho?.category);
+  const ehNota = rascunho?.tipo === 'nota';
+  const podeSalvar = (rascunho?.pattern.trim().length ?? 0) >= 2
+    && Boolean(ehNota ? rascunho?.folderId : rascunho?.category);
 
   const nomeConta = (id: string | null) =>
     id ? ((accounts ?? []).find((c) => c.id === id)?.name ?? 'conta') : null;
 
-  const abrir = (rule?: CategorizationRule) => {
+  const abrir = (rule?: CategorizationRule, tipo: TipoDeRegra = 'lancamento') => {
     visita.current += 1;
     setDetailVisit(visita.current);
     gravando.current = false;
@@ -121,8 +131,10 @@ export default function RulesScreen() {
             pattern: rule.pattern,
             category: rule.category,
             accountId: rule.account_id,
+            tipo: tipoDaRegra(rule),
+            folderId: rule.folder_id ?? null,
           }
-        : VAZIO
+        : { ...VAZIO, tipo }
     );
   };
 
@@ -135,7 +147,8 @@ export default function RulesScreen() {
   };
 
   const salvar = () => {
-    if (!rascunho || !podeSalvar || gravando.current || save.isPending || !detailWorkspace) return;
+    if (!rascunho || !podeSalvar || gravando.current || save.isPending) return;
+    if (!ehNota && !detailWorkspace) return;
     const owner = visita.current;
     gravando.current = true;
     setErroSalvar(null);
@@ -143,10 +156,11 @@ export default function RulesScreen() {
       {
         id: rascunho.id,
         pattern: rascunho.pattern.trim(),
-        category: rascunho.category!,
-        accountId: rascunho.accountId,
-        workspaceId: detailWorkspace,
-        ...detalheDaEscrita(rascunho),
+        category: ehNota ? null : rascunho.category!,
+        folderId: ehNota ? rascunho.folderId : null,
+        accountId: ehNota ? null : rascunho.accountId,
+        workspaceId: ehNota ? rascunho.workspaceId : detailWorkspace,
+        ...(ehNota ? {} : detalheDaEscrita(rascunho)),
       },
       {
         onSuccess: () => {
@@ -163,10 +177,11 @@ export default function RulesScreen() {
           if (ehGatilhoRepetido(err)) {
             const existente = lista.find(
               (r) => r.pattern.toLowerCase() === rascunho.pattern.trim().toLowerCase()
+                && tipoDaRegra(r) === rascunho.tipo
             );
             setErroSalvar(
               existente
-                ? <>Já existe uma regra para <Forte>{existente.pattern}</Forte> → {existente.category ?? 'sem categoria'}. Edite ela em vez de criar outra.</>
+                ? <>Já existe uma regra para <Forte>{existente.pattern}</Forte> → {destinoDaRegra(existente)}. Edite ela em vez de criar outra.</>
                 : 'Já existe uma regra com esse gatilho.'
             );
             return;
@@ -180,7 +195,9 @@ export default function RulesScreen() {
 
   const apagar = (rule: CategorizationRule) =>
     confirmDestructive(
-      `Parar de categorizar ${rule.pattern} automaticamente?`,
+      tipoDaRegra(rule) === 'nota'
+        ? `Parar de mandar para a pasta as notas que citam ${rule.pattern}?`
+        : `Parar de categorizar ${rule.pattern} automaticamente?`,
       'Apagar regra',
       () =>
         remove.mutate(rule.id, {
@@ -188,11 +205,15 @@ export default function RulesScreen() {
           // Hoje apagar falha em silêncio: a linha some da UI e volta na próxima query.
           onError: () => toast({ message: 'Não deu para apagar a regra.', tone: 'error' }),
         }),
-      'Os lançamentos já categorizados continuam como estão.'
+      tipoDaRegra(rule) === 'nota'
+        ? 'As notas já guardadas continuam onde estão.'
+        : 'Os lançamentos já categorizados continuam como estão.'
     );
 
   /** O menu da regra, UMA lista para o toque longo e o arrasto. */
-  const tituloDaRegra = (rule: CategorizationRule) => `${rule.pattern} → ${rule.category ?? 'sem categoria'}`;
+  const destinoDaRegra = (rule: CategorizationRule) =>
+    tipoDaRegra(rule) === 'nota' ? `pasta ${rule.note_folders?.name ?? ''}`.trim() : (rule.category ?? 'sem categoria');
+  const tituloDaRegra = (rule: CategorizationRule) => `${rule.pattern} → ${destinoDaRegra(rule)}`;
   const acoesDaRegra = (rule: CategorizationRule): ItemAction[] => [
     { label: 'Editar', icon: 'pencil', arrasto: 'direita', onPress: () => abrir(rule) },
     { label: 'Apagar', icon: 'trash', destructive: true, arrasto: 'esquerda', onPress: () => apagar(rule) },
@@ -241,48 +262,67 @@ export default function RulesScreen() {
     </Animated.View>
   ) : null;
   // Aos poucos (24/09/2026): o agente cria regra sozinho, e a lista cresce.
-  const regras = useAosPoucos(lista);
-  const regraRows = lista.length > 0 ? (
+  const { lancamentos, notas } = separaRegras(lista);
+  const regrasDeLancamento = useAosPoucos(lancamentos);
+  const regrasDeNota = useAosPoucos(notas);
+  const secao = (
+    titulo: string,
+    tipo: TipoDeRegra,
+    janela: ReturnType<typeof useAosPoucos<CategorizationRule>>,
+    total: number,
+    vazioTitulo: string,
+    vazioDica: string,
+  ) => (
     <View style={styles.lista}>
-    <Section title="Suas regras">
-      {regras.visiveis.map((rule, index) => (
-        <Animated.View
-          key={rule.id}
-          layout={transicaoDeLayout}
-          entering={FadeInDown.duration(Motion.duration.slow).delay(
-            Math.min(index * Motion.stagger.step, Motion.stagger.cap)
-          )}
-        >
-          <Deslizavel titulo={tituloDaRegra(rule)} acoes={acoesDaRegra(rule)}>
-          <Row
-            title={`${rule.pattern}  →  ${rule.category ?? 'sem categoria'}`}
-            subtitle={legenda(rule)}
-            icon="text.badge.checkmark"
-            chevron={false}
-            accessibilityLabel={`Quando contiver ${rule.pattern}, categorizar como ${rule.category ?? 'sem categoria'}, ${legenda(rule)}`}
-            onPress={() => abrir(rule)}
-            onLongPress={() => acoes(rule)}
-          />
-          </Deslizavel>
-        </Animated.View>
-      ))}
-    </Section>
-    <VerMais restantes={regras.restantes} onPress={regras.verMais} />
+      <Section title={titulo}>
+        {janela.visiveis.map((rule, index) => (
+          <Animated.View
+            key={rule.id}
+            layout={transicaoDeLayout}
+            entering={FadeInDown.duration(Motion.duration.slow).delay(
+              Math.min(index * Motion.stagger.step, Motion.stagger.cap)
+            )}
+          >
+            <Deslizavel titulo={tituloDaRegra(rule)} acoes={acoesDaRegra(rule)}>
+              <Row
+                title={`${rule.pattern}  →  ${destinoDaRegra(rule)}`}
+                subtitle={legenda(rule)}
+                icon={tipo === 'nota' ? 'folder' : 'text.badge.checkmark'}
+                chevron={false}
+                accessibilityLabel={tipo === 'nota'
+                  ? `Quando a nota citar ${rule.pattern}, guardar na ${destinoDaRegra(rule)}, ${legenda(rule)}`
+                  : `Quando contiver ${rule.pattern}, categorizar como ${destinoDaRegra(rule)}, ${legenda(rule)}`}
+                onPress={() => abrir(rule)}
+                onLongPress={() => acoes(rule)}
+              />
+            </Deslizavel>
+          </Animated.View>
+        ))}
+      </Section>
+      {total === 0 ? (
+        <EmptyState
+          compacto
+          icon={tipo === 'nota' ? 'folder' : 'text.badge.checkmark'}
+          title={vazioTitulo}
+          hint={vazioDica}
+          action={{ label: 'Nova regra', onPress: () => abrir(undefined, tipo) }}
+        />
+      ) : null}
+      <VerMais restantes={janela.restantes} onPress={janela.verMais} />
     </View>
+  );
+  const mostraSecoes = !isLoading && !isError;
+  const regraRows = mostraSecoes ? (
+    <>
+      {secao('Lançamentos', 'lancamento', regrasDeLancamento, lancamentos.length,
+        'Nenhuma regra de lançamento', 'Ex.: *posto* sempre vira transporte.')}
+      {secao('Notas', 'nota', regrasDeNota, notas.length,
+        'Nenhuma regra de nota', 'Ex.: nota que cita *academia* vai para a pasta saúde.')}
+    </>
   ) : null;
-  const vazio = !isLoading && !isError && lista.length === 0 ? (
-    <EmptyState
-      icon="text.badge.checkmark"
-      title="Nenhuma regra ainda"
-      hint={
-        'Ex.: *posto* sempre vira transporte.'
-      }
-      action={{ label: 'Nova regra', onPress: () => abrir() }}
-    />
-  ) : null;
-  const ruleList = <View style={styles.paneBody}>{erro}{loading}{regraRows}{vazio}</View>;
+  const ruleList = <View style={styles.paneBody}>{erro}{loading}{regraRows}</View>;
   const ruleContext = <View style={styles.paneBody}>{faixa}{destaque}</View>;
-  const compactBody = <>{faixa}{erro}{loading}{destaque}{regraRows}{vazio}</>;
+  const compactBody = <>{faixa}{erro}{loading}{destaque}{regraRows}</>;
   const tabletBody = (
     <AdaptivePanes
       main={ruleList}
@@ -316,7 +356,7 @@ export default function RulesScreen() {
                 label="Salvar"
                 size="sm"
                 loading={save.isPending}
-                disabled={!podeSalvar || !detailWorkspace}
+                disabled={!podeSalvar || (!ehNota && !detailWorkspace)}
                 onPress={salvar}
               />
             }
@@ -326,8 +366,16 @@ export default function RulesScreen() {
             contentContainerStyle={[styles.sheetBody, { paddingBottom: Space.xxl }]}
             keyboardShouldPersistTaps="handled"
           >
+            <Segmented
+              options={[
+                { value: 'lancamento', label: 'Lançamento' },
+                { value: 'nota', label: 'Nota' },
+              ]}
+              value={rascunho?.tipo ?? 'lancamento'}
+              onChange={(tipo) => setRascunho((atual) => (atual ? { ...atual, tipo } : atual))}
+            />
             <Field
-              label="Quando o lançamento contiver" obrigatorio
+              label={ehNota ? 'Quando a nota citar' : 'Quando o lançamento contiver'} obrigatorio
               error={erroSalvar ?? undefined}
             >
               <TextField
@@ -343,6 +391,17 @@ export default function RulesScreen() {
               />
             </Field>
 
+            {ehNota ? (
+              <Field label="Guardar na pasta" obrigatorio>
+                <SelectField
+                  options={(pastas ?? []).map((f) => ({ id: f.id, label: f.name, icon: 'folder' as const }))}
+                  value={rascunho?.folderId ?? null}
+                  onChange={(folderId) => setRascunho((atual) => (atual ? { ...atual, folderId } : atual))}
+                  placeholder="Escolher pasta"
+                />
+              </Field>
+            ) : (
+            <>
             <Field label="Categorizar como" obrigatorio error={!detailWorkspace && rascunho?.id
               ? 'Não consegui conferir o espaço desta regra. Reabra a lista para tentar novamente.'
               : !rascunho?.id && defaultDetails.isError ? 'Não consegui consultar os detalhes. Tente novamente.' : undefined}>
@@ -387,6 +446,8 @@ export default function RulesScreen() {
                 />
               </Field>
             ) : null}
+            </>
+            )}
           </SheetScroll>
       </Sheet>
     </Screen>

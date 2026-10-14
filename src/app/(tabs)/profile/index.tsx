@@ -492,7 +492,7 @@ export default function ProfileScreen() {
       <Section heading="block" title="Finanças">
         {cicloConfig}
         <Row title="Categorias" subtitle="Ícone, cor, renomear e juntar" icon="tag" onPress={() => router.push('/finance/categories')} />
-        <Row title="Regras" subtitle="Categoria automática por palavra" icon="wand.and.stars" onPress={() => router.push('/finance/rules')} />
+        <Row title="Regras" subtitle="Categoria ou pasta por palavra" icon="wand.and.stars" onPress={() => router.push('/finance/rules')} />
         <Row title="Importar extrato" icon="square.and.arrow.down" onPress={() => router.push('/import')} />
         <Row title="Importações" icon="clock.arrow.circlepath" onPress={() => router.push('/import-history')} />
         {capturaDisponivel() ? (
