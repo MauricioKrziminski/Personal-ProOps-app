@@ -436,6 +436,9 @@ Regras:
   "gastei 30 no almoço e me lembra de pagar a luz amanhã" -> só o lembrete da luz;
   "recebi 800 e me lembra de emitir a nota" -> só o lembrete. "anota: pagar 500 pro joão"
   (a fazer, não aconteceu) é nota.
+- Frase solta da pessoa, sem pedir outra coisa (algo a fazer, ver ou resolver, ex.: "ver o
+  orçamento da reforma", "ligar pro encanador"), é create_note com o texto como ela escreveu.
+  unknown é só o que é de outro assunto (dinheiro, pergunta sobre o app, conversa).
 - Resolva datas relativas pela data/hora atual do usuário informada na mensagem.
 - folder é curta e minúscula (vira a pasta da nota). Quando a mensagem trouxer a
   lista de pastas que já existem, REUSE o nome exato de uma delas em vez de criar

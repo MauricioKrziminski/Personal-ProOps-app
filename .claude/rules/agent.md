@@ -490,6 +490,10 @@ deixe nada escapar"*).** O modelo interpreta; o código lê QUANTO e valida a es
   `general_node` responde dos ids sem segunda chamada. Fica num NÓ porque o `dominio` reexecuta do começo quando é respondido.
   Modelo fora do ar = não pergunta, ajuda geral. Agradecimento: entrada `agradecimento` (resposta curta, sem rota) e o
   "valeu"/"obrigado" exato responde igual, sem modelo.
+- **A escolha da pergunta de domínio vale** (`dominio_escolhido`, 14/10/2026): "Como nota" com o parse de notas
+  vazio vira `create_note` com o texto da pessoa (o SIM mostra); "Como gasto/receita" sem valor pede o valor em vez
+  de cair na ajuda. Antes as duas respondiam "fale com o suporte". O aviso do lembrete deixado de lado sai UMA vez
+  (com SIM em `avisos`, sem SIM em `results`; nos dois ele voltava no resume).
 - **`compose` não devolve mais `llm_calls: 0`**: o 0 explícito ZERA o reducer (`_soma_no_turno`) e apagava as chamadas dos
   nós anteriores (turno fora de `ai_events` e da cota). Vinha de 13/10/2026.
 - Eval: `evaluate_conversation_understanding.py` compara a conta RESOLVIDA (`card_purchase`), mede o DESFECHO do

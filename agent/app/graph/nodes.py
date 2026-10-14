@@ -901,6 +901,10 @@ async def notes_node(state: AgentState) -> dict:
     )
     plano: NotesPlan = await modelo.ainvoke([("system", NOTES), ("human", humano)])
     acoes = [a for a in plano.actions if a.type.value != "unknown"]
+    texto = (state.get("text") or "").strip()
+    if not acoes and not pendentes and state.get("dominio_escolhido") == "notas" and texto:
+        # a PESSOA escolheu "Como nota": o que ela escreveu é a nota, e o SIM mostra antes de gravar
+        acoes = [NotesAction(type="create_note", content=texto)]
     if pendentes and plano.actions and not acoes:
         # o modelo não soube o que fazer com a mensagem (`unknown`): o lembrete segue pendente e a
         # pergunta volta, com a saída
@@ -1226,7 +1230,7 @@ async def domain_gate(state: AgentState) -> dict:
     escolhido = escolha.get("candidate_id") if isinstance(escolha, dict) else escolha
     if escolhido in {o["id"] for o in opcoes}:
         # confiança 1.0: quem decidiu foi o usuário, não o modelo
-        return {"domains": [escolhido], "confidence": 1.0}
+        return {"domains": [escolhido], "confidence": 1.0, "dominio_escolhido": escolhido}
     return {"results": ["👍 Ok, não registrei nada."], "halted": True}
 
 
@@ -2115,6 +2119,10 @@ async def compose(state: AgentState) -> dict:
         return ret
     linhas = [l for l in state.get("results", []) if l]
     extra: dict = {}
+    if not linhas and state.get("dominio_escolhido") == "financas":
+        # a PESSOA disse que era gasto/receita e o parse não achou o que registrar: pedir o que falta, não a ajuda
+        linhas = ["Não achei o valor para registrar como gasto ou receita. Me manda com o valor, por exemplo"
+                  " *gastei 50 no mercado*. Ainda não registrei nada."]
     if not linhas:
         # Turno que terminou só com `unknown`: em vez do "não entendi" fixo, a mesma escolha do
         # catálogo ("onde faço X?" que o parse não reconheceu como ação).

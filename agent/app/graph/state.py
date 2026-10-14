@@ -145,6 +145,10 @@ class AgentState(TypedDict, total=False):
     # entrada (fora do app ou sem resposta). `general_node` responde destes ids sem chamar o modelo de novo.
     ajuda_ids: list[str] | None
 
+    # Domínio que a PESSOA escolheu na pergunta "Como você quer registrar isso?" (`domain_gate`). Com "notas", o
+    # parse de notas não pode descartar a frase: ela vira a nota (14/10/2026, "Como nota" respondia o suporte).
+    dominio_escolhido: str | None
+
     # extração incompleta a guardar como rascunho (o worker é quem grava)
     draft: Annotated[dict, _replace]
 

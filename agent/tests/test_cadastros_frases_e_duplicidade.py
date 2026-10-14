@@ -221,3 +221,30 @@ def test_aviso_vai_antes_da_pergunta_do_sim():
     assert com["text"].startswith("Deixei de lado Y.")
     assert _com_avisos("Confirma X?", ["A."]) == "A.\n\nConfirma X?"
     assert _com_avisos(botoes, []) is botoes
+
+
+# --- a pessoa escolheu "Como nota" --------------------------------------------------------------
+
+
+async def test_escolha_como_nota_vira_a_nota_mesmo_com_o_parse_vazio(notas):
+    # 14/10/2026: "testar o aplicativo do banco novo" → "Como nota" → o parse devolvia unknown e o turno
+    # caía no "fale com o suporte". A escolha é da pessoa: o texto dela vira a nota (o SIM mostra antes).
+    notas(NotesAction(type="unknown"))
+    st = {"workspace_id": "w1", "timezone": SP, "text": "testar o aplicativo do banco novo", "messages": None,
+          "dominio_escolhido": "notas"}
+    (a,) = (await nodes.notes_node(st))["notes_actions"]
+    assert a["type"] == "create_note" and a["content"] == "testar o aplicativo do banco novo"
+
+
+async def test_sem_escolha_o_parse_vazio_continua_vazio(notas):
+    notas(NotesAction(type="unknown"))
+    st = {"workspace_id": "w1", "timezone": SP, "text": "oi", "messages": None}
+    assert (await nodes.notes_node(st))["notes_actions"] == []
+
+
+async def test_escolha_como_gasto_sem_valor_pede_o_valor_e_nao_a_ajuda(monkeypatch):
+    async def nunca(_st):
+        raise AssertionError("não chama a ajuda")
+    monkeypatch.setattr(nodes, "_ajuda_do_catalogo", nunca)
+    saida = await nodes.compose({"results": [], "messages": [], "dominio_escolhido": "financas"})
+    assert "Não achei o valor" in saida["reply"] and "Ainda não registrei nada" in saida["reply"]

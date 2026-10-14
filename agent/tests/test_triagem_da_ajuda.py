@@ -97,6 +97,7 @@ async def test_fora_do_app_e_a_pessoa_diz_que_e_uma_nota(grafo, escolher):
     await grafo.ainvoke(geral("testar o aplicativo do banco novo"), config=cfg)
     final = await grafo.ainvoke(Command(resume="notas"), config=cfg)
     assert final["domains"] == ["notas"] and final["confidence"] == 1.0
+    assert final["dominio_escolhido"] == "notas", "o parse de notas precisa saber que a nota foi escolhida"
     assert escolher["chamadas"] == 1
 
 

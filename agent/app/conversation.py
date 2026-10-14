@@ -283,6 +283,7 @@ def _estado_base(
         "corrigindo": conteudo.get("corrigindo") or "",
         "leitura_da_imagem": None,
         "ajuda_ids": None,
+        "dominio_escolhido": None,
         "origem": "",  # só a captura de notificações preenche (fora do grafo de chat)
         "confidence": 1.0,
         "llm_calls": 0,
