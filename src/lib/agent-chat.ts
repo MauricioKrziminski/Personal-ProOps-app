@@ -497,6 +497,14 @@ const ALFANUM = /[\p{L}\p{N}]/u;
  * FECHA depois de não-espaço e antes de não-alfanumérico — por isso `snake_case`, `arquivo_v2` e
  * `http://a.com/x_y_z` ficam intactos. Nenhum par atravessa quebra de linha; marcador sem par é texto.
  */
+/**
+ * "R$" e o número na MESMA linha: a frase do servidor escreve "R$ 3.299,00" com espaço comum, e a
+ * quebra caía entre os dois ("por R$" / "3.299,00", Compartilhar, 13/10/2026). Espaço sem quebra.
+ */
+export function semQuebraNoDinheiro(texto: string): string {
+  return texto.replace(/R\$ (?=[\d−-])/g, 'R$\u00A0');
+}
+
 export function parseWhatsApp(texto: string, base = { bold: false, italic: false, strike: false }): TrechoFormatado[] {
   const out: TrechoFormatado[] = [];
   const solto = (t: string) => {

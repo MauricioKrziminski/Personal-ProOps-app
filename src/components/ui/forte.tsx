@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { StyleSheet, Text } from 'react-native';
 
 import { Fonts } from '@/constants/theme';
-import { parseWhatsApp } from '@/lib/agent-chat';
+import { parseWhatsApp, semQuebraNoDinheiro } from '@/lib/agent-chat';
 
 /**
  * O nome citado dentro de uma frase, em negrito — o lugar que era das « » (25/09/2026, pedido do
@@ -19,7 +19,7 @@ export function Forte({ children }: { children: ReactNode }) {
  * fala do agente) — o mesmo leitor do WhatsApp (`*negrito*`, `_itálico_`, `~riscado~`). Dado do usuário não passa por aqui: ele usa `Forte`.
  */
 export function ComNegrito({ texto }: { texto: string }) {
-  return parseWhatsApp(texto).map((t, i) => (
+  return parseWhatsApp(semQuebraNoDinheiro(texto)).map((t, i) => (
     <Text key={i} style={estiloDe(t)}>
       {t.text}
     </Text>

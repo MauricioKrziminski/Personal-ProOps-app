@@ -15,6 +15,7 @@ import {
   markResolved,
   parseInlineBold,
   parseWhatsApp,
+  semQuebraNoDinheiro,
   linksDoPayload,
   parseUiActions,
   plainText,
@@ -821,4 +822,11 @@ test('marcador sem par, com espaço ou quebra de linha é texto', () => {
 
 test('estilos aninham', () => {
   assert.deepEqual(fmt('*a _b_*'), ['a |b||', 'b|b|i|']);
+});
+
+
+test('R$ e o valor não se separam na quebra de linha', () => {
+  assert.equal(semQuebraNoDinheiro('por R$ 3.299,00 (ou 10x de R$ 329,90)'), 'por R$\u00A03.299,00 (ou 10x de R$\u00A0329,90)');
+  assert.equal(semQuebraNoDinheiro('saldo −R$ 10,00 e R$ -5,00'), 'saldo −R$\u00A010,00 e R$\u00A0-5,00');
+  assert.equal(semQuebraNoDinheiro('R$ de troco'), 'R$ de troco');
 });
