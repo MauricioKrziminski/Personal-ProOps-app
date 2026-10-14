@@ -363,8 +363,10 @@ async def create_reminder(ctx: ExecContext, action: NotesAction) -> ToolResult:
         ctx.user_id, ctx.workspace_id, titulo, rrule, quando, ctx.timezone,
     )
     repete = " (e se repete)" if rrule else ""
+    # no fuso da pessoa: `quando` é UTC, e das 21h à meia-noite a data UTC já é o dia seguinte
+    local = quando.astimezone(tz(ctx.timezone))
     return ToolResult(
-        f"⏰ Lembrete criado: *{titulo}* em {format_date_br(quando.date())}{repete}.",
+        f"⏰ Lembrete criado: *{titulo}* em {format_date_br(local.date())} às {local:%H:%M}{repete}.",
         result_id=row["id"] if row else None,
     )
 

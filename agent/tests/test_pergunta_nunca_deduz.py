@@ -177,6 +177,21 @@ def test_tool_recusa_sem_hora_com_a_pergunta():
         asyncio.run(notes.create_reminder(ctx, lembrete(remind_at=_dia(2))))
 
 
+def test_confirmacao_diz_dia_e_hora_no_fuso_da_pessoa(monkeypatch):
+    """22h em São Paulo já é o dia seguinte em UTC: a resposta tem que dizer o dia LOCAL e a hora."""
+    import asyncio
+
+    async def linha(*_a, **_k):
+        return {"id": "r1"}
+
+    monkeypatch.setattr(notes.db, "fetch_one", linha)
+    ctx = ExecContext("u", "w", None, SP, "t", "m")
+    dia = _dia(2)
+    res = asyncio.run(notes.create_reminder(ctx, lembrete(remind_at=f"{dia}T22:00:00")))
+    d = datetime.fromisoformat(dia)
+    assert f"em {d:%d/%m/%Y} às 22:00" in res.message
+
+
 # --- A.4: cadastro de lembrete pelo catálogo -------------------------------------------------------
 
 
