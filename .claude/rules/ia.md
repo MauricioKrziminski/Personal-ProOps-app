@@ -141,6 +141,12 @@ nenhum outro:
 - **Valor de dinheiro tem rede de segurança determinística.** Se a ação exige `amount_cents` e a
   IA omitiu, `parse_valor_em_centavos` (`app/domain/money.py`) tira do texto cru — mas só com UM
   número plausível. Nunca chutar entre dois: pedir para reformular é melhor que gravar errado.
+  **Por extenso (15/10/2026)**: `money.leitura_de_valores` (e `parse_valor_em_centavos` sobre ela) entende "trezentos reais",
+  "dois mil e quinhentos", "cento e vinte", "1,5 mil", "2 mil e 300", "3 reais e 50 centavos" e "cinquenta centavos". De 1 a 19
+  por extenso só vale diante de real/reais/centavos ("um", "duas" são artigo e contagem); "mil" sozinho, "cem por cento",
+  "30 dias" e "10 meses" não são dinheiro. Quantia vaga ("uns trezentos", "duzentos e tantos", "mais ou menos 100") não devolve
+  valor (`vago=True`): quem chama pergunta. Segue valendo UM valor só; dois nunca escolhem. Chamadores: `finance`,
+  `movimentos`, `lote_d`, `required`, `draft` e a rede dos cadastros (`resources._completar_valor_dito`).
 - **O limite do schema é o PRODUTO propriedades × valores de enum, não cada um.** Medido contra a
   API real em 30/08/2026 (`agent/scripts/diagnose_finance_schema.py`, uma variável por vez):
   `15×22 = 330` recusa; `9×22 = 198`, `15×10 = 150` e `15×7 = 105` passam. Campos INTEGER são

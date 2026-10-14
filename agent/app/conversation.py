@@ -282,6 +282,7 @@ def _estado_base(
         "preset": False,
         "corrigindo": conteudo.get("corrigindo") or "",
         "leitura_da_imagem": None,
+        "ajuda_ids": None,
         "origem": "",  # só a captura de notificações preenche (fora do grafo de chat)
         "confidence": 1.0,
         "llm_calls": 0,
@@ -1011,7 +1012,7 @@ def _pergunta(pausa: dict, candidatos: list[dict], pendente: dict | None) -> dic
 
     numerado = "\n".join(f"{i}) {c['label']}" for i, c in enumerate(candidatos, 1))
 
-    if pausa.get("purpose") in ("amount_unit", "recorrente_pagas"):
+    if pausa.get("purpose") in ("amount_unit", "recorrente_pagas", "forma_pix_credito"):
         # A pessoa já disse QUAL compra: a saída aqui é desistir, não "nenhuma dessas"
         # nem "me diz pelo valor ou pela data", que são textos de busca.
         corpo = f"🤔 {pausa['summary']}"

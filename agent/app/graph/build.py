@@ -31,6 +31,7 @@ from app.graph.nodes import (
     resource_node,
     pick_domains,
     resolve_node,
+    triagem_da_ajuda,
     route,
     safe_node,
 )
@@ -48,6 +49,9 @@ def build(checkpointer: AsyncPostgresSaver):
 
     builder.add_node("router", route)
     # pergunta o domínio ANTES de extrair, quando o router hesitou
+    # a escolha do catálogo de ajuda acontece AQUI, num nó seu: o `dominio` reexecuta do começo quando a pessoa
+    # responde a pergunta, e uma chamada de modelo dentro dele seria repetida (e podia mudar de resposta)
+    builder.add_node("triagem", triagem_da_ajuda)
     builder.add_node("dominio", domain_gate)
     builder.add_node("financas", finance_node)
     builder.add_node("financas_consulta", finance_query_node)
@@ -63,7 +67,8 @@ def build(checkpointer: AsyncPostgresSaver):
     builder.add_node("compor", compose)
 
     builder.add_edge(START, "router")
-    builder.add_edge("router", "dominio")
+    builder.add_edge("router", "triagem")
+    builder.add_edge("triagem", "dominio")
     # fan-out: a aresta condicional devolve uma LISTA, e o LangGraph roda os nós
     # escolhidos em paralelo. Eles escrevem chaves diferentes do estado, então
     # não há conflito de escrita concorrente.

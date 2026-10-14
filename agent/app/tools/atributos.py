@@ -144,6 +144,10 @@ async def _congelar(workspace_id, texto, acoes, alvos, indices) -> list[dict]:
                 normalize_igual(dito, f["name"]) for f in await detalhes_da_categoria(workspace_id, categoria)):
             dito = None
 
+        duvida_da_forma = erro is None and dom.forma_em_duvida(forma, texto)
+        if duvida_da_forma:
+            forma = None  # só vale depois da resposta (`_perguntar_forma`, no portão)
+
         detalhe_id = detalhe_nome = parent = None
         if dito and categoria and erro is None:
             achada, pergunta = await escolher_detalhe(workspace_id, categoria, dito)
@@ -177,6 +181,8 @@ async def _congelar(workspace_id, texto, acoes, alvos, indices) -> list[dict]:
                 "subcategory_id": detalhe_id, "subcategory_name": detalhe_nome, "subcategory_parent": parent,
                 "frase": frase,
             }}
+        if duvida_da_forma:
+            alvos[i] = {**alvos[i], "forma_em_duvida": True}
     return alvos
 
 

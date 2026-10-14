@@ -114,9 +114,26 @@ async def test_lembrete_novo_nao_herda_data_nem_repeticao_do_pendente(notas):
         assert a["recurrence"] is None and "2026-11-05" not in (a["remind_at"] or "")
     for d in ret["notes_draft"]:
         assert d["recurrence"] is None and "2026-11-05" not in (d["remind_at"] or "")
-    assert any("Deixei de lado o lembrete de *pagar o aluguel*" in r for r in ret["results"])
-    # e em `avisos`: com SIM, `results` não aparece; o aviso vai antes da pergunta
-    assert ret["avisos"] == ["Deixei de lado o lembrete de *pagar o aluguel*, que estava sem hora."]
+    aviso = "Deixei de lado o lembrete de *pagar o aluguel*, que estava sem hora."
+    assert [*ret.get("results", []), *ret["avisos"]].count(aviso) == 1
+
+
+AVISO = "Deixei de lado o lembrete de *pagar o aluguel*, que estava sem hora."
+
+
+async def test_aviso_do_pendente_com_sim_vai_so_antes_da_pergunta(notas):
+    # em `results` ele sobrevivia ao resume e saía de novo no "Ok, não fiz nada"
+    notas(NotesAction(type="create_reminder", content="ligar pra mãe", remind_at="2027-01-15T18:00:00"))
+    ret = await nodes.notes_node(estado("me lembra de ligar pra mãe 15/01 às 18h"))
+    assert len(ret["notes_actions"]) == 1
+    assert ret["avisos"] == [AVISO] and AVISO not in ret.get("results", [])
+
+
+async def test_aviso_do_pendente_sem_sim_vai_na_resposta(notas):
+    notas(NotesAction(type="create_reminder", content="ligar pra mãe", remind_at="2027-01-15"))
+    ret = await nodes.notes_node(estado("me lembra de ligar pra mãe 15/01"))
+    assert not ret["notes_actions"] and ret["avisos"] == []
+    assert ret["results"][0] == AVISO and "Que horas" in ret["results"][1]
 
 
 async def test_resposta_so_com_a_hora_completa_o_pendente(notas):

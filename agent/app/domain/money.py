@@ -9,6 +9,7 @@ parser determinístico não depende de cota nem de humor do modelo.
 from __future__ import annotations
 
 import re
+import unicodedata
 
 # Números que claramente não são dinheiro numa mensagem de WhatsApp.
 _RUIDO = [
@@ -19,7 +20,8 @@ _RUIDO = [
     re.compile(r"\bdia\s+\d{1,2}\b", re.IGNORECASE),                       # "dia 5" — recorrência
     re.compile(r"\b\d{1,2}[/:]\d{1,2}(?:[/:]\d{2,4})?\b"),                 # 05/09, 14:30
     re.compile(r"\b\d{1,2}h(?:\d{2})?\b", re.IGNORECASE),                  # 8h, 8h30
-    re.compile(r"\b\d{1,2}%"),                                             # 20%
+    re.compile(r"\b\d{1,3}%"),                                             # 20%
+    re.compile(r"\b\d{1,3}\s*(?:dias?|semanas?|meses|mês|anos?)\b", re.IGNORECASE),  # "30 dias", "10 meses"
 ]
 
 _MULTIPLICADORES = [
@@ -32,49 +34,151 @@ _NUMEROS = re.compile(r"\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?|\d+(?:[.,]\d{1,2})?")
 MAX_CENTS = 100_000_000_00  # R$ 100 milhões: acima disso é erro de digitação ou alucinação
 
 
+_UNIDADES = {
+    "um": 1, "uma": 1, "dois": 2, "duas": 2, "tres": 3, "quatro": 4, "cinco": 5, "seis": 6, "sete": 7,
+    "oito": 8, "nove": 9, "dez": 10, "onze": 11, "doze": 12, "treze": 13, "catorze": 14, "quatorze": 14,
+    "quinze": 15, "dezesseis": 16, "dezessete": 17, "dezoito": 18, "dezenove": 19,
+    "vinte": 20, "trinta": 30, "quarenta": 40, "cinquenta": 50, "sessenta": 60, "setenta": 70,
+    "oitenta": 80, "noventa": 90, "cem": 100, "cento": 100,
+    "duzentos": 200, "duzentas": 200, "trezentos": 300, "trezentas": 300, "quatrocentos": 400,
+    "quatrocentas": 400, "quinhentos": 500, "quinhentas": 500, "seiscentos": 600, "seiscentas": 600,
+    "setecentos": 700, "setecentas": 700, "oitocentos": 800, "oitocentas": 800, "novecentos": 900,
+    "novecentas": 900,
+}
+_GRANDEZAS = {"mil": 1_000, "milhao": 1_000_000, "milhoes": 1_000_000}
+_MOEDA = {"real", "reais", "centavo", "centavos"}
+_TOKENS = re.compile(r"\d[\d.,]*|[^\W\d_]+|\s+|.", re.UNICODE)
+
+# "uns trezentos", "duzentos e tantos", "mais ou menos 100": quantia que a pessoa NÃO cravou.
+_VAGO = re.compile(
+    r"\b(?:uns|umas|alguns|algumas|quase|aproximadamente|cerca\s+de|perto\s+de|em\s+torno\s+de|"
+    r"por\s+volta\s+de|mais\s+ou\s+menos|pouco\s+mais\s+de)\s+(?:de\s+)?(?:r\$\s*)?\d"
+    r"|\d[\d.,]*(?:\s*(?:reais|real|mil))?\s+e\s+(?:tantos|tantas|tanto|pouco|poucos|poucas)\b",
+    re.IGNORECASE,
+)
+
+
+def _sem_acento(palavra: str) -> str:
+    return unicodedata.normalize("NFD", palavra.lower()).encode("ascii", "ignore").decode()
+
+
+def _numeros_por_extenso(texto: str) -> str:
+    """"trezentos e cinquenta reais" -> "350 reais". Só o que é inequívoco: 1..19 sozinho ("um", "duas")
+    é artigo ou contagem, então só vale diante de "real/reais/centavos"; vinte ou mais, cem, mil... valem."""
+    toks = _TOKENS.findall(texto)
+    saida: list[str] = []
+    i = 0
+
+    def proximo_palavra(j: int) -> int | None:
+        j += 1
+        while j < len(toks) and toks[j].isspace():
+            j += 1
+        return j if j < len(toks) else None
+
+    while i < len(toks):
+        w = _sem_acento(toks[i])
+        ultimo = next((t for t in reversed(saida) if not t.isspace()), "")
+        anterior_digito = ultimo[-1:].isdigit()
+        eh_num = w in _UNIDADES or w in _GRANDEZAS
+        if not eh_num or (w in _GRANDEZAS and anterior_digito):
+            saida.append(toks[i])
+            i += 1
+            continue
+        total = atual = 0
+        piso = 4  # dentro do grupo, centena > dezena > unidade: "cem e duzentos" não é um número
+        j = i
+        fim = i
+        while j is not None and j < len(toks):
+            w = _sem_acento(toks[j])
+            if w in _UNIDADES:
+                v = _UNIDADES[w]
+                classe = 3 if v >= 100 else 2 if v >= 20 else 1
+                if classe >= piso:
+                    break
+                piso = classe
+                atual += v
+            elif w in _GRANDEZAS:
+                total += max(atual, 1) * _GRANDEZAS[w]
+                atual, piso = 0, 4
+            else:
+                break
+            fim = j
+            n = proximo_palavra(j)
+            if n is not None and _sem_acento(toks[n]) == "e":
+                n = proximo_palavra(n)
+            if n is not None and (_sem_acento(toks[n]) in _UNIDADES or _sem_acento(toks[n]) in _GRANDEZAS):
+                j = n
+                continue
+            break
+        valor = total + atual
+        depois = proximo_palavra(fim)
+        moeda = depois is not None and _sem_acento(toks[depois]) in _MOEDA
+        so_mil = i == fim and _sem_acento(toks[i]) == "mil"  # "mil vezes obrigado"
+        if (valor >= 20 and not so_mil) or moeda:
+            saida.append(str(valor))
+            i = fim + 1
+        else:
+            saida.append(toks[i])
+            i += 1
+    return "".join(saida)
+
+
+def leitura_de_valores(texto: str | None) -> tuple[list[int], bool]:
+    """(valores em centavos que o texto cita, a quantia foi dita de forma vaga?).
+
+    Entende dígitos ("1.234,56", "2 mil", "1,5 mil e 200"), reais e centavos ("3 reais e 50 centavos") e
+    número por extenso ("trezentos e cinquenta", "dois mil e quinhentos"). Vago ("uns trezentos",
+    "duzentos e tantos", "mais ou menos 100") devolve vago=True e nenhum valor: chutar a quantia é o erro caro.
+    """
+    if not texto:
+        return [], False
+    # "cem por cento" é taxa, não dinheiro (e o "cento" não pode virar um segundo número)
+    texto = re.sub(r"(\w)\s+por\s+cento\b", r"\1% ", texto, flags=re.IGNORECASE)
+    limpo = f" {_numeros_por_extenso(texto)} "
+    if _VAGO.search(limpo):
+        return [], True
+    for padrao in _RUIDO:
+        limpo = padrao.sub(" ", limpo)
+    limpo = re.sub(r"\b(\d[\d.]*)\s*reais?\s+e\s+(\d{1,2})\s*centavos?\b",
+                   lambda m: f"{m[1]},{m[2].zfill(2)}", limpo, flags=re.IGNORECASE)
+    limpo = re.sub(r"\b(\d{1,2})\s*centavos?\b", lambda m: f"0,{m[1].zfill(2)}", limpo, flags=re.IGNORECASE)
+    limpo = re.sub(r"\b(\d{1,3})\s*mil\s+(?:e\s+)?(\d{1,3})\b(?!\s*(?:x\b|vez|parcela|%|[/:]|h\b|[.,]\d))",
+                   lambda m: str(int(m[1]) * 1000 + int(m[2])), limpo, flags=re.IGNORECASE)
+
+    for padrao, fator in _MULTIPLICADORES:
+        achados = padrao.findall(limpo)
+        if achados:
+            try:
+                return [round(float(a.replace(".", "").replace(",", ".")) * fator * 100) for a in achados], False
+            except ValueError:
+                return [], False
+
+    valores = []
+    for bruto in _NUMEROS.findall(limpo):
+        # quem vem por último manda: 1.234,56 (BR) vs 1,234.56 (US)
+        if bruto.rfind(",") > bruto.rfind("."):
+            normalizado = bruto.replace(".", "").replace(",", ".")
+        else:
+            normalizado = bruto.replace(",", "")
+        try:
+            valor = float(normalizado)
+        except ValueError:
+            continue
+        valores.append(round(valor * 100))
+    return valores, False
+
+
 def parse_valor_em_centavos(texto: str | None) -> int | None:
-    """"1.234,56" | "45" | "2 mil" -> centavos. None se não houver UM candidato claro.
+    """"1.234,56" | "45" | "2 mil" | "trezentos reais" -> centavos. None se não houver UM candidato claro.
 
     Conservador de propósito: "parcelei 3600 em 12x" tem dois números, então
     devolve None e o fluxo pede para reformular. Chutar qual dos dois é o
     dinheiro é pior do que perguntar.
     """
-    if not texto:
+    valores, _vago = leitura_de_valores(texto)
+    if len(valores) != 1 or valores[0] <= 0:
         return None
-
-    limpo = f" {texto} "
-    for padrao in _RUIDO:
-        limpo = padrao.sub(" ", limpo)
-
-    for padrao, fator in _MULTIPLICADORES:
-        achados = padrao.findall(limpo)
-        if len(achados) == 1:
-            base = achados[0].replace(".", "").replace(",", ".")
-            try:
-                return round(float(base) * fator * 100)
-            except ValueError:
-                return None
-        if len(achados) > 1:
-            return None  # ambíguo
-
-    candidatos = _NUMEROS.findall(limpo)
-    if len(candidatos) != 1:
-        return None
-
-    bruto = candidatos[0]
-    # quem vem por último manda: 1.234,56 (BR) vs 1,234.56 (US)
-    if bruto.rfind(",") > bruto.rfind("."):
-        normalizado = bruto.replace(".", "").replace(",", ".")
-    else:
-        normalizado = bruto.replace(",", "")
-
-    try:
-        valor = float(normalizado)
-    except ValueError:
-        return None
-    if valor <= 0:
-        return None
-    return round(valor * 100)
+    return valores[0]
 
 
 def parse_installment_total(text: str, installments: int | None) -> int | None:

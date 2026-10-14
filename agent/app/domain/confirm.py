@@ -519,6 +519,11 @@ def _relembrar_opcoes(pendente: dict) -> str:
             "🤔 Ainda não registrei nada — preciso saber se as que já passaram entram como pagas ou ficam em aberto.\n"
             f"{numerado}\nResponde com o número, ou *NÃO* para cancelar."
         )
+    if (pendente.get("action") or {}).get("purpose") == "forma_pix_credito":
+        return (
+            "🤔 Ainda não registrei nada — preciso saber se foi Pix no crédito ou uma compra no cartão de crédito.\n"
+            f"{numerado}\nResponde com o número, ou *NÃO* para cancelar."
+        )
     if (pendente.get("action") or {}).get("purpose") == "amount_unit":
         return (
             "🤔 Ainda não mexi em nada — preciso saber se é o total da compra ou cada parcela.\n"

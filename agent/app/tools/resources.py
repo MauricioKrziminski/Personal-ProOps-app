@@ -17,11 +17,11 @@ import psycopg
 from app import db
 from app.tools import atributos, copias, lote_d, movimentos
 from app.domain.dates import format_date_br, now_utc, to_instant, local_iso_date, tz
-from app.domain.money import cents_to_brl, MAX_CENTS
+from app.domain.money import cents_to_brl, leitura_de_valores, MAX_CENTS
 from app.domain.recurrence import descreve_rrule, next_occurrence
 from app.domain.categories import normalize
 from app.domain.matching import ultimo_dia_do_mes
-from app.graph.schemas import ResourceAction, ResourceActionType as Op
+from app.graph.schemas import ResourceAction, ResourceActionType as Op, ResourceField
 from app.tools.base import ExecContext, ToolResult, ensure_owned, request_id
 from app.tools.guards import Level1Error, clean_rrule
 from app.domain import matching
@@ -1314,8 +1314,55 @@ def _nao_achei(action: ResourceAction, rows: list[dict]) -> str:
     )
 
 
+# O ÚNICO campo de dinheiro que a frase de criar um cadastro carrega naturalmente. O modelo às vezes o omite
+# ("Crie uma conta Reserva" → "É poupança, começa com trezentos reais" voltava sem saldo, ~1 em 3) e a frase do
+# SIM dizia R$ 0,00. A segunda coluna é a pergunta quando a frase tem dinheiro mas não UM valor claro; onde é
+# None (campo já obrigatório ou opcional sem default mostrado) o `validate_fields` segue com a pergunta que já tem.
+_VALOR_DITO = {
+    "accounts": ("initial_balance_cents", "Qual o saldo inicial da conta{nome}? Ainda não salvei nada."),
+    "cards": ("credit_limit_cents", None),
+    "goals": ("target_cents", None),
+    "budgets": ("limit_cents", None),
+    "assets": ("current_value_cents", None),
+}
+_DIAS_DO_CARTAO = re.compile(r"\b(?:fecha\w*|vence\w*|vencimento)\s+(?:no\s+)?(?:dia\s+)?\d{1,2}\b", re.IGNORECASE)
+_ANCORA_DE_DINHEIRO = re.compile(r"r\$|\breais?\b|\bmil\b", re.IGNORECASE)
+
+
+def _completar_valor_dito(ctx: ExecContext, action: ResourceAction) -> None:
+    """Rede de dinheiro nos cadastros: o campo que o modelo omitiu sai do texto SÓ com UM valor claro.
+
+    Dois valores, quantia vaga ("uns trezentos") ou um número que parece ano sem ancoragem de dinheiro não
+    escolhem nada: na conta viram pergunta, nos outros a pergunta de campo faltante de sempre.
+    """
+    if action.type != Op.CREATE or action.resource not in _VALOR_DITO:
+        return
+    campo, pergunta = _VALOR_DITO[action.resource]
+    if any(f.name == campo for f in action.fields):
+        return
+    texto = ctx.texto or ""
+    if action.name:
+        texto = re.sub(re.escape(action.name.strip()), " ", texto, flags=re.IGNORECASE)  # "Inter 2" não é saldo
+    if action.resource == "cards":
+        texto = _DIAS_DO_CARTAO.sub(" ", texto)
+    valores, vago = leitura_de_valores(texto)
+    if not valores and not vago:
+        return  # a frase não tem dinheiro: o padrão de sempre
+    ano = len(valores) == 1 and valores[0] % 100 == 0 and 1900 <= valores[0] // 100 <= 2100 \
+        and not _ANCORA_DE_DINHEIRO.search(texto)
+    if len(valores) == 1 and valores[0] > 0 and not ano:
+        action.fields.append(ResourceField(name=campo, value=str(valores[0])))
+    elif pergunta:
+        _error(pergunta.format(nome=f" *{action.name}*" if action.name else ""))
+
+
 async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
+    _completar_valor_dito(ctx, action)
     values = validate_fields(action)
+    if (action.type == Op.CREATE and not action.name and isinstance(values.get(CATALOG[action.resource][1]), str)
+            and values[CATALOG[action.resource][1]].strip()):
+        # o modelo às vezes deixa `name` vazio e põe o nome em `fields`: o nome do item é um só, e é o da frase
+        action.name = values[CATALOG[action.resource][1]].strip()
     table, identity, deletion, _ = CATALOG[action.resource]
     prepared = {
         "table": table,

@@ -61,6 +61,16 @@ def pix_no_credito(texto: str) -> bool:
     return _tem_pista(texto, ("cred",))
 
 
+def forma_em_duvida(forma: str | None, texto: str) -> bool:
+    """O modelo disse "crédito" e a frase também fala em Pix ("com pix no crédito"): Pix no cartão OU compra no
+    crédito? Os dois leem a frase; quem decide é a pessoa, numa pergunta antes do SIM (15/10/2026).
+
+    O outro lado do mesmo conflito já não escapa: "pix" sem a pista de Pix é vetado em `forma_proposta`, e "pix" com
+    "crédito" na frase é o Pix no cartão (`pix_no_credito`), que pergunta o cartão.
+    """
+    return forma == "credit" and _tem_pista(texto, _PISTAS_FORMA["pix"])
+
+
 def erro_da_forma(metodo: str | None, tipo_conta: str | None) -> str | None:
     """Espelho de `paymentMethodError` (`src/lib/payment-method.ts`): None = combina.
 

@@ -103,7 +103,8 @@ async def test_unknown_no_fim_do_turno_usa_o_catalogo(monkeypatch):
 async def test_compose_com_resultado_nao_chama_modelo(monkeypatch):
     monkeypatch.setattr(ia, "structured", lambda *_a, **_k: pytest.fail("sem modelo"))
     r = await nodes.compose({"results": ["✅ ok"], "text": "x", "messages": []})
-    assert r["reply"] == "✅ ok" and r["llm_calls"] == 0
+    # sem a chave: um `llm_calls: 0` explícito ZERA a contagem do turno (`_soma_no_turno`) e o turno some de `ai_events`
+    assert r["reply"] == "✅ ok" and "llm_calls" not in r
 
 
 def test_ajuda_e_ajuda_geral_saem_do_catalogo():

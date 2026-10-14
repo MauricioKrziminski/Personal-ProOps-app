@@ -36,6 +36,13 @@ CATALOGO: tuple[Entrada, ...] = (
         "(responda *sim*).",
     ),
     Entrada(
+        # Resposta CURTA e sem rota: agradecer não é pedir a tela de ajuda (15/10/2026: "valeu, ajudou muito"
+        # recebia a apresentação inteira do agente).
+        "agradecimento", "Agradecimento ou despedida",
+        ("valeu", "muito obrigado", "brigadão", "tchau", "até mais", "agradeço"),
+        "😊 Por nada! É só mandar quando precisar.",
+    ),
+    Entrada(
         "agente_nao_faz", "O que o agente não faz",
         ("o que você não faz?", "você importa extrato?", "você consegue cancelar minha assinatura?",
          "você apaga minha conta?", "você dá conselho de investimento?"),

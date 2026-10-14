@@ -52,6 +52,7 @@ from app.domain.required import faltando
 from app.domain.categories import normalize
 from app.domain.money import cents_to_brl
 from app.graph.state import CHAVE_MIDIA, AgentState
+from app.domain import atributos as atributos_dom
 from app.tools import atributos, guards, lote_d, movimentos, resolve
 from app.tools import notes as notes_tools
 from app.security import sanitize_untrusted
@@ -59,7 +60,7 @@ from app.services import ia, midia_enviada
 from app.tools.base import ExecContext
 from app.tools.finance import apply_rules, bump_rule_hits
 from app.conhecimento import ajuda
-from app.conhecimento.app import AJUDA_GERAL
+from app.conhecimento.app import AJUDA_GERAL, POR_ID
 from app.tools.registry import execute
 
 log = logging.getLogger(__name__)
@@ -75,8 +76,15 @@ _SAUDACOES = {
 }
 
 
+_AGRADECIMENTOS = {"obrigado", "obrigada", "vlw", "valeu"}
+
+
 def _eh_saudacao(texto: str) -> bool:
     return texto.lower().strip(" !?.,") in _SAUDACOES
+
+
+def _eh_agradecimento(texto: str) -> bool:
+    return texto.lower().strip(" !?.,") in _AGRADECIMENTOS
 
 
 async def _ajuda_do_catalogo(state: AgentState) -> dict:
@@ -84,24 +92,55 @@ async def _ajuda_do_catalogo(state: AgentState) -> dict:
 
     Sem texto (só mídia) ou com o modelo fora do ar, vale a ajuda geral fixa. No app, as telas
     citadas viram `links` do `ui_payload` (no WhatsApp o caminho já vai escrito no texto).
+
+    Com `ajuda_ids` no estado a escolha JÁ foi feita pela triagem (uma chamada por turno): aqui só se responde,
+    e `llm_calls` nem entra no retorno (um 0 zeraria a contagem que a triagem somou).
     """
     texto = (state.get("text") or "").strip()
     chamadas = 0
     corpo, links = AJUDA_GERAL, []
-    if texto:
+    triada = state.get("ajuda_ids") is not None
+    if triada:
+        corpo, links = ajuda.responder(ajuda.ids_validos(state["ajuda_ids"]))
+    elif texto:
         try:
             escolhidas = await ajuda.escolher(texto)
             chamadas = 1
             corpo, links = ajuda.responder(escolhidas)
         except Exception:  # noqa: BLE001 — ajuda nunca derruba o turno
             log.warning("escolha do catálogo falhou; segue a ajuda geral", exc_info=True)
-    ret: dict = {"results": [corpo], "llm_calls": chamadas}
+    ret: dict = {"results": [corpo]} if triada else {"results": [corpo], "llm_calls": chamadas}
     if state.get("channel") == "app":
         # a pessoa JÁ está no agente: "Abrir Agente" abriria uma conversa nova
         links = [l for l in links if not str(l.get("rota", "")).startswith("/agent")]
     if links and state.get("channel") == "app":
         ret["reply"] = {"body": corpo, "text": corpo, "links": links}
     return ret
+
+
+async def triagem_da_ajuda(state: AgentState) -> dict:
+    """Mensagem `geral` com o roteador confiante: ESCOLHE no catálogo de ajuda antes de decidir se é do app.
+
+    "testar o aplicativo do banco novo" vinha como `geral` com confiança alta e acabava em "Isso eu ainda não sei
+    responder" — a frase se perdia. A MESMA chamada que `general_node` fazia (papel `parse`, uma por turno) roda
+    aqui, num nó próprio: o `dominio` reexecuta do começo quando a pessoa responde a pergunta, e uma chamada de
+    modelo dentro dele seria repetida. Vazio (fora do app ou sem entrada) vira a pergunta de sempre no `dominio`.
+
+    Fora daqui: saudação (fast-path sem modelo), imagem lida, mídia sem legenda, roteador em dúvida (já pergunta
+    sem gastar chamada) e `geral` junto de outro domínio. Modelo fora do ar = não tria e não pergunta: vale a
+    ajuda geral fixa de hoje.
+    """
+    texto = (state.get("text") or "").strip()
+    if (state.get("halted") or state.get("domains") != [Domain.GERAL.value] or not texto
+            or state.get("leitura_da_imagem") or sem_legenda(state) or _eh_saudacao(texto)
+            or geral_incerto(state.get("domains") or [], state.get("confidence", 1.0))):
+        return {}
+    try:
+        escolhidas = await ajuda.escolher(texto)
+    except Exception:  # noqa: BLE001 — ajuda nunca derruba o turno
+        log.warning("triagem da ajuda falhou; segue a ajuda geral", exc_info=True)
+        return {}
+    return {"ajuda_ids": [e.id for e in escolhidas], "llm_calls": 1}
 
 
 # ---------------------------------------------------------------------------
@@ -880,9 +919,9 @@ async def notes_node(state: AgentState) -> dict:
     if antigo and any(a.type.value == "create_reminder" and normalize(a.content or "") != normalize(antigo.get("content") or "")
                       for a in acoes):
         # pedido novo no lugar do pendente (resource_draft: o novo descarta o velho): a pessoa fica sabendo
-        # nos dois: `results` (resposta sem SIM) e `avisos` (vai antes da pergunta do SIM, que apaga `results`)
+        # UMA vez — com SIM, em `avisos` (antes da pergunta); sem SIM, em `results`. Nos dois, o `results`
+        # sobrevivia ao resume e o aviso saía de novo junto do "Ok, não fiz nada" (WhatsApp, 14/10/2026)
         avisos.append(f"Deixei de lado o lembrete de *{antigo.get('content')}*, que estava sem hora.")
-        perguntas.append(avisos[-1])
     for a in acoes:
         await _congela_pasta_da_regra(state["workspace_id"], a)
         if a.type.value == "create_reminder":
@@ -900,6 +939,8 @@ async def notes_node(state: AgentState) -> dict:
                 continue
             _congela_lembrete(state.get("timezone", "America/Sao_Paulo"), a)
         prontas.append(a)
+    if not prontas:
+        perguntas[:0], avisos = avisos, []
     ret = {
         "notes_actions": [a.model_dump() for a in prontas],
         "notes_draft": incompletas,
@@ -909,6 +950,30 @@ async def notes_node(state: AgentState) -> dict:
     if perguntas:
         ret["results"] = [*state.get("results", []), *perguntas]
     return ret
+
+
+# O tipo da conta só vale se a pessoa o DISSE (14/10/2026): "Crie uma conta Reserva" voltava como
+# poupança pelo nome. Pista = a mesma ancoragem da forma de pagamento (`atributos_dom._tem_pista`).
+# Sem pista o campo sai e o cadastro pergunta o tipo; o que veio de um turno anterior (rascunho) não passa
+# por aqui — a âncora roda ANTES de herdar os campos do rascunho.
+_PISTAS_TIPO_DE_CONTA = {
+    "checking": ("corrente", "cc", "movimento"),
+    "savings": ("poupanca", "poupar"),
+    "cash": ("dinheiro", "especie", "carteira", "vivo"),
+    "investment": ("investimento", "investir", "investe", "aplicacao", "aplicar", "cdb", "tesouro",
+                   "corretora", "renda", "acoes", "fundo", "fundos", "cofrinho", "caixinha"),
+}
+
+
+def _tipo_de_conta_ancorado(acao, texto: str):
+    if acao.type != ResourceActionType.CREATE or acao.resource != "accounts":
+        return acao
+    tipo = next((f.value for f in acao.fields if f.name == "type"), None)
+    pistas = _PISTAS_TIPO_DE_CONTA.get(str(tipo or "").lower())
+    if tipo is None or (pistas and atributos_dom._tem_pista(texto, pistas)):
+        return acao
+    acao.fields = [f for f in acao.fields if f.name != "type"]
+    return acao
 
 
 def _com_campos_do_rascunho(acoes: list, rascunho: list[dict]) -> list:
@@ -1006,7 +1071,8 @@ Catálogo:
         plan = await ia.structured(
             ResourcePlan, ia.PAPEL_PARSE, no="cadastros", versao=ia.versao_do_prompt(prompt)
         ).ainvoke([('system',prompt),('human',user)])
-        planned, calls = _com_campos_do_rascunho(plan.actions, state.get('resource_draft') or []), 1
+        acoes_do_modelo = [_tipo_de_conta_ancorado(a, state.get('text') or '') for a in plan.actions]
+        planned, calls = _com_campos_do_rascunho(acoes_do_modelo, state.get('resource_draft') or []), 1
     if Domain.NOTAS.value in (state.get('domains') or []):
         # ⚠️ **Nota e lembrete NOVOS têm um dono só: o nó de notas** (23/09/2026). Os dois
         # extratores rodam em paralelo sobre a MESMA frase, e "crie a pasta App e ponha a
@@ -1073,6 +1139,8 @@ async def general_node(state: AgentState) -> dict:
     if state.get("leitura_da_imagem"):  # produto ou "outro", lido pelo `route`: template, sem catálogo
         return {"results": [_resposta_da_imagem(state["leitura_da_imagem"])]}
     texto = (state.get("text") or "").strip()
+    if _eh_agradecimento(texto):  # agradecer não pede a apresentação do agente (15/10/2026): a entrada curta do catálogo
+        return {"results": [POR_ID["agradecimento"].resposta]}
     if not texto or _eh_saudacao(texto):
         return {"results": [AJUDA_GERAL]}
     return await _ajuda_do_catalogo(state)
@@ -1135,7 +1203,9 @@ async def domain_gate(state: AgentState) -> dict:
         return {"results": ["Não alterei nenhum dos registros."], "halted": True}
     dominios, confianca = state.get("domains") or [], state.get("confidence", 1.0)
     # imagem lida (produto/outro) já tem resposta própria em `general_node`
-    duvida = geral_incerto(dominios, confianca) and not state.get("leitura_da_imagem")
+    # a triagem não achou nada no catálogo (fora do app ou sem entrada): a frase não se perde, pergunta-se
+    nao_achou = state.get("ajuda_ids") == [] and dominios == [Domain.GERAL.value]
+    duvida = (geral_incerto(dominios, confianca) or nao_achou) and not state.get("leitura_da_imagem")
     if not duvida and not dominio_incerto(dominios, confianca):
         return {}
 
@@ -1176,9 +1246,17 @@ async def resolve_node(state: AgentState) -> dict:
     """
     if state.get("halted"):
         return {}
+    # Contrato descrito é dívida: a compra parcelada SEM cartão que o parse de finanças tirou da mesma frase sai
+    # (15/10/2026, "financiamento do carro em 48x de 1470, estou na nona": o roteador às vezes manda finanças
+    # junto dos cadastros). Os dois vão a este fan-in, que vê o lote inteiro.
+    financas, aviso_do_contrato = _contrato_e_divida(state)
+    if aviso_do_contrato:
+        state = {**state, "finance_actions": financas, "avisos": [*(state.get("avisos") or []), aviso_do_contrato],
+                 "results": [*state.get("results", []), aviso_do_contrato]}
     acoes = _actions(state)
     if not acoes:
-        return {}
+        return {"finance_actions": financas, "avisos": state["avisos"], "results": state["results"]} \
+            if aviso_do_contrato else {}
     # A validação vale para TODO lote, inclusive o que não mira registro
     # existente — o bug do "registrar None em 12x" era exatamente uma criação,
     # que não passa pelo resolver. Sair antes daqui pulava o esclarecimento.
@@ -1251,8 +1329,30 @@ async def resolve_node(state: AgentState) -> dict:
             except guards.Level1Error as err:
                 alvos[i] = {**alvos[i], "correction_error": err.mensagem_usuario}
 
-    return {"targets": with_resources(alvos), "results": esclarecimentos,
-            "draft": _rascunho(state, acoes, alvos)}
+    saida = {"targets": with_resources(alvos), "results": esclarecimentos,
+             "draft": _rascunho(state, acoes, alvos)}
+    if aviso_do_contrato:
+        saida.update(finance_actions=financas, avisos=state["avisos"])
+    return saida
+
+
+def _contrato_e_divida(state: AgentState) -> tuple[list[dict], str | None]:
+    """(finance_actions, aviso): sem cartão + dívida a cadastrar na mesma frase = é um contrato, não uma compra.
+
+    "Dívida a cadastrar" é um `resource_create debts` — pronto (`resource_actions`) ou incompleto
+    (`resource_draft`, o caso de sempre: falta o saldo ou o dia). Compra com cartão citado fica: é compra.
+    """
+    financas = list(state.get("finance_actions") or [])
+    cadastros = [*(state.get("resource_actions") or []), *(state.get("resource_draft") or [])]
+    if not any(c.get("resource") == "debts" and c.get("type") == ResourceActionType.CREATE.value for c in cadastros):
+        return financas, None
+    sem_cartao = [a for a in financas if a.get("type") == FinanceActionType.CREATE_INSTALLMENT_PURCHASE.value
+                  and not (a.get("account") or "").strip()]
+    if not sem_cartao:
+        return financas, None
+    restantes = [a for a in financas if a not in sem_cartao]
+    nomes = ", ".join(f"*{a.get('description') or 'compra parcelada'}*" for a in sem_cartao)
+    return restantes, f"Tratei {nomes} como financiamento (contrato), não como compra no cartão."
 
 
 def _incompletas(state: AgentState, acoes: list) -> dict[int, str]:
@@ -1477,6 +1577,37 @@ def _perguntar_pagas(state: AgentState, i: int, acao, alvo: dict) -> tuple[dict,
                   "results": [*state.get("results", []), "👌 Ok, não registrei nada."]}
 
 
+FORMA_OPCOES = {"forma:pix": "pix", "forma:credit": "credit"}
+
+
+def _perguntar_forma(state: AgentState, i: int, acao, alvo: dict) -> tuple[dict, dict | None]:
+    """"Pix no crédito" com o modelo dizendo crédito: Pix no cartão ou compra no cartão de crédito?
+
+    O modelo propôs `credit` e a frase também tem a pista de Pix (`atributos.forma_em_duvida`): as duas leituras
+    existem, e quem decide é a pessoa (14/10/2026: nunca deduzir). A resposta congela a forma no ALVO, que é o que a
+    frase do SIM e a tool leem — sem ela nada é gravado.
+    """
+    if not alvo.get("forma_em_duvida"):
+        return alvo, None
+    escolha = interrupt({
+        "kind": "choice",
+        "purpose": "forma_pix_credito",
+        "action_index": i,
+        "action_type": acao.type.value,
+        "summary": "Foi Pix no crédito ou compra no cartão de crédito?",
+        "options": [{"id": "forma:pix", "label": "Pix no crédito"},
+                    {"id": "forma:credit", "label": "Compra no cartão de crédito"}],
+    })
+    escolhido = escolha.get("candidate_id") if isinstance(escolha, dict) else escolha
+    if escolhido in FORMA_OPCOES:
+        forma = FORMA_OPCOES[escolhido]
+        attrs = dict(alvo.get("atributos") or {})
+        frase = " · ".join(p for p in (atributos_dom.FRASE_DA_FORMA[forma], attrs.get("frase")) if p)
+        return {**alvo, "forma_em_duvida": False, "atributos": {**attrs, "payment_method": forma, "frase": frase}}, None
+    return alvo, {"approved": False, "halted": True,
+                  "results": [*state.get("results", []), "👌 Ok, não registrei nada."]}
+
+
 async def gate(state: AgentState) -> dict:
     # A revision finishes this node before the next confirmation, so its exact
     # targets are checkpointed and are not re-read on approval replay.
@@ -1541,6 +1672,9 @@ async def _gate(state: AgentState) -> dict:
         if parada:
             return parada
         alvos[i], parada = _perguntar_pagas(state, i, acao, alvos[i])
+        if parada:
+            return parada
+        alvos[i], parada = _perguntar_forma(state, i, acao, alvos[i])
         if parada:
             return parada
 
@@ -1992,7 +2126,9 @@ async def compose(state: AgentState) -> dict:
     texto_reply = "\n".join(linhas)
     return {
         "reply": reply or texto_reply,
-        "llm_calls": extra.get("llm_calls", 0),
+        # só soma o que o catálogo gastou AQUI: um 0 explícito zera `llm_calls` (`_soma_no_turno`) e apagava as
+        # chamadas dos nós anteriores — o turno deixava de virar linha em `ai_events` e de contar na cota
+        **({"llm_calls": extra["llm_calls"]} if extra.get("llm_calls") else {}),
         "messages": [
             *state.get("messages", []),
             {"role": "assistant", "content": texto_reply},

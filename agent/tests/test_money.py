@@ -76,3 +76,56 @@ def test_parcela_dita_so_com_o_n_do_modelo():
     assert parcela_dita("comprei em 10x de 300", 12) is None
     assert parcela_dita("tv de 3000 em 10x", 10) is None
     assert parcela_dita("10x de 300 e 5x de 20", 10) is None
+
+
+class TestPorExtenso:
+    """15/10/2026: "começa com trezentos reais" — o modelo omite o saldo e a rede precisa ler o extenso."""
+
+    @pytest.mark.parametrize("texto,centavos", [
+        ("É poupança, começa com trezentos reais", 30_000),
+        ("trezentos e cinquenta", 35_000),
+        ("cem", 10_000),
+        ("cento e vinte reais", 12_000),
+        ("vinte e cinco reais", 2_500),
+        ("dez reais", 1_000),
+        ("um real", 100),
+        ("mil reais", 100_000),
+        ("mil e quinhentos reais", 150_000),
+        ("dois mil e quinhentos", 250_000),
+        ("cem mil", 10_000_000),
+        ("dois milhões e quinhentos mil", 250_000_000),
+        ("três reais e cinquenta centavos", 350),
+        ("3 reais e 5 centavos", 305),
+        ("cinquenta centavos", 50),
+        ("1,5 mil", 150_000),
+        ("2 mil e 300", 230_000),
+        ("2 mil 300 reais", 230_000),
+        ("quero cem por cento de 50", 5_000),
+    ])
+    def test_valor_unico(self, texto, centavos):
+        assert parse_valor_em_centavos(texto) == centavos
+
+    @pytest.mark.parametrize("texto", [
+        "uns trezentos",
+        "duzentos e tantos",
+        "mais ou menos cem",
+        "mais ou menos 100",
+        "cerca de 200 reais",
+        "comprei um celular",        # "um" é artigo
+        "duas parcelas",
+        "trinta dias",
+        "mil vezes obrigado",
+        "cem por cento",
+        "cem e duzentos",
+        "gastei cem no mercado e duzentos na farmácia",   # dois valores: nunca escolhe
+        "transferi 100 e gastei 200",
+    ])
+    def test_vago_ou_ambiguo_devolve_none(self, texto):
+        assert parse_valor_em_centavos(texto) is None
+
+    def test_vago_e_dito_a_parte(self):
+        from app.domain.money import leitura_de_valores
+        assert leitura_de_valores("começa com uns trezentos") == ([], True)
+        assert leitura_de_valores("começa com trezentos reais") == ([30_000], False)
+        assert leitura_de_valores("100 e 200") == ([10_000, 20_000], False)
+        assert leitura_de_valores("sem dinheiro") == ([], False)

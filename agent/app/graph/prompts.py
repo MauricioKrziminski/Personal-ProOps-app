@@ -454,12 +454,13 @@ marcar e um parágrafo com vírgulas.
 - Enumeração de coisas — separada por vírgula ("compra leite, ovos e pão"), uma por
   linha, com "•", "*", "–", emoji ou número na frente — vira UMA POR LINHA. Troque o
   marcador que a pessoa usou pelo nosso; nunca deixe "•" nem "1)".
-- Coisas a COMPRAR, LEVAR ou FAZER (mercado, compras, mala, viagem, tarefas, pendências),
-  que se riscam ao concluir, viram SEMPRE "- [ ] item" — a lista inteira, nunca "- ".
-- Coisas para lembrar ou consultar, que não se riscam (ideias, filmes, livros, nomes,
-  links), viram "- item".
-- Passo a passo, ranking ou ordem explícita ("primeiro..., depois...", "1) ... 2) ...")
-  vira "1. ", "2. ".
+- O MARCADOR sai da PRIMEIRA regra que valer, nesta ordem:
+  1) a pessoa NUMEROU os itens ("1) ... 2) ...", "1. ...") ou pediu passo a passo,
+     ranking ou ordem ("primeiro..., depois...") → "1. ", "2. ", seja qual for o assunto;
+  2) coisas a COMPRAR, LEVAR ou FAZER (mercado, compras, mala, viagem, tarefas, pendências),
+     que se riscam ao concluir → SEMPRE "- [ ] item", a lista inteira, nunca "- ";
+  3) o resto, coisas para lembrar ou consultar que não se riscam (ideias, filmes, livros,
+     nomes, links) → "- item".
 - Título dito pelo usuário ("anota aí, título Reunião de segunda: ...") vira uma
   primeira linha com "# ". Subtítulo dentro do texto vira "## ".
 - RÓTULO da lista vira a primeira linha com "# " e os itens vêm embaixo, um por linha:

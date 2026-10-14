@@ -129,10 +129,51 @@ async def resource(text, resource_draft=None):
     return {"domains": routed["domains"], **result}
 
 
+async def financiamento_sem_contrato(text):
+    """O que o PRODUTO faz com "financiamento do carro em 48x de 1470, estou na nona", seja qual for a rota.
+
+    O roteador às vezes devolve cadastros, às vezes finanças (ou os dois). Os desfechos certos são: uma dívida a
+    cadastrar (o contrato), ou uma compra parcelada SEM cartão cuja pergunta de cartão oferece "É financiamento"
+    (a saída da pessoa). Compra gravada num cartão chutado seria o erro.
+    """
+    from app import conversation
+    from app.domain.required import faltando
+    from app.graph.schemas import FinanceAction
+
+    inicial = state(text)
+    roteado = await nodes.route(inicial)
+    estado = {**inicial, "domains": roteado["domains"]}
+    if "financas" in roteado["domains"]:
+        estado.update(await nodes.finance_node(estado))
+    if "cadastros" in roteado["domains"]:
+        estado.update({k: v for k, v in (await nodes.resource_node(estado)).items() if k != "results"})
+    financas, _aviso = nodes._contrato_e_divida(estado)
+    cadastros = [*(estado.get("resource_actions") or []), *(estado.get("resource_draft") or [])]
+    divida = any(c.get("resource") == "debts" and c.get("type") == "resource_create" for c in cadastros)
+    compras = [a for a in financas if a.get("type") == "create_installment_purchase"]
+    cartoes = [{"id": "c1", "name": "Nubank", "type": "credit_card", "closing_day": 3}]
+    oferece = []
+    for a in compras:
+        if a.get("account"):
+            oferece.append(False)  # o modelo inventou um cartão que a frase não tem
+            continue
+        falta = faltando(FinanceAction.model_validate(a), text, BASE["timezone"])
+        pergunta = conversation._pergunta_cartao("d1", cartoes, falta[1] if falta else "", so_cartoes=conversation._so_cartoes(a))
+        oferece.append(bool(falta and falta[0] == "account"
+                            and any("financiamento" in r[1].lower() for r in pergunta.get("rows") or pergunta.get("buttons"))))
+    return {"domains": roteado["domains"], "divida": divida, "compras": len(compras), "oferece_financiamento": oferece}
+
+
 async def resource_followup(first, answer):
     initial = await resource(first)
-    assert initial["resource_draft"], initial
-    return await resource(answer, initial["resource_draft"])
+    rascunho = initial["resource_draft"]
+    if not rascunho:
+        # o modelo completou sozinho já na 1ª volta (ex.: deduziu `savings` de "Reserva"): não há pergunta para
+        # responder. A ação dele vira o pendente, com a pergunta do que a resposta traz, e a 2ª volta mede o mesmo
+        # (a rede de dinheiro / o campo dito).
+        assert initial["resource_actions"], initial
+        rascunho = [{**initial["resource_actions"][0], "_pergunta": "Qual o tipo e o saldo inicial da conta?"}]
+    return await resource(answer, rascunho)
 
 
 async def lembrete_followup(first, answer):
@@ -180,6 +221,22 @@ def escopo_final(result, texto):
     parsed = InstallmentScope(**cru) if cru else None
     final = scope_from_text(texto, parsed)
     return final.mode if final else None
+
+
+def conta_resolvida(termo):
+    """Contra um cartão "Inter" E uma conta "Inter": o que o resolvedor do produto (`resolve_account`) escolheria.
+
+    Devolve o tipo da conta única, "ambigua" se casar com as duas (o produto PERGUNTA, nada errado é escrito) ou
+    None. O modelo diz "cartão Inter" ou "Inter": as duas formas são aceitas, o erro é cair na conta corrente.
+    """
+    from app.domain import matching
+
+    linhas = [{"id": "cartao", "name": "Inter", "type": "credit_card"},
+              {"id": "conta", "name": "Inter", "type": "checking"}]
+    certos = matching.match_accounts(termo, linhas, semelhanca=False, account_type=matching.infer_account_type(termo))
+    if len(certos) == 1:
+        return certos[0]["type"]
+    return "ambigua" if certos else None
 
 
 def eq(actual, expected):
@@ -390,14 +447,11 @@ CASES = [
     ),
     (
         "financing_missing_contract",
-        lambda: resource(
-            "Tenho um financiamento do carro em 48x de1470, estou na nona"
+        lambda: financiamento_sem_contrato(
+            "Tenho um financiamento do carro em 48x de 1470, estou na nona"
         ),
-        lambda r: (
-            eq(r["domains"], ["cadastros"]),
-            eq(r["resource_actions"], []),
-            eq(r["resource_draft"][0]["resource"], "debts"),
-        ),
+        # desfecho, não rota: a dívida a cadastrar, ou a compra sem cartão com a saída "É financiamento"
+        lambda r: eq(r["divida"] or (r["compras"] > 0 and all(r["oferece_financiamento"])), True),
     ),
     (
         "card_purchase",
@@ -406,7 +460,8 @@ CASES = [
             eq(r["domains"], ["financas"]),
             eq(action(r)["type"], "create_installment_purchase"),
             eq(action(r)["amount_cents"], 300000),
-            eq(action(r)["account"], "Inter"),
+            # o que vale é a conta RESOLVIDA, não a string crua: a regra de 22/09/2026 mantém "cartão Inter"
+            eq(conta_resolvida(action(r)["account"]) in ("credit_card", "ambigua"), True),
         ),
     ),
     (
@@ -572,7 +627,9 @@ async def main(args):
                     extracted = observation["resource_actions"][0]
                     eq(extracted["type"], "resource_create")
                     eq(extracted["resource"], expected_resource)
-                    eq(extracted["name"].casefold(), expected_name.casefold())
+                    # o nome pode vir só em `fields` (o `prepare` o promove): vale o do cadastro preparado
+                    nome = extracted.get("name") or observation["resource_prepared"][0]["values"].get("name")
+                    eq((nome or "").casefold(), expected_name.casefold())
                 cache.put(name, {"observation": observation})
                 return {"id": name, "pass": True, "observation": observation}
             except Exception as error:  # noqa: BLE001 — evaluation records failures and continues

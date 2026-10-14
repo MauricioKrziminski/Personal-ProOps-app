@@ -140,6 +140,11 @@ class AgentState(TypedDict, total=False):
     # Só strings: o checkpointer serializa isto, e UUID/date crus não sobrevivem.
     targets: Annotated[list[dict], _replace]
 
+    # Ids do catálogo de ajuda que a triagem escolheu para uma mensagem `geral` (`triagem_da_ajuda`, UMA chamada por
+    # turno): None = não triou (saudação, imagem, modelo fora do ar, outro domínio); [] = o modelo não achou
+    # entrada (fora do app ou sem resposta). `general_node` responde destes ids sem chamar o modelo de novo.
+    ajuda_ids: list[str] | None
+
     # extração incompleta a guardar como rascunho (o worker é quem grava)
     draft: Annotated[dict, _replace]
 

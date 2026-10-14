@@ -465,6 +465,37 @@ cadastros já recebia (`scripts/probe_resposta_ao_cadastro.py`, 4/4 no Gemini re
   ("parcela fixa"), as palavras do seletor do app, e os ícones de pasta; `test_todo_valor_de_enum_tem_rotulo_em_portugues`
   quebra se um enum novo nascer sem rótulo (cores já são palavras em português).
 
+**Rede de dinheiro nos cadastros, forma "pix ou crédito", contrato e triagem da ajuda (15/10/2026, dono do produto: *"não
+deixe nada escapar"*).** O modelo interpreta; o código lê QUANTO e valida a estrutura; dúvida vira pergunta.
+
+- **Nome só em `fields`**: `resources.prepare` promove `fields[identity]` a `action.name` na criação (a frase do SIM e o
+  "Concluído" leem dali; antes: "criar cartão — nome: Inter").
+- **Valor omitido num cadastro** (`_completar_valor_dito`, `_VALOR_DITO`): conta (`initial_balance_cents`), cartão
+  (`credit_limit_cents`), meta (`target_cents`), orçamento (`limit_cents`), bem (`current_value_cents`). Sai de `ctx.texto`
+  SÓ com UM valor claro (`money.leitura_de_valores`), sem o nome do item ("Inter 2") e, no cartão, sem "fecha/vence N".
+  Na conta, dois valores, quantia vaga ("uns trezentos") ou um número que parece ano sem R$/reais PERGUNTA o saldo
+  (`Level1Error` → `resource_draft`, a resposta chega no turno seguinte e a rede lê dela); nos outros cai na pergunta de campo
+  faltante de sempre. Sem dinheiro na frase a conta segue em R$ 0,00 mostrado (não pergunta).
+- **Pix no crédito** (`atributos.forma_em_duvida`, `nodes._perguntar_forma`): modelo diz `credit` e a frase também tem a
+  pista de Pix → o congelamento marca `forma_em_duvida` (sem forma provisória) e o portão faz
+  `kind=choice, purpose=forma_pix_credito` ("Foi Pix no crédito ou compra no cartão de crédito?", `forma:pix | forma:credit`),
+  antes do SIM; a resposta congela `atributos.payment_method` e a frase ("no Pix · …"). Sem cartão a pergunta do cartão vem
+  antes. O outro lado do conflito já não escapa: `pix` sem pista é vetado e `pix` + "crédito" é o Pix no cartão (pergunta o cartão).
+- **Contrato descrito é dívida** (`nodes._contrato_e_divida`, no fan-in `resolve_node`): compra parcelada SEM cartão no
+  mesmo lote de um `resource_create debts` (pronto ou no `resource_draft`) sai, com aviso "Tratei X como financiamento".
+  Só-finanças: a pergunta de cartão da compra sem cartão oferece "É financiamento" (`test_contrato_e_divida.py` prende).
+- **Triagem da ajuda** (`nodes.triagem_da_ajuda`, nó entre `router` e `dominio`): `geral` confiante, não saudação, sem
+  imagem, sozinho → UMA chamada `ajuda.escolher`; ids em `ajuda_ids` (None = não triou; `[]` = fora do app ou sem entrada).
+  `[]` vira a pergunta "Como você quer registrar isso?" (3 opções; "Era uma dúvida sobre o app" devolve o suporte);
+  `general_node` responde dos ids sem segunda chamada. Fica num NÓ porque o `dominio` reexecuta do começo quando é respondido.
+  Modelo fora do ar = não pergunta, ajuda geral. Agradecimento: entrada `agradecimento` (resposta curta, sem rota) e o
+  "valeu"/"obrigado" exato responde igual, sem modelo.
+- **`compose` não devolve mais `llm_calls: 0`**: o 0 explícito ZERA o reducer (`_soma_no_turno`) e apagava as chamadas dos
+  nós anteriores (turno fora de `ai_events` e da cota). Vinha de 13/10/2026.
+- Eval: `evaluate_conversation_understanding.py` compara a conta RESOLVIDA (`card_purchase`), mede o DESFECHO do
+  financiamento (`financing_missing_contract`) e o nome vem do cadastro preparado. **Achado**: "Crie uma conta Reserva" às
+  vezes volta com `type=savings` deduzido do nome — dedução do modelo que o `account_followup` não consegue provar.
+
 **`resolve_account` devolvia `None` para as três situações e ninguém distinguia.**
 Os chamadores faziam `resolve_account(...) or default_account(...)`, então "gastei 45
 no bradesco", sem Bradesco cadastrado, gravava na conta padrão — calado. Pior: o ramo
