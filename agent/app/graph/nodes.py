@@ -1463,7 +1463,8 @@ def _perguntar_pagas(state: AgentState, i: int, acao, alvo: dict) -> tuple[dict,
         "purpose": "recorrente_pagas",
         "action_index": i,
         "action_type": acao.type.value,
-        "summary": f"{quais} Elas e as próximas entram como {varias if len(passadas) > 1 else um} na data, "
+        # "ela/elas E as próximas" é sujeito plural: o adjetivo vai sempre no plural
+        "summary": f"{quais} {'Ela' if len(passadas) == 1 else 'Elas'} e as próximas entram como {varias} na data, "
                    "ou ficam em aberto até você dar baixa?",
         "options": [{"id": "pagas:sim", "label": f"Já {'foi' if len(passadas) == 1 else 'foram'} "
                                                   f"{um if len(passadas) == 1 else varias}"},

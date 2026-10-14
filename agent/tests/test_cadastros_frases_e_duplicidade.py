@@ -153,7 +153,7 @@ async def test_serie_com_inicio_passado_pergunta_se_entra_como_paga(ctx):
     with pytest.raises(Level1Error) as e:
         await resources.prepare(ctx, a)
     m = e.value.mensagem_usuario
-    assert "20/09/2026" in m and "já passou" in m and "entra como paga" in m and "Ainda não salvei" in m
+    assert "20/09/2026" in m and "já passou" in m and "Ela e as próximas entram como pagas" in m and "Ainda não salvei" in m
 
 
 async def test_varias_passadas_perguntam_uma_vez_com_a_contagem(ctx):

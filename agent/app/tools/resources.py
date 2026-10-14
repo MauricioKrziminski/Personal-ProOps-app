@@ -1818,9 +1818,10 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
                          if len(passadas) == 1 else
                          f"{len(passadas)} ocorrências de *{titulo}* já passaram "
                          f"(de {format_date_br(passadas[0])} a {format_date_br(passadas[-1])}).")
-                _error(f"{quais} Elas e as próximas entram como {varias if len(passadas) > 1 else um} na data, "
-                       f"ou ficam em aberto até você dar baixa? Responda *entra como {um if len(passadas) == 1 else varias}* "
-                       "ou *fica em aberto*. Ainda não salvei nada.")
+                # "ela/elas E as próximas" é sujeito plural: o adjetivo vai sempre no plural
+                _error(f"{quais} {'Ela' if len(passadas) == 1 else 'Elas'} e as próximas entram como {varias} na data, "
+                       f"ou ficam em aberto até você dar baixa? Responda *entram como {varias}* "
+                       "ou *ficam em aberto*. Ainda não salvei nada.")
         if action.type == Op.CREATE and action.resource == "reminders":
             values["timezone"] = ctx.timezone
     extra_d = None
