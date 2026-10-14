@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
 import { readingPaneWidths } from '@/design/adaptive-window';
-import { HitTarget, Motion, Radius, Space } from '@/design/tokens';
+import { HitTarget, Motion, Space } from '@/design/tokens';
 import { useAgentConversations } from '@/hooks/use-agent-chat';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -67,6 +67,7 @@ export const AgentRecentConversations = memo(function AgentRecentConversations()
               preview={c.preview ?? null}
               updatedAt={c.last_message_at}
               onOpen={abrir}
+              style={styles.linha}
             />
           ))}
           <Pressable
@@ -88,16 +89,16 @@ export const AgentRecentConversations = memo(function AgentRecentConversations()
 
 const styles = StyleSheet.create({
   root: { gap: Space.md },
-  // Lista de linhas: quem separa uma conversa da outra é a própria linha, não o respiro do card.
-  card: { paddingVertical: Space.xs, paddingHorizontal: Space.sm, gap: 0 },
+  // Lista de linhas: o card não tem respiro (as linhas trazem o delas) e recorta o realce do
+  // toque nos cantos arredondados, como o grupo do `Row`.
+  card: { padding: 0, gap: 0, overflow: 'hidden' },
+  linha: { paddingHorizontal: Space.lg },
   erro: { gap: Space.md, alignItems: 'flex-start' },
   verTodas: {
     minHeight: HitTarget,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: Space.sm,
-    borderRadius: Radius.sm,
-    borderCurve: 'continuous',
+    paddingHorizontal: Space.lg,
   },
 });

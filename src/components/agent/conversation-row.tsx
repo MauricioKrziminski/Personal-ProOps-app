@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Icon } from '@/components/ui/icon';
@@ -18,6 +18,8 @@ interface Props {
   onOpen: (id: string) => void;
   onLongPress?: (id: string) => void;
   selected?: boolean;
+  /** Dentro de um grupo (Card que recorta), a linha leva a calha do `Row` e o realce sangra até a borda. */
+  style?: StyleProp<ViewStyle>;
 }
 
 /**
@@ -36,6 +38,7 @@ export const ConversationRow = memo(function ConversationRow({
   onOpen,
   onLongPress,
   selected = false,
+  style,
 }: Props) {
   const theme = useTheme();
   // O motor escreve `*R$ 45,00*` (negrito do WhatsApp). Numa linha de resumo
@@ -56,6 +59,7 @@ export const ConversationRow = memo(function ConversationRow({
           backgroundColor: pressed || selected ? theme.backgroundSelected : 'transparent',
           borderBottomColor: theme.separator,
         },
+        style,
       ]}>
       <View style={styles.body}>
         <ThemedText type="headline" style={styles.title}>

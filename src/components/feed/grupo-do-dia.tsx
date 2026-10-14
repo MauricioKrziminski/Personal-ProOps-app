@@ -82,7 +82,6 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     borderWidth: 1,
     overflow: 'hidden',
-    paddingVertical: Space.xs,
   },
   fio: { height: StyleSheet.hairlineWidth, marginLeft: Space.lg + COLUNA_DA_HORA + Space.md },
   agora: {
