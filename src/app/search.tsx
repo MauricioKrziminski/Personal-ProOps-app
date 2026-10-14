@@ -150,7 +150,7 @@ export default function SearchScreen() {
               <Row
                 key={n.id}
                 title={noteTitle(n.content) || 'Nota sem título'}
-                subtitle={notePreview(n.content, PREVIA) || (n.source === 'whatsapp' ? 'via WhatsApp' : '')}
+                subtitle={notePreview(n.content, PREVIA) || (n.source === 'whatsapp' ? 'pelo agente' : '')}
                 icon="note.text"
                 onPress={() => router.push(`/notes/${n.id}`)}
               />

@@ -738,7 +738,7 @@ export default function NoteDetailScreen() {
                 </Animated.View>
               ) : note.data ? (
                 <ThemedText type="footnote" themeColor="textSecondary">
-                  {note.data.source === 'whatsapp' ? 'via WhatsApp' : 'no app'} ·{' '}
+                  {note.data.source === 'whatsapp' ? 'pelo agente' : 'no app'} ·{' '}
                   {relativeBR(note.data.updated_at)}
                 </ThemedText>
               ) : null}

@@ -69,7 +69,7 @@ import { alvosDoAberto, estaPaga, hrefDoLembrete, resumoDosAvisos } from '@/lib/
  */
 
 const SOURCE_LABEL: Record<Transaction['source'], string> = {
-  whatsapp: 'via WhatsApp',
+  whatsapp: 'pelo agente',
   app: 'criado no app',
   import: 'importado de extrato',
   recurring: 'gerado por recorrência',

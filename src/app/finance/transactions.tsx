@@ -96,7 +96,7 @@ import {
 
 
 const SOURCE_LABEL: Record<Transaction['source'], string> = {
-  whatsapp: 'via WhatsApp',
+  whatsapp: 'pelo agente',
   app: '',
   import: 'importado',
   recurring: 'recorrente',

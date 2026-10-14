@@ -91,7 +91,7 @@ function NoteCardBase({ note, folderName, folderColor, actions, drag, dragging }
     folderName ? `pasta ${folderName}` : null,
     tags.length > 0 ? `${tags.length} ${tags.length === 1 ? 'tag' : 'tags'}` : null,
     contagem ? `${done} de ${total} itens feitos` : null,
-    note.source === 'whatsapp' ? 'via WhatsApp' : null,
+    note.source === 'whatsapp' ? 'pelo agente' : null,
     `atualizada ${quando}`,
     note.pinned ? 'fixada' : null,
   ]
@@ -175,14 +175,16 @@ function NoteCardBase({ note, folderName, folderColor, actions, drag, dragging }
                       </View>
                     ) : null}
 
-                    {/* A espiral marca o que a IA registrou — o quinto papel previsto em §2b. Um
+                    {/* A espiral marca o que a IA registrou — o quinto papel previsto em §2b, e o rótulo
+                        é "Agente": `source='whatsapp'` quer dizer "pelo agente", que também mora no
+                        chat do app (13/10/2026; dizia "WhatsApp" para nota criada no app). Um
                         balão de conversa diria "veio de um chat"; a marca diz "isto entrou pelo
                         ProOps", que é a informação que importa. */}
                     {note.source === 'whatsapp' ? (
                       <View style={styles.pedaco}>
                         <Mark size={13} color="textSecondary" />
                         <ThemedText type="caption" themeColor="textSecondary">
-                          WhatsApp
+                          Agente
                         </ThemedText>
                       </View>
                     ) : null}
