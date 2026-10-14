@@ -15,7 +15,7 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.types import interrupt
 
 from app import db
-from app.domain.dates import local_datetime_iso, local_iso_date, now_utc
+from app.domain.dates import local_datetime_iso, local_iso_date, now_utc, tz
 from app.graph.policy import (
     describe_for_confirmation,
     dominio_incerto,
@@ -56,7 +56,7 @@ from app.tools import notes as notes_tools
 from app.security import sanitize_untrusted
 from app.services import ia, midia_enviada
 from app.tools.base import ExecContext
-from app.tools.finance import apply_rules
+from app.tools.finance import apply_rules, bump_rule_hits
 from app.conhecimento import ajuda
 from app.conhecimento.app import AJUDA_GERAL
 from app.tools.registry import execute
@@ -749,8 +749,13 @@ async def _congela_pasta_da_regra(workspace_id, acao) -> None:
     """A pasta da regra de nota entra na ação ANTES do SIM: a frase e o efeito dizem a mesma coisa.
 
     `sem_pasta` (a pessoa pediu fora das pastas) vence a regra. Sem `hits` aqui: ela pode recusar.
+    O nome já sai normalizado: é o que `ensure_folder` grava e o que a frase mostra.
     """
-    if acao.type.value != "create_note" or acao.sem_pasta or not acao.content:
+    if acao.type.value != "create_note" or acao.sem_pasta:
+        return
+    if acao.folder:
+        acao.folder = notes_tools.normalize_folder(acao.folder) or None
+    if not acao.content:
         return
     try:
         regra = await notes_tools.regra_da_nota(workspace_id, acao.content, acao.folder)
@@ -758,6 +763,21 @@ async def _congela_pasta_da_regra(workspace_id, acao) -> None:
             acao.folder = regra["pasta"]["name"]
     except Exception:  # noqa: BLE001 — a regra nunca derruba o turno
         log.warning("regra de nota não consultada no parse", exc_info=True)
+
+
+def _congela_lembrete(timezone_name: str, acao) -> None:
+    """O instante que a tool usaria entra em `remind_at` ANTES do SIM (a mesma conta, `instante_do_lembrete`):
+    a frase diz a data e a HORA que vão tocar. Só data vira 00:00, e a frase mostra; vazio ou passado
+    vira a próxima da recorrência. Sem instante (a tool recusa) a ação fica como veio."""
+    if acao.type.value != "create_reminder":
+        return
+    try:
+        quando = notes_tools.instante_do_lembrete(
+            acao.remind_at, guards.clean_rrule(acao.recurrence), timezone_name)
+    except Exception:  # noqa: BLE001 — a tool dá o erro, com a frase certa
+        return
+    if quando is not None:
+        acao.remind_at = quando.astimezone(tz(timezone_name)).strftime("%Y-%m-%dT%H:%M:%S")
 
 
 async def notes_node(state: AgentState) -> dict:
@@ -788,6 +808,7 @@ async def notes_node(state: AgentState) -> dict:
     acoes = [a for a in plano.actions if a.type.value != "unknown"]
     for a in acoes:
         await _congela_pasta_da_regra(state["workspace_id"], a)
+        _congela_lembrete(state.get("timezone", "America/Sao_Paulo"), a)
     return {
         "notes_actions": [a.model_dump() for a in acoes],
         "llm_calls": 1,
@@ -1098,8 +1119,20 @@ async def resolve_node(state: AgentState) -> dict:
 
     # forma de pagamento, fixo/variável, essencial e detalhe que o parse propôs (lote C): só valem se a
     # frase os sustenta; falhar nunca bloqueia o lançamento
+    # a regra de categoria/detalhe do usuário também, e ANTES: os atributos leem a categoria final
+    alvos = await atributos.congelar_regras(
+        state["workspace_id"], acoes, alvos, pular=set(_incompletas(state, acoes)))
     alvos = await atributos.congelar(
         state["workspace_id"], state.get("text", ""), acoes, alvos, pular=set(_incompletas(state, acoes)))
+
+    # pasta que a nota vai CRIAR: a frase diz "(nova)" (o nome já está normalizado no parse)
+    for i, a in enumerate(acoes):
+        if isinstance(a, NotesAction) and a.type.value == "create_note" and a.folder and not a.sem_pasta:
+            try:
+                if not await notes_tools._pasta_existe(state["workspace_id"], a.folder):
+                    alvos[i] = {**alvos[i], "pasta_nova": True}
+            except Exception:  # noqa: BLE001 — só deixa de avisar; a nota é criada igual
+                log.warning("pasta da nota não conferida", exc_info=True)
 
     # nº de parcelas fora de 2..99 é recusado ANTES do SIM: a mesma régua da tool, que só
     # roda depois dele (confirmar uma coisa e ouvir "não dá" é o oposto de pedir confirmação)
@@ -1643,7 +1676,13 @@ async def _executar(
             ctx.action_index = indice
             ctx.target = alvos[indice] or None
             if isinstance(acao, FinanceAction) and acao.type in RULE_APPLIES:
-                acao = await apply_rules(ctx.workspace_id, acao)
+                regra = (alvos[indice] or {}).get("regra")
+                if regra is None:  # sem marcador (checkpoint de antes do deploy, banco fora): como antes
+                    if not acao.categoria_dita:
+                        acao = await apply_rules(ctx.workspace_id, acao)
+                elif regra.get("category"):  # congelada antes do SIM: grava o que a frase disse
+                    await bump_rule_hits(regra["rule_id"])
+                    acao = acao.model_copy(update={"category": regra["category"]})
             resultado = await execute(ctx, acao)
             feitos.append((indice, acao, resultado))
             falhou = resultado.read_only and not resultado.ja_executada

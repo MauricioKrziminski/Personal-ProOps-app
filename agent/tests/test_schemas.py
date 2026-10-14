@@ -41,13 +41,13 @@ MAX_PRODUTO = 198
 # method="json_schema", o que o langchain-google-genai 4.3.7 usa; o de agosto era outro método de
 # envio) — passaram: 24 propriedades opcionais (anyOf null) x enum 14 = 336; 24 x 14 com
 # type:[t,null]; 30 e 36 propriedades sem null; 36 propriedades anyOf x enum 20 = 720 (soma 56).
-# O FinanceAction tem 22 x 14 = 308 (soma 36), com forma de pagamento, fixo/variável, essencial e
+# O FinanceAction tem 23 x 14 = 322 (soma 37), com forma de pagamento, fixo/variável, essencial e
 # detalhe. O gemini-3.7-flash (RESERVA do `structured()`) ainda NÃO foi medido com este schema:
 # crescer além do produto exato abaixo exige medir nos DOIS modelos antes.
 FINANCE_TETO_MEDIDO = 720
 FINANCE_SOMA_TETO_MEDIDA = 56
-FINANCE_PRODUTO_ATUAL = 308
-FINANCE_SOMA_ATUAL = 36
+FINANCE_PRODUTO_ATUAL = 322
+FINANCE_SOMA_ATUAL = 37
 MAX_SOMA = 31
 
 MODELOS = [

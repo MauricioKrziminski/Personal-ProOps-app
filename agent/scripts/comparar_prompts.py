@@ -141,7 +141,7 @@ def so_prompts() -> None:
 
 
 def _resumo(acao: dict) -> dict:
-    return {k: v for k, v in acao.items() if v not in (None, "", [], {}) and k != "confidence"}
+    return {k: v for k, v in acao.items() if v not in (None, "", [], {}) and v is not False and k != "confidence"}
 
 
 async def _um_caminho(v2: bool, texto: str, historico: list[dict]) -> dict:

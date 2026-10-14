@@ -301,6 +301,13 @@ def describe(tx: dict) -> str:
     return partes
 
 
+async def bump_rule_hits(rule_id) -> None:
+    try:
+        await db.execute("select public._bump_rule_hits(%s)", rule_id)
+    except Exception as err:  # noqa: BLE001 — contador não derruba lançamento
+        log.debug("bump_rule_hits ignorado: %s", err)
+
+
 async def apply_rules(workspace_id: UUID, action: FinanceAction) -> FinanceAction:
     """Regra do usuário GANHA da IA.
 
@@ -317,12 +324,18 @@ async def apply_rules(workspace_id: UUID, action: FinanceAction) -> FinanceActio
     if not regra:
         return action
 
-    try:
-        await db.execute("select public._bump_rule_hits(%s)", regra["rule_id"])
-    except Exception as err:  # noqa: BLE001 — contador não derruba lançamento
-        log.debug("bump_rule_hits ignorado: %s", err)
-
+    await bump_rule_hits(regra["rule_id"])
     return action.model_copy(update={"category": regra["category"] or action.category})
+
+
+async def _detalhe_da_regra(ctx: ExecContext, action: FinanceAction, categoria: str | None):
+    """O detalhe da regra que a frase do SIM disse (congelado no alvo). Sem marcador (checkpoint de
+    antes do deploy): consulta como antes. O detalhe DITO nunca chega aqui (`detalhe_valido` vem antes)."""
+    alvo = ctx.target or {}
+    if "regra" not in alvo:
+        return await _subcategory_from_rule(ctx.workspace_id, action, categoria)
+    dado = atributos.detalhe_da_regra(alvo, alvo.get("atributos"))
+    return UUID(dado) if dado else None
 
 
 async def _subcategory_from_rule(workspace_id, action: FinanceAction, category: str | None):
@@ -394,8 +407,7 @@ async def create_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
     categoria = guards.clean_category(action.category)
     attrs = (ctx.target or {}).get("atributos")
     # o detalhe DITO ganha da regra do usuário; a regra só vale quando a pessoa não disse nenhum
-    detalhe = atributos.detalhe_valido(attrs, categoria) or await _subcategory_from_rule(
-        ctx.workspace_id, action, categoria)
+    detalhe = atributos.detalhe_valido(attrs, categoria) or await _detalhe_da_regra(ctx, action, categoria)
     extras = await atributos.colunas(ctx.workspace_id, kind, categoria, attrs)
     # Citou conta que não existe (ou ambígua) -> pergunta. Só quem NÃO citou cai
     # na conta padrão, que é preferência do usuário e não dedução nossa.
@@ -519,8 +531,7 @@ async def create_installment_purchase(
         quando = add_months(quando, -(atual - 1))
     categoria = guards.clean_category(action.category)
     attrs = (ctx.target or {}).get("atributos")
-    detalhe = atributos.detalhe_valido(attrs, categoria) or await _subcategory_from_rule(
-        ctx.workspace_id, action, categoria)
+    detalhe = atributos.detalhe_valido(attrs, categoria) or await _detalhe_da_regra(ctx, action, categoria)
     extras = await atributos.colunas(ctx.workspace_id, "expense", categoria, attrs)
     if extras or (attrs or {}).get("subcategory_id"):
         # Forma, classificação ou detalhe DITOS: o caminho do app (`create_purchase`), que aplica os

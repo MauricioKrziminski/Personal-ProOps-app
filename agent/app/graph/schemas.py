@@ -145,6 +145,9 @@ class FinanceAction(BaseModel):
     account: str | None = Field(
         None, description="Nome da conta ou cartão citado ('no nubank' -> nubank), também quando há forma de pagamento.")
     category: str | None = Field(None, description="Categoria curta e minúscula.")
+    # logo depois de `category` (a ORDEM é a de escrita): a regra do usuário só pode trocar a categoria
+    # que a pessoa NÃO disse
+    categoria_dita: bool = Field(False, description="true só se a pessoa DISSE a categoria ('categoria lazer', 'em saúde').")
     occurred_at: str | None = Field(None, description="Data do lançamento, YYYY-MM-DD.")
     counterparty_account: str | None = Field(
         None, description="Conta destino (transferência, pagamento de fatura)."

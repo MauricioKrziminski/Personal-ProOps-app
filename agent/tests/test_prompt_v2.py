@@ -27,8 +27,8 @@ from app.services import consumo, embeddings, ia
 
 # --- pinos do caminho v1 ------------------------------------------------------------------
 
-PIN_ROUTER = "338041fd"  # 14/10/2026: frase solta é notas; na dúvida geral × notas, notas
-PIN_FINANCE = "d311b689"  # 09/10/2026: detalhe pela palavra-marca, medido no Haiku e no Gemini
+PIN_ROUTER = "dfda2343"  # 14/10/2026: critério de frase solta x pergunta, exemplos fora das avaliações
+PIN_FINANCE = "fb4c0d49"  # 14/10/2026: categoria_dita (a regra do usuário só vale onde a pessoa não disse)
 PIN_FINANCE_QUERY = "5d4cc1d7"
 PIN_NOTES = "28977bc1"  # 13/10/2026: pasta com regra na lista de pastas e a frase sobre ela
 PIN_SCHEMA_ROUTER = "290d403c0f22daf5"

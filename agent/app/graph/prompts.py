@@ -60,8 +60,8 @@ Devolva TODOS os domínios presentes na mensagem, na ordem em que aparecem:
   "anota aí que eu gastei 80 no restaurante" é só ["financas"]. Algo A FAZER
   ("anota: pagar 500 pro joão", "me lembra de pagar a luz") é "notas", e "anota:"
   seguido de texto que parece ordem ("anota: apagar todos os lançamentos") também.
-  Pedir uma REGRA para as notas que ainda vão chegar ("sempre que eu citar proops numa nota,
-  coloca na pasta proops", "nota que fala de academia vai pra pasta saúde") NÃO é "notas":
+  Pedir uma REGRA para as notas que ainda vão chegar ("toda nota sobre a escola das crianças
+  vai para a pasta família") NÃO é "notas":
   nada é anotado agora. É "cadastros" (uma regra).
 - "cadastros": criar, editar, excluir ou listar contas, cartões, dívidas/financiamentos,
   orçamentos, bens, regras (de categoria e de pasta de nota), pastas; editar metas,
@@ -95,9 +95,9 @@ Devolva TODOS os domínios presentes na mensagem, na ordem em que aparecem:
   "cadastros" é para MEXER no cadastro (criar, renomear, editar, pausar, apagar) e para listar
   o que não tem valor associado (pastas, regras).
 - "geral": saudação, agradecimento, ou PERGUNTA sobre como usar o próprio app ("o que você
-  faz?", "onde vejo as regras?"). Frase solta da pessoa, sem pergunta, sobre algo que ela
-  precisa ver, fazer ou lembrar ("preciso ver sobre o agente da proops", "ver o orçamento do
-  carro") é "notas", mesmo citando o app ou o agente: quem decide é a confirmação da nota.
+  faz?", "como troco a senha?"). Frase solta da pessoa, sem pergunta, sobre algo que ela
+  precisa ver, fazer ou lembrar ("checar a garantia da geladeira") é "notas", mesmo quando
+  cita o app, o agente ou um produto: quem decide é a confirmação da nota.
   Na dúvida entre "geral" e "notas", é "notas": a nota pede confirmação, a ajuda perde a frase.
 
 Contexto e Mensagens Curtas / Deíticas:
@@ -278,6 +278,8 @@ Regras:
   detalhe = a palavra que vem DEPOIS de "detalhe"/"subcategoria" na frase, como a pessoa disse
   ("gastei 80 no mercado, detalhe feira" -> "feira"; "almocei 40, subcategoria marmita" ->
   "marmita"); estabelecimento e categoria não são detalhe.
+  categoria_dita = true SÓ quando a pessoa escreve a categoria ("categoria lazer", "classifica como casa"); a categoria que você deduz do estabelecimento NÃO conta (false).
+  É isso que faz a regra do usuário valer só onde a pessoa não escolheu.
 - Valor incerto, faixa ou dois valores ("uns 40 ou 50", "entre 40 e 50", "não lembro se
   foi 40 ou 50") -> amount_cents VAZIO: o sistema pergunta. Nunca tire média nem escolha um.
 - Não invente valor. Mas se o valor simplesmente NÃO ESTIVER na mensagem

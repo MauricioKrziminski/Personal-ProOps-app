@@ -165,7 +165,7 @@ nenhum outro:
   6/6**, regressão nascida quando `payment_method` entrou no parse). Ordem atual:
   `type → target_ref → description → amount_cents → account → …`. Campo novo entra pensando nisso,
   e com sonda antes e depois: a mesma troca que conserta um tipo de ação pode tirar o campo de outro.
-- Por isso Finanças são **dois** schemas: escrita/correção (`FinanceAction`: 22 campos × 14 = 308) e consulta (`FinanceQuery`: 13 × 13 = 169, com `continua_anterior` e `mostrar`; medido em 06/10/2026). Escrita e
+- Por isso Finanças são **dois** schemas: escrita/correção (`FinanceAction`: 23 campos × 14 = 322) e consulta (`FinanceQuery`: 13 × 13 = 169, com `continua_anterior` e `mostrar`; medido em 06/10/2026). Escrita e
   correção ficam juntas de propósito — separá-las obrigaria o router a decidir se "o mercado de
   ontem foi 120" é lançamento novo ou correção, e errar isso cria a duplicata que o produto
   inteiro luta para evitar.

@@ -545,6 +545,59 @@ def secoes():
              lambda a: bool(a) and not a.get("sem_pasta") and (a.get("folder") or "").lower() == "proops",
              "pasta=proops, sem_pasta=false", lambda: _nota("anota: ideia pro agente da proops")),
         ],
+        # O pedido de "sem pasta" dito de jeitos que o prompt não mostra (o campo é semântico, não
+        # palavra-chave), e o controle: pasta dita explicitamente vence a regra (14/10/2026).
+        "notas/fora da pasta, outras formas": [
+            (t, lambda a: bool(a) and a.get("sem_pasta") is True and not a.get("folder"),
+             "sem_pasta=true", lambda t=t: _nota(t))
+            for t in ["deixa essa nota solta: revisar o pitch da proops",
+                      "anota sem pasta nenhuma: proops precisa de logo novo",
+                      "anota mas não põe em pasta: falar com o time da proops",
+                      "guarda isso fora de qualquer pasta: métricas da proops",
+                      "anota: ideia pra proops. não precisa organizar em pasta"]
+        ] + [
+            (t, lambda a: bool(a) and not a.get("sem_pasta") and (a.get("folder") or "").lower() == "trabalho",
+             "pasta=trabalho (a dita)", lambda t=t: _nota(t))
+            for t in ["anota na pasta trabalho: proposta da proops pro cliente"]
+        ],
+        # Frase solta x pergunta sobre o app: conjunto FORA do prompt do roteador (nenhuma destas
+        # frases, nem paráfrase próxima, está lá). Mede o critério, não o caso que o motivou.
+        "roteamento/frase solta é nota": [
+            (t, lambda d: d == ["notas"], "->notas", lambda t=t: _dominios(t))
+            for t in ["ver se o fornecedor mandou o orçamento das caixas",
+                      "falar com a contadora sobre o MEI",
+                      "revisar o fluxo de cadastro do app novo",
+                      "pesquisar seguro viagem pra dezembro",
+                      "trocar a lâmpada da cozinha",
+                      "ideia de nome pro podcast: papo de planilha",
+                      "levar o carro na revisão dos 30 mil",
+                      "marcar dentista pras crianças",
+                      "estudar a documentação do agente de IA da empresa",
+                      "o porteiro pediu pra avisar da reunião de condomínio",
+                      "lembrar a ana do aniversário do pedro",
+                      "testar o aplicativo do banco novo"]
+        ],
+        "roteamento/pergunta do app é ajuda": [
+            (t, lambda d: d == ["geral"], "->geral", lambda t=t: _dominios(t))
+            for t in ["como eu exporto meus dados?", "tem modo escuro?", "dá pra usar no computador?",
+                      "o agente consegue ler foto de cupom?", "como apago uma regra?",
+                      "onde mudo o dia que fecha meu mês?", "boa noite", "valeu, ajudou muito"]
+        ] + [
+            (t, lambda d, e=e: d == [e], f"->{e}", lambda t=t: _dominios(t))
+            for t, e in [("paguei 120 de luz", "financas"), ("quanto falta da fatura?", "financas_consulta")]
+        ],
+        # `categoria_dita`: a regra do usuário só troca a categoria que a pessoa NÃO escreveu. Frases fora
+        # do prompt; mede o campo do parse (14/10/2026).
+        "categoria/dita x regra": [
+            (t, lambda x: len(x) == 1 and x[0].get("categoria_dita") is True, "categoria_dita=true",
+             lambda t=t: _acoes(t))
+            for t in ["gastei 40 no posto, coloca em viagem", "almoço 32 reais, categoria trabalho",
+                      "paguei 90 de academia em saúde"]
+        ] + [
+            (t, lambda x: len(x) == 1 and not x[0].get("categoria_dita"), "categoria_dita=false",
+             lambda t=t: _acoes(t))
+            for t in ["gastei 40 no posto", "uber 23", "comprei pão 12"]
+        ],
         "notas/fixar": [
             (t, _campo("notes", "pinned", "true"), "notes.pinned=true",
              lambda t=t: _recurso(t))

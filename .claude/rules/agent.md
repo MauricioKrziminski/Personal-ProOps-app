@@ -86,7 +86,7 @@ O serviço que recebe do WhatsApp, decide e escreve. Substituiu o par
   com a mesma imagem) e "Já comprei, lançar". Comprovante, fatura, outro ou leitura fora do ar seguem o `finance_node`
   (`llm_calls` 2, ou 1 sem leitura).
 - **Teto MEDIDO do schema: o PRODUTO propriedades × valores de enum, não cada um.** O
-  `FinanceAction` está em **308** (22×14, soma 36; teto medido de 720 no Lite em 06/10/2026, ver
+  `FinanceAction` está em **322** (23×14, soma 37, com `categoria_dita`; teto medido de 720 no Lite em 06/10/2026, ver
   `ia.md`); os outros seguem em 198/31. Passar disso devolve `400 INVALID_ARGUMENT` sem detalhe. `tests/test_schemas.py` prende o limite — somar campo
   exige tirar outro, ou rodar o probe antes. Números e histórico em `ia.md`.
 
@@ -195,7 +195,7 @@ foi assim que renomear um lançamento ficou de fora por meses.
 Onde a capacidade nova cabe, em ordem: **campo no catálogo de `ResourceAction`** (5×5, sobra
 folga, e campo virtual traduzido no `prepare` não precisa nem existir como coluna) → **alvo novo
 resolvido** para uma ação que já existe → tipo de ação novo, que hoje **não cabe** em
-`FinanceAction` (22 campos × 14 = 308, teto medido de 720 em 06/10/2026; ver `ia.md`).
+`FinanceAction` (23 campos × 14 = 322, teto medido de 720 em 06/10/2026; ver `ia.md`).
 
 ## Correção de compra parcelada, sem menu (21/09/2026)
 

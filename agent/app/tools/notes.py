@@ -275,14 +275,20 @@ async def delete_note(ctx: ExecContext, action: NotesAction) -> ToolResult:
     return ToolResult("🗑️ Nota na lixeira — 30 dias para restaurar.", result_id=achadas[0]["id"])
 
 
+def instante_do_lembrete(remind_at: str | None, rrule: str | None, timezone_name: str):
+    """Quando o lembrete toca: o `remind_at` (só data = 00:00 local) ou, se vazio/passado, a próxima da
+    recorrência. UMA conta para a tool e para a frase do SIM (`nodes._congela_lembrete`)."""
+    quando = to_instant(remind_at, timezone_name) if remind_at else None
+    if quando is None or quando <= now_utc():
+        quando = next_occurrence(rrule, now_utc(), timezone_name) if rrule else None
+    return quando
+
+
 async def create_reminder(ctx: ExecContext, action: NotesAction) -> ToolResult:
     titulo = guards.require_text(action.content, o_que="o que lembrar", maximo=200)
     rrule = guards.clean_rrule(action.recurrence)
 
-    quando = to_instant(action.remind_at, ctx.timezone) if action.remind_at else None
-    if quando is None or quando <= now_utc():
-        # sem hora explícita (ou já passou), a recorrência define a próxima
-        quando = next_occurrence(rrule, now_utc(), ctx.timezone) if rrule else None
+    quando = instante_do_lembrete(action.remind_at, rrule, ctx.timezone)
     if quando is None:
         raise Level1Error(
             "❌ Não entendi quando lembrar. Tenta \"amanhã às 9\" ou \"todo dia 5\"."

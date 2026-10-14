@@ -18,7 +18,7 @@ import logging
 from app import db
 from app.domain import atributos as dom
 from app.domain import matching
-from app.graph.schemas import FinanceAction, FinanceActionType
+from app.graph.schemas import RULE_APPLIES, FinanceAction, FinanceActionType
 from app.tools import guards
 
 log = logging.getLogger(__name__)
@@ -235,3 +235,60 @@ def aviso_do_detalhe(attrs: dict | None, categoria: str | None) -> str:
         return (f"\nO detalhe *{attrs.get('subcategory_name') or 'dito'}* não foi gravado: "
                 f"a categoria virou *{categoria or 'sem categoria'}*.")
     return ""
+
+
+async def regra_que_casa(workspace_id, acao: FinanceAction) -> dict | None:
+    """A regra do usuário que casa com o lançamento (`category`, `rule_id`, `subcategory_id`), SEM efeito.
+
+    Roda na fase cognitiva (papel de serviço, fora do trecho `sob_rls`): a versão pública
+    `_match_rule` é a mesma que `finance.apply_rules` consulta na execução.
+    """
+    texto = " ".join(p for p in (acao.description, acao.category) if p)
+    if not texto:
+        return None
+    return await db.fetch_one(
+        "select category, rule_id, subcategory_id from private.match_rule_subcategory(%s, %s) limit 1",
+        workspace_id, texto)
+
+
+async def congelar_regras(workspace_id, acoes: list, alvos: list[dict], pular: set[int] | None = None) -> list[dict]:
+    """A regra de categoria/detalhe do usuário entra ANTES do SIM: a frase diz o que será gravado.
+
+    `alvos[i]["regra"] = {rule_id, category, subcategory_id, subcategory_name}`: `category`/`rule_id`
+    só quando a regra TROCOU a categoria (a pessoa não a disse: `categoria_dita`); o detalhe da regra
+    vale quando a regra é da categoria FINAL. Troca `acoes[i].category` no lugar, para os atributos
+    (padrão da categoria, detalhe dito) lerem a categoria final. Falha do banco = sem marcador, e o
+    executor aplica a regra como antes (também o caso de checkpoint anterior a este código).
+    """
+    alvos = [*alvos] + [{}] * max(0, len(acoes) - len(alvos))
+    for i, a in enumerate(acoes):
+        if (not isinstance(a, FinanceAction) or a.type not in RULE_APPLIES
+                or i in (pular or set()) or alvos[i].get("correction_error")):
+            continue
+        try:
+            r = await regra_que_casa(workspace_id, a)
+            aplicada = bool(r and r["category"] and not a.categoria_dita)
+            final = r["category"] if aplicada else a.category
+            sub_id = sub_nome = None
+            if r and r["subcategory_id"] and final and matching.normalize(r["category"] or "") == matching.normalize(final):
+                linha = await db.fetch_one(
+                    "select name from public.subcategories where id = %s and workspace_id = %s",
+                    r["subcategory_id"], workspace_id)
+                if linha:
+                    sub_id, sub_nome = str(r["subcategory_id"]), linha["name"]
+        except Exception as err:  # noqa: BLE001 — a regra nunca derruba o lançamento
+            log.warning("regra do lançamento não consultada no parse: %s", err)
+            continue
+        alvos[i] = {**alvos[i], "regra": {
+            "rule_id": str(r["rule_id"]) if aplicada else None, "category": r["category"] if aplicada else None,
+            "subcategory_id": sub_id, "subcategory_name": sub_nome}}
+        if aplicada:
+            acoes[i] = a.model_copy(update={"category": r["category"]})
+    return alvos
+
+
+def detalhe_da_regra(alvo: dict | None, attrs: dict | None) -> str | None:
+    """O detalhe que a regra congelou, se a pessoa não disse nenhum (o dito vale mais)."""
+    if (attrs or {}).get("subcategory_id"):
+        return None
+    return ((alvo or {}).get("regra") or {}).get("subcategory_id")

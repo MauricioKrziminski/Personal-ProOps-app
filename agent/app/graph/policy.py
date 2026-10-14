@@ -596,6 +596,18 @@ def par_de_substituicao(acoes: list, alvos: list[dict | None]) -> set[int]:
     return set()
 
 
+def _da_regra_do_usuario(target: dict | None) -> list[str]:
+    """O que a regra do usuário decidiu (congelado em `resolve_node`): categoria e detalhe, para a
+    frase do SIM dizer o que será gravado. O detalhe DITO (nos atributos) já está na frase própria."""
+    regra = (target or {}).get("regra") or {}
+    attrs = (target or {}).get("atributos") or {}
+    return [p for p in (
+        f"categoria {regra['category']} (sua regra)" if regra.get("category") else None,
+        f"detalhe {regra['subcategory_name']} (sua regra)"
+        if regra.get("subcategory_name") and not attrs.get("subcategory_id") else None,
+    ) if p]
+
+
 def describe_for_confirmation(
     action: FinanceAction | FinanceQuery | NotesAction, target: dict | None = None,
     hoje: str | None = None,
@@ -739,7 +751,9 @@ def describe_for_confirmation(
             n = action.installments or 0
             cada = (f" de {cents_to_brl(action.amount_cents // n)}"
                     if n and action.amount_cents and action.amount_cents % n == 0 else "")
-            entendido = f" ({frase})" if (frase := ((target or {}).get("atributos") or {}).get("frase")) else ""
+            partes = [p for p in (((target or {}).get("atributos") or {}).get("frase"),
+                                  *_da_regra_do_usuario(target)) if p]
+            entendido = f" ({' · '.join(partes)})" if partes else ""
             return f"registrar {valor}{nome} em {action.installments}x{cada} no cartão {action.account or 'a informar'}{entendido}: {paid} parcelas iniciais pagas e {(action.installments or 0)-paid} pendentes"
         if tipo == "create_goal":
             nome = action.target_ref or action.description or "a meta"
@@ -783,14 +797,18 @@ def describe_for_confirmation(
         # Sem `hoje` (chamador que não sabe o fuso), a data aparece sempre que existir.
         quando = (f" em {format_date_br(action.occurred_at)}"
                   if action.occurred_at and action.occurred_at[:10] != hoje else "")
+        da_regra = _da_regra_do_usuario(target)
         categoria = (f", categoria {action.category}"
                      if tipo in {"create_expense", "create_income"}
                      and action.description and action.category
                      and action.description.strip().casefold() != action.category.strip().casefold()
                      else "")
+        if ((target or {}).get("regra") or {}).get("category") and tipo in {"create_expense", "create_income"}:
+            categoria = f", {da_regra.pop(0)}"  # a que a REGRA pôs (a do parse não será a gravada)
         repete = f", repete {descreve_rrule(action.recurrence)}" if action.recurrence else ""
         # o que o parse entendeu e a ancoragem validou (forma, fixo/variável, essencial, detalhe — lote C)
-        entendido = f", {frase}" if (frase := ((target or {}).get("atributos") or {}).get("frase")) else ""
+        frase = ((target or {}).get("atributos") or {}).get("frase")
+        entendido = "".join(f", {p}" for p in (frase, *da_regra) if p)
         if valor:
             return f"registrar {o_que}{valor} em {alvo}{quando}{categoria}{onde}{entendido}{repete}"
         return f"registrar {alvo}{quando}{categoria}{onde}{entendido}{repete}"
@@ -801,7 +819,8 @@ def describe_for_confirmation(
     if tipo == "delete_reminder":
         return f"cancelar o lembrete de {alvo}"
     if tipo == "create_note":
-        pasta = " fora das pastas" if action.sem_pasta else f" na pasta {action.folder}" if action.folder else ""
+        nova = " (nova)" if (target or {}).get("pasta_nova") else ""
+        pasta = " fora das pastas" if action.sem_pasta else f" na pasta {action.folder}{nova}" if action.folder else ""
         return f"criar a nota {previa_da_nota(action.content)}{pasta}"
     if tipo == "create_reminder":
         quando = ""
