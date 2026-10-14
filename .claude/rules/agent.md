@@ -434,6 +434,30 @@ cadastros já recebia (`scripts/probe_resposta_ao_cadastro.py`, 4/4 no Gemini re
   antes do SIM e a frase diz "parcelas fixas, juros incluídos… taxa não informada", então não é
   silencioso.
 
+**Staging, 14/10/2026 (chat real, Haiku): quatro defeitos de cadastro e lembrete.**
+
+- **Série nova de gasto/receita tem um dono só: o nó de finanças.** Com `financas` no lote, `resource_node`
+  descarta `resource_create recurring` (como já fazia com nota/lembrete e `notas`); a TRANSFERÊNCIA recorrente
+  (finanças não cria) e editar/pausar/apagar série seguem nos cadastros. Era "gastei 30 de uber e vai repetir
+  todo mês" aprovando duas séries. Limite: se o parse de finanças perder uma série dita na mesma frase, ela não
+  é recuperada pelos cadastros.
+- **Lembrete pendente (`notes_draft`) só preenche a peça que faltava.** `_com_campos_do_lembrete` herda data,
+  hora e repetição do pendente apenas quando a ação devolvida não traz `content` ou traz o MESMO (comparado
+  normalizado); conteúdo diferente é lembrete novo, avaliado sozinho, e o pendente é descartado com uma linha
+  ("Deixei de lado o lembrete de *X*, que estava sem hora."). O turno humano manda o modelo devolver o
+  `content` do pedido novo.
+- **Frase de cadastro de série**: frequência em palavras (`descreve_rrule`, a mesma do "repete todo dia 14" das
+  finanças), nunca RRULE crua; lançamento recorrente é DATA (sem "às 00:00"); "próximo envio" é de lembrete: na
+  série a frase diz "próxima: dd/mm" só quando difere da primeira. `next_run_at` ARMAZENADO continua sendo o
+  início (o materializador parte dele; o agendador o move para a próxima futura em até 1 min, igual ao app).
+  O rótulo de `auto_confirm` é o do formulário ("entra como pago/recebido/feita na data").
+- **Início no passado pergunta, não decide**: série nova com ocorrências antes de hoje e sem `auto_confirm` dito
+  vira UMA pergunta (com a contagem) "entram como pagas na data (e as próximas) ou ficam em aberto?"; a resposta
+  preenche `auto_confirm` pelo rascunho. Início hoje ou futuro não pergunta.
+- **Enum cru não vai à frase**: `ROTULO_DE_ENUM` cobre `amortized` ("com juros ao mês") e `fixed_installments`
+  ("parcela fixa"), as palavras do seletor do app, e os ícones de pasta; `test_todo_valor_de_enum_tem_rotulo_em_portugues`
+  quebra se um enum novo nascer sem rótulo (cores já são palavras em português).
+
 **`resolve_account` devolvia `None` para as três situações e ninguém distinguia.**
 Os chamadores faziam `resolve_account(...) or default_account(...)`, então "gastei 45
 no bradesco", sem Bradesco cadastrado, gravava na conta padrão — calado. Pior: o ramo

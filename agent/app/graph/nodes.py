@@ -49,6 +49,7 @@ from app.graph.schemas import (
 from app.domain import matching
 from app.domain.reference import pergunta_do_antecedente
 from app.domain.required import faltando
+from app.domain.categories import normalize
 from app.domain.money import cents_to_brl
 from app.graph.state import CHAVE_MIDIA, AgentState
 from app.tools import atributos, guards, lote_d, movimentos, resolve
@@ -813,6 +814,8 @@ def _com_campos_do_lembrete(acoes: list, pendentes: list[dict]) -> list:
     for a in acoes:
         if a.type.value != "create_reminder":
             continue
+        if a.content and normalize(a.content) != normalize(antigo.get("content") or ""):
+            continue  # outro lembrete, completo por si: não herda data nem repetição do pendente (14/10/2026)
         a.content = a.content or antigo.get("content")
         if not a.recurrence and guards.clean_rrule(antigo.get("recurrence")):
             a.recurrence = antigo.get("recurrence")
@@ -851,7 +854,8 @@ async def notes_node(state: AgentState) -> dict:
             + "\nA mensagem dele é a RESPOSTA a isso: devolva o MESMO create_reminder pendente com content e"
             " recurrence mantidos e remind_at completado ou corrigido pela resposta (ISO com data e hora; a"
             " data do pendente vale se ele só disse a hora). Se ele desistiu do lembrete, devolva actions"
-            " vazio. Se for um pedido novo, trate como pedido novo."
+            " vazio. Se for um pedido novo (outro lembrete, com o seu próprio texto), devolva a ação dele com o"
+            " content DO PEDIDO NOVO e só com o que ele mesmo disse: nunca use data, hora nem repetição do pendente."
         )
     modelo = ia.structured(
         NotesPlan, ia.PAPEL_PARSE, no="notes", versao=ia.versao_do_prompt(NOTES)
@@ -872,6 +876,11 @@ async def notes_node(state: AgentState) -> dict:
                 "results": [*state.get("results", []), "Lembrete cancelado. Não salvei nada."]}
     acoes = _com_campos_do_lembrete(acoes, pendentes)
     prontas, incompletas, perguntas = [], [], []
+    antigo = next((p for p in pendentes if p.get("type") == "create_reminder"), None)
+    if antigo and any(a.type.value == "create_reminder" and normalize(a.content or "") != normalize(antigo.get("content") or "")
+                      for a in acoes):
+        # pedido novo no lugar do pendente (resource_draft: o novo descarta o velho): a pessoa fica sabendo
+        perguntas.append(f"Deixei de lado o lembrete de *{antigo.get('content')}*, que estava sem hora.")
     for a in acoes:
         await _congela_pasta_da_regra(state["workspace_id"], a)
         if a.type.value == "create_reminder":
@@ -1003,6 +1012,14 @@ Catálogo:
         # notas no lote, criar nota/lembrete aqui é sempre eco; editar continua sendo daqui.
         planned = [a for a in planned
                    if not (a.type == ResourceActionType.CREATE and a.resource in {'notes', 'reminders'})]
+    if Domain.FINANCAS.value in (state.get('domains') or []):
+        # ⚠️ **Gasto/receita recorrente NOVO tem um dono só: o nó de finanças** (14/10/2026). "gastei 30 de
+        # uber e vai repetir todo mês" ia aos dois extratores e o SIM aprovava DUAS séries. Com finanças no
+        # lote, criar série de gasto/receita aqui é eco; a TRANSFERÊNCIA recorrente (que o nó de finanças
+        # não cria) e editar/pausar/apagar série existente continuam sendo daqui.
+        planned = [a for a in planned
+                   if not (a.type == ResourceActionType.CREATE and a.resource == 'recurring'
+                           and next((f.value for f in a.fields if f.name == 'kind'), None) != 'transfer')]
     context=ExecContext(state['user_id'],state['workspace_id'],state.get('phone'),state['timezone'],state.get('text',''),state['source_message_id'])
     actions, prepared, incomplete, questions = [], [], [], []
     for action in planned:

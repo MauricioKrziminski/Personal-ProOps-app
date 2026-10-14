@@ -146,6 +146,14 @@ async def lembrete_followup(first, answer):
     return {"domains": roteado["domains"], **segundo}
 
 
+async def serie_nos_dois_nos(text):
+    """Router devolveu financas + cadastros (staging, 14/10/2026): a série nova tem UM dono, o nó de finanças."""
+    inicial = state(text, domains=["financas", "cadastros"])
+    fin = await nodes.finance_node(inicial)
+    cad = await nodes.resource_node(inicial)
+    return {"finance_actions": fin.get("finance_actions", []), "resource_actions": cad.get("resource_actions", [])}
+
+
 def action(result):
     return result["actions"][0]
 
@@ -339,6 +347,26 @@ CASES = [
             eq(len(r["notes_actions"]), 1),
             eq(r["notes_actions"][0]["remind_at"][11:16], "09:00"),
             eq(r["notes_draft"], []),
+        ),
+    ),
+    (
+        "serie_nova_um_dono_so",
+        lambda: serie_nos_dois_nos("gastei 30 de uber e vai repetir todo mes"),
+        lambda r: (
+            eq(len(r["finance_actions"]), 1),
+            eq(bool(r["finance_actions"][0].get("recurrence")), True),
+            eq([a for a in r["resource_actions"] if a["resource"] == "recurring"], []),
+        ),
+    ),
+    (
+        # lembrete pendente + pedido NOVO completo: não herda a data nem a repetição do pendente
+        "lembrete_pedido_novo_nao_herda",
+        lambda: lembrete_followup("me lembra de pagar o aluguel todo dia 5", "me lembra hoje as 8 da manha de tomar o remedio"),
+        lambda r: (
+            eq(r["domains"], ["notas"]),
+            eq([a for a in r["notes_actions"] + r["notes_draft"] if a.get("recurrence")], []),
+            eq([a for a in r["notes_actions"] + r["notes_draft"] if a.get("content") != "tomar o remédio"
+                and "remédio" not in (a.get("content") or "").lower()], []),
         ),
     ),
     (
