@@ -249,7 +249,10 @@ begin
   -- Debt method edits retain cash arithmetic and respect numbered one/future/all scopes.
   insert into public.debts(user_id,name,kind,principal_cents,remaining_cents,interest_rate_monthly,
     installments,installments_paid,installment_cents,calculation_mode,account_id,due_day,first_due_date,payment_method)
-    values(u,'F01 debt','loan',3000,3000,0,3,0,1000,'fixed_installments',bank,10,current_date+10,'boleto') returning id into debt;
+    -- due_day = o dia da âncora: com 10 fixo, a 1ª parcela caía no dia 10 do mês de hoje+10, que
+    -- depois do dia 10 já passou e saía da janela de hoje a +60 (CI vermelho desde 12/10/2026).
+    values(u,'F01 debt','loan',3000,3000,0,3,0,1000,'fixed_installments',bank,
+           extract(day from current_date+10)::int,current_date+10,'boleto') returning id into debt;
   select edit_revision into revision from public.debts where id=debt;
   req:=gen_random_uuid();
   debt_result:=public.update_debt_contract_scoped(debt,1,'one','{"payment_method":"pix"}',revision,'{}',req);

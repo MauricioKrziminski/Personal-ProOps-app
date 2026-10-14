@@ -187,7 +187,8 @@ begin
       'ai_events','agent_feedback','alerts_sent','billing_events','user_sessions','messages_queue',
       'messages_raw','pending_actions','draft_actions','executed_actions','agent_routing',
       'app_chat_messages','jobs','transaction_embeddings','net_worth_snapshots',
-      'whatsapp_sends')  -- whatsapp_sends: contador de envios do agente (infra, sem policy; só o agente escreve)
+      'whatsapp_sends',  -- whatsapp_sends: contador de envios do agente (infra, sem policy; só o agente escreve)
+      'ai_reports')  -- ai_reports: denúncia de resposta da IA (sem policy; só o agente escreve, como agent_feedback)
     and not exists (
       select 1 from pg_catalog.pg_trigger g
       where g.tgrelid = format('public.%I', c.table_name)::regclass
