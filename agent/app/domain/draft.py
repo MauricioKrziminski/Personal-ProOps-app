@@ -245,6 +245,11 @@ def mesclar(acao_guardada: dict, decidido: dict) -> dict:
     slot = decidido.get("slot")
     if slot == 'already_paid_count':
         juntado['already_paid_count']=decidido['already_paid_count']
+        total, atual = _parcelas(juntado), juntado.get('current_installment')
+        if atual is not None and total >= 2 and not 1 <= atual <= total:
+            # a atual que a pessoa disse não cabia na compra: a resposta (quantas já pagas) a refaz
+            proxima = decidido['already_paid_count'] + 1
+            juntado['current_installment'] = proxima if proxima <= total else None
     elif slot == "account":
         juntado["account"] = decidido["account"]
     elif slot == "description":

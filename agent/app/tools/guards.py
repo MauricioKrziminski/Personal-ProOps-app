@@ -140,14 +140,17 @@ def require_installments(n: int | None) -> int:
 def require_current_installment(atual: int | None, total: int) -> int:
     """Em que parcela a compra já está. 1 = compra de agora.
 
-    Fora de 1..total é o modelo entendendo errado ("tô na 12ª de 10"), e aí a
-    retroação jogaria o histórico para um passado que não existe. Cair para 1
-    perde a informação mas não inventa nenhuma — e o usuário corrige numa
-    mensagem.
+    Fora de 1..total é contradição ("tô na 12ª de 10"): `required.faltando` PERGUNTA antes do SIM
+    (14/10/2026). Se chegar aqui mesmo assim, recusa — cair para 1 em silêncio é deduzir.
     """
     if not isinstance(atual, int) or isinstance(atual, bool):
         return 1
-    return atual if 1 <= atual <= total else 1
+    if not 1 <= atual <= total:
+        raise Level1Error(
+            f"❌ A compra tem {total} parcelas e a parcela atual ({atual}) não cabe. "
+            "Me diz quantas já foram pagas. Ainda não registrei nada."
+        )
+    return atual
 
 
 def clean_rrule(value: str | None) -> str | None:

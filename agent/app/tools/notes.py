@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import timedelta
+from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 
 from app import db
@@ -22,6 +22,7 @@ from app.domain.dates import (
     local_now,
     now_utc,
     to_instant,
+    tz,
 )
 from app.domain.recurrence import descreve_rrule, em_pausa, next_occurrence
 from app.graph.schemas import NotesAction
@@ -275,13 +276,70 @@ async def delete_note(ctx: ExecContext, action: NotesAction) -> ToolResult:
     return ToolResult("🗑️ Nota na lixeira — 30 dias para restaurar.", result_id=achadas[0]["id"])
 
 
+def _instante_dito(remind_at: str | None, timezone_name: str):
+    """O instante que a pessoa DISSE (data E hora), ou None. Só data não é instante: a hora não
+    se inventa (14/10/2026) — `to_instant` carimbava 00:00 e, ilegível, devolvia "agora"."""
+    cru = (remind_at or "").strip()
+    if len(cru) <= 10:  # sem componente de hora (ou vazio)
+        return None
+    try:
+        lido = datetime.fromisoformat(cru[:-1] + "+00:00" if cru.endswith("Z") else cru)
+    except ValueError:
+        return None
+    return (lido if lido.tzinfo else lido.replace(tzinfo=tz(timezone_name))).astimezone(UTC)
+
+
 def instante_do_lembrete(remind_at: str | None, rrule: str | None, timezone_name: str):
-    """Quando o lembrete toca: o `remind_at` (só data = 00:00 local) ou, se vazio/passado, a próxima da
-    recorrência. UMA conta para a tool e para a frase do SIM (`nodes._congela_lembrete`)."""
-    quando = to_instant(remind_at, timezone_name) if remind_at else None
-    if quando is None or quando <= now_utc():
-        quando = next_occurrence(rrule, now_utc(), timezone_name) if rrule else None
-    return quando
+    """Quando o lembrete toca, ou None se falta algo que só a pessoa sabe (hora dita, data legível,
+    futuro, regra válida). UMA conta para a tool, a pergunta e a frase do SIM (`nodes._congela_lembrete`).
+    Com recorrência a primeira é a próxima ocorrência NAQUELA hora."""
+    dito = _instante_dito(remind_at, timezone_name)
+    if dito is None:
+        return None
+    if rrule:
+        proxima = next_occurrence(rrule, now_utc(), timezone_name, dtstart=dito)
+        return proxima or (dito if dito > now_utc() else None)
+    return dito if dito > now_utc() else None
+
+
+def _dia_dito(remind_at: str | None, timezone_name: str) -> str:
+    """" amanhã (15/10)" / " hoje (14/10)" / " dia 20/10", ou "" se a data não é legível."""
+    dia = (remind_at or "").strip()[:10]
+    try:
+        date.fromisoformat(dia)
+    except ValueError:
+        return ""
+    br = format_date_br(dia)
+    if dia == local_iso_date(timezone_name):
+        return f" hoje ({br[:5]})"
+    if dia == local_iso_date(timezone_name, now_utc() + timedelta(days=1)):
+        return f" amanhã ({br[:5]})"
+    return f" dia {br}"
+
+
+def pergunta_do_lembrete(titulo: str | None, remind_at: str | None, recurrence: str | None,
+                         timezone_name: str) -> str | None:
+    """A PERGUNTA do que falta para criar o lembrete, ou None se está completo (14/10/2026: "sempre
+    pergunte e nunca deduza"). Valida ESTRUTURA (componente de hora, instante legível, futuro, RRULE)."""
+    nome = f"*{(titulo or 'isso').strip()}*"
+    regra = guards.clean_rrule(recurrence)
+    if (recurrence or "").strip() and not regra:
+        return f"Não entendi como {nome} se repete — todo dia, toda semana, todo mês…? Me diz também a hora."
+    if instante_do_lembrete(remind_at, regra, timezone_name) is not None:
+        return None
+    if regra and next_occurrence(regra, now_utc(), timezone_name) is None:
+        return f"Não entendi como {nome} se repete — todo dia, toda semana, todo mês…? Me diz também a hora."
+    cru = (remind_at or "").strip()
+    if len(cru) > 10 and _instante_dito(cru, timezone_name) is None:
+        return f"Não entendi quando lembrar de {nome}. Me diz o dia e a hora (ex.: amanhã às 9)."
+    if len(cru) > 10 and not regra:
+        passou = _instante_dito(cru, timezone_name).astimezone(tz(timezone_name))
+        return (f"Esse horário já passou ({passou.strftime('%d/%m às %H:%M')}): para quando eu te "
+                f"lembro de {nome}?")
+    onde = f" {descreve_rrule(regra)}" if regra else _dia_dito(cru, timezone_name)
+    if not onde:
+        return f"Quando eu te lembro de {nome}? Me diz o dia e a hora."
+    return f"Que horas eu te lembro de {nome}{onde}?"
 
 
 async def create_reminder(ctx: ExecContext, action: NotesAction) -> ToolResult:
@@ -291,7 +349,8 @@ async def create_reminder(ctx: ExecContext, action: NotesAction) -> ToolResult:
     quando = instante_do_lembrete(action.remind_at, rrule, ctx.timezone)
     if quando is None:
         raise Level1Error(
-            "❌ Não entendi quando lembrar. Tenta \"amanhã às 9\" ou \"todo dia 5\"."
+            "❌ " + pergunta_do_lembrete(titulo, action.remind_at, action.recurrence, ctx.timezone)
+            + " Ainda não criei o lembrete."
         )
 
     row = await db.fetch_one(

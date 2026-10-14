@@ -394,6 +394,46 @@ respondendo "Qual conta foi usada para pagar a prestação?" virou "pagar qual?"
 Hoje ele vai fora do envelope, com "Você perguntou ao usuário: …" — a mesma frase que o nó de
 cadastros já recebia (`scripts/probe_resposta_ao_cadastro.py`, 4/4 no Gemini real).
 
+**Valor que a pessoa não disse e não é preferência gravada é PERGUNTA, nunca padrão silencioso**
+(14/10/2026, dono do produto: *"sempre pergunte e nunca deduza, em todas as situações"*).
+
+- **Lembrete: a hora não se inventa.** O `NOTES` manda `remind_at` só com a data (`YYYY-MM-DD`) quando
+  a hora não foi dita, também na recorrente. Antes: só data virava 00:00, recorrente sem hora usava o
+  minuto da mensagem, passado só falhava DEPOIS do SIM e data ilegível virava "agora". Hoje
+  `notes_node` valida a ESTRUTURA antes do portão (`notes.pergunta_do_lembrete`: componente de hora,
+  instante legível, futuro se não repete, RRULE válida) e, faltando algo, NÃO propõe: guarda o lembrete
+  em **`notes_draft`** (lista de `NotesAction` + `_pergunta`, mesmo desenho do `resource_draft`, mesmo
+  reducer) e responde UMA pergunta ("Que horas eu te lembro de *X* amanhã (15/10)?").
+  `instante_do_lembrete` segue sendo a única conta (tool, pergunta e frase do SIM): sem hora dita
+  devolve `None`; recorrente com hora = próxima ocorrência NAQUELA hora (`dtstart` = a hora dita).
+- **A pergunta tem resposta.** Com `notes_draft` o roteador recebe "Lembrete incompleto" + "Você
+  perguntou ao usuário…" no turno humano (PIN_ROUTER intacto) e a resposta ("às 9") vai a `notas`;
+  `notes_node` recebe o pendente e a pergunta, e `_com_campos_do_lembrete` faz o `create_reminder` herdar
+  título, repetição válida e a data do pendente (resposta só com a hora ganha a data). Limpa quando
+  completa, quando `actions` volta vazio ("cancela"), quando o roteador marca `discard_resource_draft`
+  ("Lembrete cancelado") ou quando o turno é claramente outro (roteador sem `notas`). A mesma pergunta
+  de novo vira "Não consegui tirar esse dado… responde *cancela*". Não vai para `rascunho`/slot de
+  finanças: não precisa de migration. **Limite conhecido:** com um rascunho de FINANÇAS aberto ao
+  mesmo tempo, a resposta ("às 9") vai primeiro ao classificador do rascunho (`draft.interpretar`).
+- **Cadastro de lembrete** (`resource_create reminders`): `next_run_at` só com data também pergunta a
+  hora (`Level1Error` → `resource_draft`), a frase mostra o instante na hora DELA (era ISO em UTC) e o
+  canal (`push`, o padrão do app) já saía na frase.
+- **Recorrente criada pelo agente**: a data DITA é o início (antes `occurred_at` era ignorado e valia
+  o minuto da mensagem); sem data, a próxima da regra. A primeira ocorrência é congelada no alvo
+  (`resolve.primeira_ocorrencia`) e a frase diz ", repete todo dia 5, primeira em 05/11/2026"; a tool
+  grava a congelada. Se o parse costuma preencher `occurred_at` com hoje, regra que casa com hoje
+  começa hoje — medir antes de confiar.
+- **Conta nova**: a frase mostra "saldo inicial: R$ 0,00" quando não foi dito. O formulário do app
+  também abre em zero e não o exige, então é mostrar, não perguntar.
+- **Parcela atual que não cabe** ("12ª de 10"): `required.faltando` PERGUNTA quantas já foram pagas
+  (slot `already_paid_count`, sem slot novo nem migration) e `draft.mesclar` refaz a atual como
+  pagas+1; `guards.require_current_installment` agora recusa em vez de cair para 1.
+- **Dívida para parcela fixa sem o valor da parcela**: pergunta (era `saldo ÷ faltam`, que com juros
+  não é a parcela do contrato). **Modo da dívida** (`_debt_mode`): decisão mantida — o modo sai do que
+  foi dito (principal, saldo ou taxa ⇒ com juros; senão parcela fixa), a pergunta de campo faltante vem
+  antes do SIM e a frase diz "parcelas fixas, juros incluídos… taxa não informada", então não é
+  silencioso.
+
 **`resolve_account` devolvia `None` para as três situações e ninguém distinguia.**
 Os chamadores faziam `resolve_account(...) or default_account(...)`, então "gastei 45
 no bradesco", sem Bradesco cadastrado, gravava na conta padrão — calado. Pior: o ramo

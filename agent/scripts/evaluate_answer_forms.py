@@ -150,6 +150,19 @@ async def _nota(texto):
     return acoes[0] if acoes else None
 
 
+async def _lembrete(texto):
+    """O `create_reminder` que o modelo extraiu, ainda que o nó o tenha guardado como PERGUNTA
+    (`notes_draft`): o que se mede é o `remind_at` que o modelo escreveu, não a decisão do nó."""
+    saida = await nodes.notes_node({**BASE, "text": texto, "messages": []})
+    acoes = (saida.get("notes_actions") or []) + (saida.get("notes_draft") or [])
+    return next((a for a in acoes if a.get("type") == "create_reminder"), None)
+
+
+def _sem_hora(a):
+    """Lembrete SEM hora inventada: `remind_at` vazio ou só a data (YYYY-MM-DD)."""
+    return bool(a) and len((a.get("remind_at") or "").strip()) <= 10
+
+
 def _linhas_de_item(c: str) -> list[str]:
     return [l.strip() for l in c.splitlines() if l.strip() and not l.strip().startswith("#")]
 
@@ -597,6 +610,21 @@ def secoes():
             (t, lambda x: len(x) == 1 and not x[0].get("categoria_dita"), "categoria_dita=false",
              lambda t=t: _acoes(t))
             for t in ["gastei 40 no posto", "uber 23", "comprei pão 12"]
+        ],
+        # 14/10/2026: sem hora dita o modelo escreve SÓ a data (o nó pergunta a hora); com hora, ela vale.
+        "notas/lembrete/hora não dita": [
+            (t, _sem_hora, "remind_at sem hora", lambda t=t: _lembrete(t))
+            for t in ["me lembra de ligar pro dentista amanhã",
+                      "me lembra de pagar o IPTU dia 20",
+                      "todo dia 5 me lembra do aluguel",
+                      "lembrete: renovar o seguro do carro na sexta"]
+        ] + [
+            ("me lembra amanhã às 9 de ligar pro dentista",
+             lambda a: bool(a) and "T09:00" in (a.get("remind_at") or ""), "09:00 mantido",
+             lambda: _lembrete("me lembra amanhã às 9 de ligar pro dentista")),
+            ("todo dia às 8h me lembra de tomar o remédio",
+             lambda a: bool(a) and "T08:00" in (a.get("remind_at") or "") and "DAILY" in (a.get("recurrence") or ""),
+             "08:00 diário", lambda: _lembrete("todo dia às 8h me lembra de tomar o remédio")),
         ],
         "notas/fixar": [
             (t, _campo("notes", "pinned", "true"), "notes.pinned=true",

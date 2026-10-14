@@ -66,13 +66,12 @@ class TestParcelaAtual:
     def test_parcela_informada_passa(self):
         assert require_current_installment(4, 10) == 1 + 3
 
-    def test_fora_da_faixa_cai_para_um_em_vez_de_inventar_passado(self):
-        """"tô na 12ª de 10" é o modelo entendendo errado. Retroagir 11 meses
-        criaria histórico que não existe; cair para 1 perde informação mas não
-        inventa nenhuma."""
-        assert require_current_installment(12, 10) == 1
-        assert require_current_installment(0, 10) == 1
-        assert require_current_installment(-4, 10) == 1
+    def test_fora_da_faixa_recusa_em_vez_de_deduzir_um(self):
+        """"tô na 12ª de 10" é contradição: `faltando` pergunta antes do SIM (14/10/2026); a tool recusa
+        em vez de cair para 1 em silêncio."""
+        for atual in (12, 0, -4):
+            with pytest.raises(Level1Error):
+                require_current_installment(atual, 10)
 
     def test_nao_confunde_bool_com_int(self):
         assert require_current_installment(True, 10) == 1

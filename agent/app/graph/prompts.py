@@ -408,10 +408,14 @@ Tipos:
 - delete_note: apagar uma nota. search_term identifica qual. Só quando a pessoa pede
   para apagar uma NOTA; "apaga o último lançamento/gasto" é de finanças, não daqui.
 - create_reminder: ser lembrado de algo. content = o que lembrar, remind_at =
-  quando (ISO, na hora local do usuário), recurrence = RRULE SÓ quando a pessoa diz que
+  quando, recurrence = RRULE SÓ quando a pessoa diz que
   se repete ("me lembra de pagar o cartão dia 10" é UMA vez, sem recurrence;
   "todo dia 5" -> FREQ=MONTHLY;BYMONTHDAY=5; "todo dia às 8h" -> FREQ=DAILY;
   "todo último dia do mês"/"todo fim de mês" -> FREQ=MONTHLY;BYMONTHDAY=-1).
+  ⚠️ remind_at COM hora dita ("às 9", "9h", "meio-dia", "daqui a 2 horas") é ISO local com data e hora
+  (2026-10-15T09:00:00). SEM hora dita é SÓ a data (YYYY-MM-DD): NUNCA invente hora (nem 00:00, nem 09:00,
+  nem a hora de agora); o sistema pergunta a que falta. Lembrete que se repete e sem hora dita: remind_at
+  vazio ou só a data.
   ⚠️ Fim de mês explícito é BYMONTHDAY=-1. "Dia 30" e "dia 31" são dias FIXOS;
   o agendador ajusta ao último dia disponível em meses mais curtos. Não inferir
   fim de mês só porque o número escolhido é o último dia do mês atual.

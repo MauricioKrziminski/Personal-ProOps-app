@@ -30,7 +30,7 @@ from app.services import consumo, embeddings, ia
 PIN_ROUTER = "dfda2343"  # 14/10/2026: critério de frase solta x pergunta, exemplos fora das avaliações
 PIN_FINANCE = "fb4c0d49"  # 14/10/2026: categoria_dita (a regra do usuário só vale onde a pessoa não disse)
 PIN_FINANCE_QUERY = "5d4cc1d7"
-PIN_NOTES = "28977bc1"  # 13/10/2026: pasta com regra na lista de pastas e a frase sobre ela
+PIN_NOTES = "dedea66f"  # 14/10/2026: remind_at sem hora dita é só a data (nunca inventa hora)
 PIN_SCHEMA_ROUTER = "290d403c0f22daf5"
 PIN_TURNO_SIMPLES = "02e5e46b1513deff"
 PIN_TURNO_COMPLETO = "b0faf9bb068ff346"  # 09/10/2026: "subcategoria X" vence o nome da lista (Haiku)

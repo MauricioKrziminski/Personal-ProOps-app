@@ -212,14 +212,21 @@ def lembrete(**kw):
     return NotesAction(type="create_reminder", content="pagar a luz", **kw)
 
 
-def test_so_data_vira_00h_e_a_frase_mostra():
-    amanha = (datetime.now(tz("America/Sao_Paulo")) + timedelta(days=2)).date().isoformat()
-    a = lembrete(remind_at=amanha)
+def test_so_data_nao_vira_instante_e_pergunta_a_hora():
+    """A hora não se inventa (14/10/2026): só data = falta a hora, e a pergunta cita o dia."""
+    amanha = (datetime.now(tz("America/Sao_Paulo")) + timedelta(days=1)).date().isoformat()
+    assert notes.instante_do_lembrete(amanha, None, "America/Sao_Paulo") is None
+    pergunta = notes.pergunta_do_lembrete("pagar a luz", amanha, None, "America/Sao_Paulo")
+    assert pergunta.startswith("Que horas eu te lembro de *pagar a luz* amanhã (")
+
+
+def test_com_hora_a_frase_diz_amanha_as_09h():
+    amanha = (datetime.now(tz("America/Sao_Paulo")) + timedelta(days=1)).date().isoformat()
+    a = lembrete(remind_at=f"{amanha}T09:00:00")
+    assert notes.pergunta_do_lembrete(a.content, a.remind_at, None, "America/Sao_Paulo") is None
     nodes._congela_lembrete("America/Sao_Paulo", a)
-    assert a.remind_at == f"{amanha}T00:00:00"
-    assert policy.describe_for_confirmation(a, None).endswith("às 00:00")
-    esperado = notes.instante_do_lembrete(a.remind_at, None, "America/Sao_Paulo")
-    assert esperado.astimezone(tz("America/Sao_Paulo")).strftime("%H:%M") == "00:00"
+    hoje = datetime.now(tz("America/Sao_Paulo")).date().isoformat()
+    assert policy.describe_for_confirmation(a, None, hoje).endswith("para amanhã às 09:00")
 
 
 def test_passado_com_recorrencia_vira_a_proxima_e_a_frase_mostra():
@@ -230,7 +237,7 @@ def test_passado_com_recorrencia_vira_a_proxima_e_a_frase_mostra():
     assert a.remind_at[:10] != "2020-01-01" and "às " in policy.describe_for_confirmation(a, None)
 
 
-def test_sem_instante_a_acao_fica_como_veio():
+def test_sem_instante_a_acao_fica_como_veio():  # passado e sem repetição: a tool recusa; a ação não muda
     a = lembrete(remind_at="2020-01-01T08:00:00")
     nodes._congela_lembrete("America/Sao_Paulo", a)
     assert a.remind_at == "2020-01-01T08:00:00"

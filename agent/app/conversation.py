@@ -273,6 +273,7 @@ def _estado_base(
         "resource_actions": [],
         "resource_prepared": [],
         "resource_draft": None,
+        "notes_draft": None,
         "reply": "",
         "targets": [],
         "chosen_id": "",

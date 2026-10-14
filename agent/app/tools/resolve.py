@@ -1246,3 +1246,23 @@ async def conta_padrao(workspace_id, acoes: list, alvos: list[dict]) -> list[dic
                 and (not a.counterparty_account or (not a.account and not padrao["id"]))):
             alvos[i] = {**alvos[i], "correction_error": SEM_DUAS_CONTAS}
     return alvos
+
+
+async def primeira_ocorrencia(timezone_name: str, acoes: list, alvos: list[dict], pular=frozenset()) -> list[dict]:
+    """Congela no alvo a PRIMEIRA ocorrência da recorrente nova, para a frase do SIM dizer a data e a
+    tool gravar essa (14/10/2026): data dita é o início; sem data, a próxima da regra."""
+    from app.domain.dates import tz
+    from app.domain.recurrence import primeira_da_recorrencia
+    from app.tools import guards
+
+    alvos = [*alvos] + [{}] * max(0, len(acoes) - len(alvos))
+    for i, a in enumerate(acoes):
+        if (getattr(a, "type", None) not in {FinanceActionType.CREATE_EXPENSE, FinanceActionType.CREATE_INCOME}
+                or not a.recurrence or i in pular or alvos[i].get("correction_error")):
+            continue
+        regra = guards.clean_rrule(a.recurrence)
+        primeira = primeira_da_recorrencia(regra, a.occurred_at, timezone_name) if regra else None
+        if primeira is not None:
+            alvos[i] = {**alvos[i], "primeira_ocorrencia": primeira.isoformat(),
+                        "primeira_dia": primeira.astimezone(tz(timezone_name)).date().isoformat()}
+    return alvos

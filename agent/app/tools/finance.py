@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime
 from uuid import UUID
 
 import psycopg
@@ -34,9 +35,9 @@ from app.domain.correcao_plano import (
     fatura_travada,
     pagas_na_fatura,
 )
-from app.domain.dates import add_months, format_date_br, local_iso_date, now_utc
+from app.domain.dates import add_months, format_date_br, local_iso_date
 from app.domain.money import cents_to_brl, parse_valor_em_centavos
-from app.domain.recurrence import next_occurrence
+from app.domain.recurrence import primeira_da_recorrencia
 from app.graph import policy
 from app.graph.schemas import FinanceAction, FinanceActionType
 from app.tools import atributos, guards
@@ -418,7 +419,10 @@ async def create_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
     rrule = guards.clean_rrule(action.recurrence)
 
     if rrule:
-        proxima = next_occurrence(rrule, now_utc(), ctx.timezone)
+        # a congelada antes do SIM (a frase disse a data); sem ela (pendência antiga), a mesma conta
+        congelada = (ctx.target or {}).get("primeira_ocorrencia")
+        proxima = (datetime.fromisoformat(congelada) if congelada
+                   else primeira_da_recorrencia(rrule, action.occurred_at, ctx.timezone))
         if proxima is None:
             raise Level1Error("❌ Não entendi a recorrência. Tenta \"todo dia 5\" ou \"toda segunda\".")
         row = await _inserir(

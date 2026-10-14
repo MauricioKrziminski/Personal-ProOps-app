@@ -8,6 +8,7 @@ subindo o grafo inteiro é regra que ninguém testa.
 from __future__ import annotations
 
 import re
+from datetime import date, timedelta
 
 from app.config import get_settings
 from app.domain.correcao_plano import (
@@ -806,6 +807,8 @@ def describe_for_confirmation(
         if ((target or {}).get("regra") or {}).get("category") and tipo in {"create_expense", "create_income"}:
             categoria = f", {da_regra.pop(0)}"  # a que a REGRA pôs (a do parse não será a gravada)
         repete = f", repete {descreve_rrule(action.recurrence)}" if action.recurrence else ""
+        if repete and (target or {}).get("primeira_dia"):
+            repete += f", primeira em {format_date_br(target['primeira_dia'])}"
         # o que o parse entendeu e a ancoragem validou (forma, fixo/variável, essencial, detalhe — lote C)
         frase = ((target or {}).get("atributos") or {}).get("frase")
         entendido = "".join(f", {p}" for p in (frase, *da_regra) if p)
@@ -826,7 +829,13 @@ def describe_for_confirmation(
         quando = ""
         if action.remind_at:
             hora = str(action.remind_at)[11:16]
-            quando = f" para {format_date_br(action.remind_at)}" + (f" às {hora}" if hora else "")
+            dia = str(action.remind_at)[:10]
+            rotulo = format_date_br(action.remind_at)
+            if hoje and dia == hoje:  # "hoje"/"amanhã" são o que a pessoa disse (e o fuso é o dela)
+                rotulo = "hoje"
+            elif hoje and dia == (date.fromisoformat(hoje) + timedelta(days=1)).isoformat():
+                rotulo = "amanhã"
+            quando = f" para {rotulo}" + (f" às {hora}" if hora else "")
         repete = " (repete)" if action.recurrence else ""
         return f"criar o lembrete *{action.content or ''}*{quando}{repete}"
     return f"salvar {alvo}"

@@ -498,9 +498,9 @@ def test_trocar_o_modo_da_divida_deriva_o_contrato_fixo():
     assert values["remaining_cents"] == 147000 * 38
     assert values["interest_rate_monthly"] == "0"
 
-    sem_parcela = {"calculation_mode": "fixed_installments"}
-    _converter_modo_da_divida(sem_parcela, {**old, "installment_cents": None})
-    assert sem_parcela["installment_cents"] == round(5_000_000 / 38)
+    # sem o valor da parcela (nem dito, nem no contrato) PERGUNTA: nunca saldo ÷ faltam (14/10/2026)
+    with pytest.raises(Level1Error, match="valor de cada parcela"):
+        _converter_modo_da_divida({"calculation_mode": "fixed_installments"}, {**old, "installment_cents": None})
 
     para_juros = {"calculation_mode": "amortized"}
     _converter_modo_da_divida(para_juros, {**old, "calculation_mode": "fixed_installments"})

@@ -118,6 +118,16 @@ def faltando(action, texto_cru: str = "", timezone: str = "America/Sao_Paulo") -
     if tipo is FinanceActionType.CREATE_INSTALLMENT_PURCHASE:
         from app.domain.dates import local_iso_date
 
+        # Parcela atual fora de 1..N é contradição, não "1" em silêncio (14/10/2026): pergunta pelo que
+        # a pessoa sabe de verdade (quantas já foram pagas) — a resposta refaz a atual (`draft.mesclar`).
+        total = action.installments or 0
+        atual = action.current_installment
+        if atual is not None and total >= 2 and not 1 <= atual <= total:
+            return (
+                "already_paid_count",
+                f"A compra tem {total} parcelas e você falou da {atual}ª — isso não bate. "
+                "Quantas parcelas já foram pagas? Diga a quantidade (ou zero se nenhuma).",
+            )
         historical = (action.current_installment or 1) > 1 or bool(
             action.occurred_at and action.occurred_at < local_iso_date(timezone)
         )

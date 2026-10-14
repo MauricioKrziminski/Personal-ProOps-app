@@ -130,6 +130,8 @@ class AgentState(TypedDict, total=False):
     resource_actions: Annotated[list[dict], _replace]
     resource_prepared: Annotated[list[dict], _replace]
     resource_draft: Annotated[list[dict] | None, _resource_draft]
+    # lembrete que falta hora/data/repetição: a PERGUNTA viaja junto (`_pergunta`); [] limpa, None preserva
+    notes_draft: Annotated[list[dict] | None, _resource_draft]
 
     # alvos resolvidos na Fase Cognitiva, ALINHADOS POR POSIÇÃO com _actions().
     # Entrada: {} para ação que não mira registro existente, ou

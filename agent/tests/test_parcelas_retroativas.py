@@ -86,10 +86,16 @@ class TestRetroacao:
 
     @pytest.mark.asyncio
     async def test_parcela_impossivel_nao_inventa_passado(self, rpc):
-        """"tô na 12ª de 10" é o modelo errando. Retroagir 11 meses criaria um
-        histórico que nunca existiu."""
-        await finance.create_installment_purchase(CTX, _acao(current_installment=12))
-        assert rpc[0][3] == "2026-08-31"
+        """"tô na 12ª de 10" é contradição: não retroage 11 meses nem cai para 1 em silêncio. A
+        pergunta sai ANTES do SIM (`faltando`), e a tool recusa se mesmo assim chegar."""
+        from app.domain.required import faltando
+        from app.tools.guards import Level1Error
+
+        slot, pergunta = faltando(_acao(current_installment=12))
+        assert slot == "already_paid_count" and "10 parcelas" in pergunta and "12" in pergunta
+        with pytest.raises(Level1Error):
+            await finance.create_installment_purchase(CTX, _acao(current_installment=12))
+        assert rpc == []
 
     @pytest.mark.asyncio
     async def test_o_total_nao_muda_com_a_retroacao(self, rpc):

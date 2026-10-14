@@ -135,6 +135,17 @@ async def resource_followup(first, answer):
     return await resource(answer, initial["resource_draft"])
 
 
+async def lembrete_followup(first, answer):
+    """Duas voltas do lembrete sem hora (14/10/2026): a 1ª vira PERGUNTA (`notes_draft`), a 2ª a responde."""
+    primeiro = await nodes.notes_node(state(first))
+    assert primeiro["notes_draft"] and not primeiro["notes_actions"], primeiro
+    roteado = await nodes._rotear_texto(state(answer, notes_draft=primeiro["notes_draft"]))
+    if roteado["domains"] != ["notas"]:
+        return {"domains": roteado["domains"], "notes_actions": []}
+    segundo = await nodes.notes_node(state(answer, notes_draft=primeiro["notes_draft"]))
+    return {"domains": roteado["domains"], **segundo}
+
+
 def action(result):
     return result["actions"][0]
 
@@ -318,6 +329,16 @@ CASES = [
             eq(fields(r)["installments_paid"], 8),
             eq(fields(r)["remaining_cents"], 5000000),
             eq(fields(r)["due_day"], 10),
+        ),
+    ),
+    (
+        "lembrete_followup",
+        lambda: lembrete_followup("me lembra de ligar pro dentista amanhã", "às 9"),
+        lambda r: (
+            eq(r["domains"], ["notas"]),
+            eq(len(r["notes_actions"]), 1),
+            eq(r["notes_actions"][0]["remind_at"][11:16], "09:00"),
+            eq(r["notes_draft"], []),
         ),
     ),
     (

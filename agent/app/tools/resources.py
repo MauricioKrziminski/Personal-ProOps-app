@@ -672,6 +672,9 @@ def validate_fields(action: ResourceAction) -> dict:
             values["type"] = "credit_card"
         if action.resource == "reminders":
             values.setdefault("channel", "push")
+        if action.resource == "accounts":
+            # a frase mostra o saldo inicial (R$ 0,00 quando a pessoa não disse), como o formulário do app
+            values.setdefault("initial_balance_cents", 0)
     return values
 
 
@@ -713,10 +716,8 @@ def _converter_modo_da_divida(values: dict, old: dict) -> None:
         _error("Para virar parcela fixa, diga quantas parcelas o contrato tem.")
     parcela = values.get("installment_cents") or old.get("installment_cents")
     if not parcela:
-        faltam = int(total) - pagas
-        if faltam <= 0:
-            _error("Diga o valor de cada parcela para virar parcela fixa.")
-        parcela = round(int(old["remaining_cents"]) / faltam)
+        # nunca dividir o saldo pelas que faltam: com juros isso não é a parcela do contrato
+        _error("Para virar parcela fixa, diga o valor de cada parcela do contrato.")
     values["installment_cents"] = int(parcela)
     values["installments"] = int(total)
     values["installments_paid"] = pagas
@@ -1767,6 +1768,10 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
     if action.resource in {"recurring", "reminders"} and action.type != Op.DELETE:
         timekey = "dtstart" if action.resource == "recurring" else "next_run_at"
         if values.get(timekey):
+            if action.resource == "reminders" and len(str(values[timekey]).strip()) <= 10:
+                # só a data: a hora não se inventa (14/10/2026). Vira a pergunta do cadastro pendente.
+                _error(f"Que horas eu te lembro de *{values.get('title') or action.name or 'isso'}*"
+                       f" em {format_date_br(str(values[timekey])[:10])}? Ainda não salvei nada.")
             try:
                 datetime.fromisoformat(values[timekey].replace("Z", "+00:00"))
                 instant = to_instant(values[timekey], ctx.timezone)
@@ -1856,6 +1861,9 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
                      "next_due_date"} and value:
             # A frase do SIM é lida pela pessoa: dd/mm/aaaa, como no app (ISO é armazenamento).
             shown = format_date_br(str(value))
+        elif key in {"next_run_at", "dtstart"} and value:
+            # o instante é UTC na gravação; a pessoa lê a hora DELA (o ISO cru dizia 12:00 para "às 9")
+            shown = datetime.fromisoformat(str(value)).astimezone(tz(ctx.timezone)).strftime("%d/%m/%Y às %H:%M")
         elif (action.resource, key) in ENUMS:
             shown = ROTULO_DE_ENUM.get(str(value), value)
         elif key in {"archived_at", "deleted_at"}:

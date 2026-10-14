@@ -10,11 +10,11 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from dateutil.rrule import rrulestr
 
-from app.domain.dates import UTC, tz
+from app.domain.dates import UTC, now_utc, tz
 
 log = logging.getLogger(__name__)
 
@@ -65,6 +65,21 @@ def next_occurrence(
         return None
 
     return proxima.astimezone(UTC) if proxima else None
+
+
+def primeira_da_recorrencia(recurrence: str | None, occurred_at: str | None, timezone_name: str) -> datetime | None:
+    """A primeira ocorrência de uma recorrente nova, em UTC (14/10/2026). Data DITA é o início: vale a
+    ocorrência da regra nesse dia ou a seguinte (nunca antes de hoje); sem data dita, a próxima a partir de agora."""
+    agora = now_utc()
+    try:
+        dia = date.fromisoformat((occurred_at or "")[:10]) if occurred_at else None
+    except ValueError:
+        dia = None
+    if dia is None:
+        return next_occurrence(recurrence, agora, timezone_name)
+    local = agora.astimezone(tz(timezone_name))
+    inicio = datetime.combine(max(dia, local.date()), local.timetz())
+    return next_occurrence(recurrence, inicio - timedelta(seconds=1), timezone_name, dtstart=inicio)
 
 
 # RRULE → português. Espelha `src/lib/rrule-text.ts` PALAVRA POR PALAVRA: a mesma série é
