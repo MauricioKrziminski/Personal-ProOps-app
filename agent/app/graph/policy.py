@@ -812,6 +812,19 @@ def describe_for_confirmation(
         # o que o parse entendeu e a ancoragem validou (forma, fixo/variável, essencial, detalhe — lote C)
         frase = ((target or {}).get("atributos") or {}).get("frase")
         entendido = "".join(f", {p}" for p in (frase, *da_regra) if p)
+        if action.recurrence and (target or {}).get("primeira_dia"):
+            # a SÉRIE, não um gasto só (nada é gravado "em" uma data: nasce uma série a partir dela), e as
+            # que já aconteceram têm o destino que a pessoa disse. Sem passadas, só o início.
+            n = len((target or {}).get("passadas") or [])
+            pago = (target or {}).get("entra_como_pago") if n else None
+            receita = tipo == "create_income"
+            um, varias = ("recebida", "recebidas") if receita else ("paga", "pagas")
+            estado = ("" if pago is None else
+                      f" ({n} já {um if n == 1 else varias}; as próximas entram como {varias} na data)" if pago else
+                      f" ({n} já {'passou' if n == 1 else 'passaram'}, em aberto até você dar baixa; as próximas também)")
+            serie = (f"criar {o_que}{valor} em {alvo} que se repete {descreve_rrule(action.recurrence)}, "
+                     f"a partir de {format_date_br(target['primeira_dia'])}{estado}")
+            return f"{serie}{categoria}{onde}{entendido}"
         if valor:
             return f"registrar {o_que}{valor} em {alvo}{quando}{categoria}{onde}{entendido}{repete}"
         return f"registrar {alvo}{quando}{categoria}{onde}{entendido}{repete}"

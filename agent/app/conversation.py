@@ -264,6 +264,7 @@ def _estado_base(
         # antiga ser re-executada e o agente repetir a resposta anterior.
         # `tests/test_state_reset.py` quebra o build se sobrar chave nova.
         "results": [],
+        "avisos": [],
         "domains": [],
         "domain_options": [],
         "subintents": [],
@@ -950,7 +951,7 @@ async def _resposta_do_estado(sessao: dict, estado: dict, thread: str) -> str | 
             },
             summary=pausa["summary"],
         )
-        return _pergunta(pausa, candidatos, linha)
+        return _com_avisos(_pergunta(pausa, candidatos, linha), estado.get("avisos") or [])
 
     # A pergunta do cartão vira MENU aqui, e não logo depois do `save_draft`, por
     # uma razão de correção: rascunho e `interrupt()` coexistem no mesmo turno
@@ -969,6 +970,16 @@ async def _resposta_do_estado(sessao: dict, estado: dict, thread: str) -> str | 
         )
 
     return estado.get("reply", "")
+
+
+def _com_avisos(resposta: dict | str, avisos: list[str]) -> dict | str:
+    """O aviso do turno vai ANTES da pergunta, no corpo e no texto (fallback)."""
+    if not avisos:
+        return resposta
+    antes = "\n".join(avisos)
+    if isinstance(resposta, dict):
+        return {**resposta, **{k: f"{antes}\n\n{resposta[k]}" for k in ("body", "text") if resposta.get(k)}}
+    return f"{antes}\n\n{resposta}"
 
 
 def _pergunta(pausa: dict, candidatos: list[dict], pendente: dict | None) -> dict | str:
@@ -1000,7 +1011,7 @@ def _pergunta(pausa: dict, candidatos: list[dict], pendente: dict | None) -> dic
 
     numerado = "\n".join(f"{i}) {c['label']}" for i, c in enumerate(candidatos, 1))
 
-    if pausa.get("purpose") == "amount_unit":
+    if pausa.get("purpose") in ("amount_unit", "recorrente_pagas"):
         # A pessoa já disse QUAL compra: a saída aqui é desistir, não "nenhuma dessas"
         # nem "me diz pelo valor ou pela data", que são textos de busca.
         corpo = f"🤔 {pausa['summary']}"

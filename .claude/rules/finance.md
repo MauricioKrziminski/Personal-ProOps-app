@@ -132,6 +132,11 @@
     permanece o calendário das próximas em aberto; edição direta da série mantém a régua de
     período descrita acima.
 
+  **O agente cria a série como o app** (14/10/2026): início dito no passado ou hoje NÃO é puxado para
+  amanhã — `dtstart`/`next_run_at` ficam na primeira ocorrência e o agendador grava as já ocorridas
+  (`cleared` se `auto_confirm`, senão `pending`/atrasadas). Quem decide `auto_confirm` é a pessoa, perguntada
+  antes do SIM (`agent.md`); nunca deduzido.
+
   **A janela é de um ano porque uma janela curta faz a projeção MENTIR** — não "acabar". A
   parcela é linha real e continua aparecendo; a receita recorrente além da janela, não: com 90
   dias, outubro de 2027 mostrava as parcelas sem o salário, e o saldo despencava para um número

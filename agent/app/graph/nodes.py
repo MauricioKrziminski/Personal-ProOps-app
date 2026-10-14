@@ -15,7 +15,7 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.types import interrupt
 
 from app import db
-from app.domain.dates import local_datetime_iso, local_iso_date, now_utc, tz
+from app.domain.dates import format_date_br, local_datetime_iso, local_iso_date, now_utc, tz
 from app.graph.policy import (
     describe_for_confirmation,
     dominio_incerto,
@@ -875,12 +875,14 @@ async def notes_node(state: AgentState) -> dict:
         return {"notes_actions": [], "notes_draft": [], "llm_calls": 1,
                 "results": [*state.get("results", []), "Lembrete cancelado. Não salvei nada."]}
     acoes = _com_campos_do_lembrete(acoes, pendentes)
-    prontas, incompletas, perguntas = [], [], []
+    prontas, incompletas, perguntas, avisos = [], [], [], []
     antigo = next((p for p in pendentes if p.get("type") == "create_reminder"), None)
     if antigo and any(a.type.value == "create_reminder" and normalize(a.content or "") != normalize(antigo.get("content") or "")
                       for a in acoes):
         # pedido novo no lugar do pendente (resource_draft: o novo descarta o velho): a pessoa fica sabendo
-        perguntas.append(f"Deixei de lado o lembrete de *{antigo.get('content')}*, que estava sem hora.")
+        # nos dois: `results` (resposta sem SIM) e `avisos` (vai antes da pergunta do SIM, que apaga `results`)
+        avisos.append(f"Deixei de lado o lembrete de *{antigo.get('content')}*, que estava sem hora.")
+        perguntas.append(avisos[-1])
     for a in acoes:
         await _congela_pasta_da_regra(state["workspace_id"], a)
         if a.type.value == "create_reminder":
@@ -901,6 +903,7 @@ async def notes_node(state: AgentState) -> dict:
     ret = {
         "notes_actions": [a.model_dump() for a in prontas],
         "notes_draft": incompletas,
+        "avisos": avisos,
         "llm_calls": 1,
     }
     if perguntas:
@@ -1434,6 +1437,45 @@ def _perguntar_unidade(state: AgentState, i: int, acao, alvo: dict) -> tuple[dic
                   "results": [*state.get("results", []), "👌 Ok, não mudei nada."]}
 
 
+PAGAS_OPCOES = {"pagas:sim": True, "pagas:nao": False}
+
+
+def _perguntar_pagas(state: AgentState, i: int, acao, alvo: dict) -> tuple[dict, dict | None]:
+    """Gasto/receita que se REPETE e já tem ocorrência até hoje: entram como pagas ou ficam em aberto?
+
+    Quem decide é a pessoa (14/10/2026: "o que o SIM descreve é o que é gravado; nunca deduzir"), e a
+    resposta vira o `auto_confirm` da série (o "Entra como pago na data" do app). Congela
+    `entra_como_pago` no ALVO, que é o que a frase do SIM e a tool leem. Alvo de checkpoint antigo
+    (sem `passadas`) não pergunta.
+    """
+    passadas = alvo.get("passadas")
+    if (getattr(acao, "type", None) not in {FinanceActionType.CREATE_EXPENSE, FinanceActionType.CREATE_INCOME}
+            or not acao.recurrence or not passadas or alvo.get("entra_como_pago") is not None):
+        return alvo, None
+    receita = acao.type == FinanceActionType.CREATE_INCOME
+    um, varias = ("recebida", "recebidas") if receita else ("paga", "pagas")
+    titulo = acao.description or acao.category or "essa série"
+    ate = f"{format_date_br(passadas[0])} a {format_date_br(passadas[-1])}"
+    quais = (f"A ocorrência de *{titulo}* de {format_date_br(passadas[0])} já aconteceu."
+             if len(passadas) == 1 else f"{len(passadas)} ocorrências de *{titulo}* já aconteceram (de {ate}).")
+    escolha = interrupt({
+        "kind": "choice",
+        "purpose": "recorrente_pagas",
+        "action_index": i,
+        "action_type": acao.type.value,
+        "summary": f"{quais} Elas e as próximas entram como {varias if len(passadas) > 1 else um} na data, "
+                   "ou ficam em aberto até você dar baixa?",
+        "options": [{"id": "pagas:sim", "label": f"Já {'foi' if len(passadas) == 1 else 'foram'} "
+                                                  f"{um if len(passadas) == 1 else varias}"},
+                    {"id": "pagas:nao", "label": "Ficam em aberto"}],
+    })
+    escolhido = escolha.get("candidate_id") if isinstance(escolha, dict) else escolha
+    if escolhido in PAGAS_OPCOES:
+        return {**alvo, "entra_como_pago": PAGAS_OPCOES[escolhido]}, None
+    return alvo, {"approved": False, "halted": True,
+                  "results": [*state.get("results", []), "👌 Ok, não registrei nada."]}
+
+
 async def gate(state: AgentState) -> dict:
     # A revision finishes this node before the next confirmation, so its exact
     # targets are checkpointed and are not re-read on approval replay.
@@ -1495,6 +1537,9 @@ async def _gate(state: AgentState) -> dict:
         if i in _incompletas(state, acoes):
             continue
         alvos[i], parada = _perguntar_unidade(state, i, acao, alvo)
+        if parada:
+            return parada
+        alvos[i], parada = _perguntar_pagas(state, i, acao, alvos[i])
         if parada:
             return parada
 
@@ -1588,7 +1633,7 @@ async def _gate(state: AgentState) -> dict:
                     # parcelas, cartão, conta — a mesma frase da confirmação comum.
                     efeito = describe_for_confirmation(
                         acao, alvos[i] or None, hoje=local_iso_date(state.get("timezone", "America/Sao_Paulo"))
-                    ).removeprefix("registrar ")
+                    ).removeprefix("registrar ").removeprefix("criar ")
                     aviso = (
                         f"⚠️ *Aviso:* Esta compra excede o limite disponível do seu {card_name} "
                         f"(Limite: {limite_str}, Disponível atual: {disp_str} → ficaria {novo_disp}). "

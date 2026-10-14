@@ -168,5 +168,8 @@ class AgentState(TypedDict, total=False):
     # id escolhido pelo usuário num empate — congelado, vem do pendente
     chosen_id: str
     results: Annotated[list[str], _replace]
+    # aviso do turno que precisa aparecer ANTES da pergunta do SIM (ex.: o lembrete pendente que um
+    # pedido novo deixou de lado); `results` some quando o grafo pausa, isto não
+    avisos: list[str]
     reply: str
     halted: bool                # True = sai sem executar (usuário desconhecido, etc.)

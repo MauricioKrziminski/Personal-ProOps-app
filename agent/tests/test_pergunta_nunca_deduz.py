@@ -254,7 +254,7 @@ async def test_primeira_ocorrencia_congelada_na_frase_e_gravada_pela_tool(monkey
     (alvo_congelado,) = await resolve.primeira_ocorrencia(SP, [acao], [{}])
     assert alvo_congelado["primeira_dia"] == alvo.isoformat()
     frase = policy.describe_for_confirmation(acao, alvo_congelado, _dia(0))
-    assert "repete todo dia" in frase and f"primeira em {alvo.strftime('%d/%m/%Y')}" in frase
+    assert "se repete todo dia" in frase and f"a partir de {alvo.strftime('%d/%m/%Y')}" in frase
 
     gravado = {}
 
@@ -296,3 +296,64 @@ def test_parcela_atual_fora_da_faixa_pergunta_quantas_pagas_e_a_resposta_refaz_a
                             {"acao": "completar", "slot": "already_paid_count", "already_paid_count": 3})
     assert juntado["already_paid_count"] == 3 and juntado["current_installment"] == 4
     assert faltando(FinanceAction(**juntado)) is None  # sem loop
+
+
+def test_lancamento_que_repete_sem_data_comeca_hoje():
+    """"gastei 30 de uber e repete todo mês": o de hoje é o primeiro, sempre (antes dependia de o
+    modelo preencher a data: 14/10 numa rodada, 14/11 na outra)."""
+    hoje = datetime.now(tz(SP)).date()
+    assert primeira_da_recorrencia("FREQ=MONTHLY", None, SP).astimezone(tz(SP)).date() == hoje
+    # com o dia da regra, é o próximo desse dia a partir de hoje (hoje incluído)
+    dia = 28 if hoje.day != 28 else 27
+    p = primeira_da_recorrencia(f"FREQ=MONTHLY;BYMONTHDAY={dia}", None, SP).astimezone(tz(SP)).date()
+    assert p.day == dia and hoje <= p <= hoje + timedelta(days=31)
+
+
+async def _grava_serie(monkeypatch, alvo, acao):
+    gravado = {}
+
+    async def inserir(tabela, colunas, *a, **k):
+        gravado.update(colunas)
+        return {"id": "r1"}
+
+    async def nada(*_a, **_k):
+        return None
+
+    async def colunas(*_a, **_k):
+        return {}
+
+    monkeypatch.setattr(finance, "_inserir", inserir)
+    monkeypatch.setattr(finance, "conta_citada", nada)
+    monkeypatch.setattr(finance, "_conta_padrao", nada)
+    monkeypatch.setattr(finance, "_detalhe_da_regra", nada)
+    monkeypatch.setattr(finance.atributos, "colunas", colunas)
+    ctx = ExecContext("u", "w", None, SP, "t", "m")
+    ctx.target = alvo
+    await finance.create_transaction(ctx, acao)
+    return gravado
+
+
+@pytest.mark.parametrize("resposta", [True, False])
+async def test_serie_comeca_na_data_dita_sem_puxar_para_hoje_e_grava_a_resposta(monkeypatch, resposta):
+    inicio = (datetime.now(tz(SP)) - timedelta(days=10)).date()
+    regra = f"FREQ=WEEKLY;BYDAY={['MO','TU','WE','TH','FR','SA','SU'][inicio.weekday()]}"
+    acao = FinanceAction(type="create_expense", amount_cents=12000, description="academia",
+                         occurred_at=inicio.isoformat(), recurrence=regra)
+    (alvo,) = await resolve.primeira_ocorrencia(SP, [acao], [{}])
+    assert alvo["primeira_dia"] == inicio.isoformat() and len(alvo["passadas"]) == 2
+    gravado = await _grava_serie(monkeypatch, {**alvo, "entra_como_pago": resposta}, acao)
+    assert gravado["dtstart"].astimezone(tz(SP)).date() == inicio  # as passadas não se perdem
+    assert gravado["auto_confirm"] is resposta
+
+
+async def test_checkpoint_antigo_sem_passadas_nao_pergunta_nem_grava_auto_confirm(monkeypatch):
+    from app.graph.nodes import _perguntar_pagas
+
+    futuro = (datetime.now(tz(SP)) + timedelta(days=45)).date()
+    acao = FinanceAction(type="create_expense", amount_cents=150000, description="aluguel",
+                         occurred_at=futuro.isoformat(), recurrence=f"FREQ=MONTHLY;BYMONTHDAY={futuro.day}")
+    antigo = {"primeira_ocorrencia": primeira_da_recorrencia(acao.recurrence, acao.occurred_at, SP).isoformat(),
+              "primeira_dia": futuro.isoformat()}
+    assert _perguntar_pagas({}, 0, acao, antigo) == (antigo, None)
+    assert f"a partir de {futuro.strftime('%d/%m/%Y')}" in policy.describe_for_confirmation(acao, antigo, _dia(0))
+    assert "auto_confirm" not in await _grava_serie(monkeypatch, antigo, acao)

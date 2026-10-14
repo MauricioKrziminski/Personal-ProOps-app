@@ -1252,7 +1252,7 @@ async def primeira_ocorrencia(timezone_name: str, acoes: list, alvos: list[dict]
     """Congela no alvo a PRIMEIRA ocorrência da recorrente nova, para a frase do SIM dizer a data e a
     tool gravar essa (14/10/2026): data dita é o início; sem data, a próxima da regra."""
     from app.domain.dates import tz
-    from app.domain.recurrence import primeira_da_recorrencia
+    from app.domain.recurrence import dias_ate_hoje, primeira_da_recorrencia
     from app.tools import guards
 
     alvos = [*alvos] + [{}] * max(0, len(acoes) - len(alvos))
@@ -1263,6 +1263,8 @@ async def primeira_ocorrencia(timezone_name: str, acoes: list, alvos: list[dict]
         regra = guards.clean_rrule(a.recurrence)
         primeira = primeira_da_recorrencia(regra, a.occurred_at, timezone_name) if regra else None
         if primeira is not None:
+            # quantas já aconteceram (início dito no passado, ou hoje): a pessoa decide no gate se entram pagas
             alvos[i] = {**alvos[i], "primeira_ocorrencia": primeira.isoformat(),
-                        "primeira_dia": primeira.astimezone(tz(timezone_name)).date().isoformat()}
+                        "primeira_dia": primeira.astimezone(tz(timezone_name)).date().isoformat(),
+                        "passadas": [d.isoformat() for d in dias_ate_hoje(regra, primeira, timezone_name)]}
     return alvos

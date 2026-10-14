@@ -115,6 +115,8 @@ async def test_lembrete_novo_nao_herda_data_nem_repeticao_do_pendente(notas):
     for d in ret["notes_draft"]:
         assert d["recurrence"] is None and "2026-11-05" not in (d["remind_at"] or "")
     assert any("Deixei de lado o lembrete de *pagar o aluguel*" in r for r in ret["results"])
+    # e em `avisos`: com SIM, `results` não aparece; o aviso vai antes da pergunta
+    assert ret["avisos"] == ["Deixei de lado o lembrete de *pagar o aluguel*, que estava sem hora."]
 
 
 async def test_resposta_so_com_a_hora_completa_o_pendente(notas):
@@ -191,3 +193,14 @@ def test_todo_valor_de_enum_tem_rotulo_em_portugues():
     for (recurso, campo), valores in resources.ENUMS.items():
         sem = [v for v in valores if v not in resources.ROTULO_DE_ENUM and campo != "color"]
         assert not sem, (recurso, campo, sem)
+
+
+def test_aviso_vai_antes_da_pergunta_do_sim():
+    from app.conversation import _com_avisos
+
+    botoes = {"body": "Confirma X?", "text": "Confirma X?\nResponde SIM", "buttons": [1]}
+    com = _com_avisos(botoes, ["Deixei de lado Y."])
+    assert com["body"].startswith("Deixei de lado Y.\n\nConfirma X?") and com["buttons"] == [1]
+    assert com["text"].startswith("Deixei de lado Y.")
+    assert _com_avisos("Confirma X?", ["A."]) == "A.\n\nConfirma X?"
+    assert _com_avisos(botoes, []) is botoes

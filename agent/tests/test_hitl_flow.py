@@ -1277,3 +1277,90 @@ async def test_foi_50_com_antecedente_corrige_o_que_a_conversa_escreveu(monkeypa
     pausa = _pausa(estado)
     assert pausa["kind"] == "confirmation"
     assert "R$ 50,00" in pausa["summary"] and "café" in pausa["summary"]
+
+
+# --- 14/10/2026: gasto/receita que se REPETE e já tem ocorrência até hoje pergunta se entra paga ----------
+
+
+def _semanal(dias_atras):
+    from datetime import datetime, timedelta
+
+    from app.domain.dates import tz
+
+    dia = (datetime.now(tz("America/Sao_Paulo")) - timedelta(days=dias_atras)).date()
+    return dia, f"FREQ=WEEKLY;BYDAY={['MO','TU','WE','TH','FR','SA','SU'][dia.weekday()]}"
+
+
+def _serie(**kw):
+    return {"type": "create_expense", "amount_cents": 12000, "description": "academia", "category": "saúde",
+            **kw}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("resposta,auto,trecho", [
+    ("pagas:sim", True, "2 já pagas; as próximas entram como pagas na data"),
+    ("pagas:nao", False, "2 já passaram, em aberto até você dar baixa"),
+])
+async def test_serie_com_inicio_passado_pergunta_e_a_frase_diz_o_que_grava(grafo, resposta, auto, trecho):
+    inicio, regra = _semanal(10)
+    cfg = {"configurable": {"thread_id": f"serie-passada-{resposta}"}}
+    estado = await grafo.ainvoke(
+        _estado([_serie(occurred_at=inicio.isoformat(), recurrence=regra)]), config=cfg)
+    pausa = _pausa(estado)
+    assert pausa["kind"] == "choice" and pausa["purpose"] == "recorrente_pagas"
+    assert {o["id"] for o in pausa["options"]} == {"pagas:sim", "pagas:nao"}
+    assert "2 ocorrências de *academia* já aconteceram" in pausa["summary"]
+
+    estado = await grafo.ainvoke(Command(resume={"approved": True, "candidate_id": resposta}), config=cfg)
+    frase = _pausa(estado)["summary"]
+    assert frase.startswith("criar gasto de R$ 120,00 em academia que se repete")
+    assert f"a partir de {inicio.strftime('%d/%m/%Y')}" in frase and trecho in frase
+    assert "categoria saúde" in frase and "na conta Nubank" in frase
+
+    final = await grafo.ainvoke(Command(resume=True), config=cfg)
+    assert final["targets"][0]["entra_como_pago"] is auto
+    assert final["targets"][0]["primeira_dia"] == inicio.isoformat()
+
+
+@pytest.mark.asyncio
+async def test_serie_sem_data_comeca_hoje_e_pergunta(grafo):
+    cfg = {"configurable": {"thread_id": "serie-hoje"}}
+    estado = await grafo.ainvoke(
+        _estado([_serie(description="uber", category=None, recurrence="FREQ=MONTHLY")]), config=cfg)
+    pausa = _pausa(estado)
+    assert pausa["purpose"] == "recorrente_pagas"
+    assert "A ocorrência de *uber*" in pausa["summary"] and "já aconteceu" in pausa["summary"]
+    estado = await grafo.ainvoke(Command(resume={"approved": True, "candidate_id": "pagas:nao"}), config=cfg)
+    assert "(1 já passou, em aberto" in _pausa(estado)["summary"]
+
+
+@pytest.mark.asyncio
+async def test_serie_que_so_comeca_no_futuro_nao_pergunta(grafo):
+    from datetime import datetime, timedelta
+
+    from app.domain.dates import tz
+
+    dia = (datetime.now(tz("America/Sao_Paulo")) + timedelta(days=3)).date()
+    cfg = {"configurable": {"thread_id": "serie-futura"}}
+    estado = await grafo.ainvoke(
+        _estado([_serie(description="netflix", recurrence=f"FREQ=MONTHLY;BYMONTHDAY={dia.day}")]), config=cfg)
+    pausa = _pausa(estado)
+    assert pausa["kind"] == "confirmation"
+    assert f"a partir de {dia.strftime('%d/%m/%Y')}" in pausa["summary"]
+
+
+@pytest.mark.asyncio
+async def test_resposta_fora_das_opcoes_da_serie_nao_registra(grafo):
+    inicio, regra = _semanal(3)
+    cfg = {"configurable": {"thread_id": "serie-recusa"}}
+    await grafo.ainvoke(_estado([_serie(occurred_at=inicio.isoformat(), recurrence=regra)]), config=cfg)
+    final = await grafo.ainvoke(Command(resume=False), config=cfg)
+    assert final["approved"] is False and "EXECUTOU" not in final["results"]
+
+
+def test_relembrar_da_pergunta_da_serie():
+    from app.domain import confirm
+
+    texto = confirm._relembrar_opcoes({"action": {"purpose": "recorrente_pagas", "candidates": [
+        {"id": "pagas:sim", "label": "Já foi paga"}, {"id": "pagas:nao", "label": "Ficam em aberto"}]}})
+    assert "pagas ou ficam em aberto" in texto and "1) Já foi paga" in texto

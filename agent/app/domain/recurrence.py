@@ -68,17 +68,18 @@ def next_occurrence(
 
 
 def primeira_da_recorrencia(recurrence: str | None, occurred_at: str | None, timezone_name: str) -> datetime | None:
-    """A primeira ocorrência de uma recorrente nova, em UTC (14/10/2026). Data DITA é o início: vale a
-    ocorrência da regra nesse dia ou a seguinte (nunca antes de hoje); sem data dita, a próxima a partir de agora."""
+    """A primeira ocorrência de um LANÇAMENTO que se repete, em UTC (14/10/2026): a da regra no dia do
+    lançamento ou a seguinte. A data dita NÃO é puxada para hoje: o que veio entre ela e hoje a pessoa
+    contou que aconteceu (a série nasce nela e o agendador grava essas ocorrências). Sem data dita o dia é HOJE, o literal de todo
+    lançamento ("gastei 30 de uber e repete todo mês" = o de hoje é o primeiro). Partir de "a próxima
+    a partir de agora" fazia a mesma frase dar 14/10 ou 14/11 conforme o modelo preenchia a data."""
     agora = now_utc()
-    try:
-        dia = date.fromisoformat((occurred_at or "")[:10]) if occurred_at else None
-    except ValueError:
-        dia = None
-    if dia is None:
-        return next_occurrence(recurrence, agora, timezone_name)
     local = agora.astimezone(tz(timezone_name))
-    inicio = datetime.combine(max(dia, local.date()), local.timetz())
+    try:
+        dia = date.fromisoformat((occurred_at or "")[:10]) if occurred_at else local.date()
+    except ValueError:
+        dia = local.date()
+    inicio = datetime.combine(dia, local.timetz())
     return next_occurrence(recurrence, inicio - timedelta(seconds=1), timezone_name, dtstart=inicio)
 
 
@@ -156,3 +157,16 @@ def em_pausa(dia, de, ate) -> bool:
         return False
     d = dia if isinstance(dia, date) else date.fromisoformat(dia)
     return de <= d < ate
+
+
+def dias_ate_hoje(recurrence: str, primeira: datetime, timezone_name: str) -> list[date]:
+    """Dias (locais) da regra, da `primeira` até HOJE inclusive: as ocorrências que já aconteceram."""
+    hoje = now_utc().astimezone(tz(timezone_name)).date()
+    dias, cursor = [], primeira - timedelta(seconds=1)
+    while len(dias) < 400:
+        occ = next_occurrence(recurrence, cursor, timezone_name, primeira)
+        if occ is None or (dia := occ.astimezone(tz(timezone_name)).date()) > hoje:
+            break
+        dias.append(dia)
+        cursor = occ
+    return dias

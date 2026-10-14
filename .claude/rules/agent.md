@@ -419,7 +419,7 @@ cadastros já recebia (`scripts/probe_resposta_ao_cadastro.py`, 4/4 no Gemini re
   hora (`Level1Error` → `resource_draft`), a frase mostra o instante na hora DELA (era ISO em UTC) e o
   canal (`push`, o padrão do app) já saía na frase.
 - **Recorrente criada pelo agente**: a data DITA é o início (antes `occurred_at` era ignorado e valia
-  o minuto da mensagem); sem data, a próxima da regra. A primeira ocorrência é congelada no alvo
+  o minuto da mensagem); sem data, HOJE (a primeira da regra de hoje em diante, 14/10/2026 à tarde). A primeira ocorrência é congelada no alvo
   (`resolve.primeira_ocorrencia`) e a frase diz ", repete todo dia 5, primeira em 05/11/2026"; a tool
   grava a congelada. Se o parse costuma preencher `occurred_at` com hoje, regra que casa com hoje
   começa hoje — medir antes de confiar.
@@ -451,9 +451,16 @@ cadastros já recebia (`scripts/probe_resposta_ao_cadastro.py`, 4/4 no Gemini re
   série a frase diz "próxima: dd/mm" só quando difere da primeira. `next_run_at` ARMAZENADO continua sendo o
   início (o materializador parte dele; o agendador o move para a próxima futura em até 1 min, igual ao app).
   O rótulo de `auto_confirm` é o do formulário ("entra como pago/recebido/feita na data").
-- **Início no passado pergunta, não decide**: série nova com ocorrências antes de hoje e sem `auto_confirm` dito
+- **Início no passado pergunta, não decide** (cadastros): série nova com ocorrências antes de hoje e sem `auto_confirm` dito
   vira UMA pergunta (com a contagem) "entram como pagas na data (e as próximas) ou ficam em aberto?"; a resposta
   preenche `auto_confirm` pelo rascunho. Início hoje ou futuro não pergunta.
+- **Gasto/receita que se repete (finanças) segue a mesma régua** (14/10/2026): o início NÃO é puxado para hoje (a
+  série nasce na data dita e o agendador grava as ocorrências até hoje) e, com ocorrência até hoje inclusive
+  (`recurrence.dias_ate_hoje`, congelada em `passadas` no alvo), o gate pergunta UMA vez `kind=choice,
+  purpose=recorrente_pagas` ("Já foram pagas | Ficam em aberto"; sem slot novo nem migration). A resposta congela
+  `entra_como_pago` no alvo, a tool grava `auto_confirm` e a frase vira a da SÉRIE: "criar gasto de R$ 120,00 em
+  academia que se repete todo dia 20, a partir de 20/09/2026 (1 já paga; as próximas entram como pagas na data)".
+  Início só no futuro não pergunta. Alvo sem `passadas` (checkpoint antigo) mantém a frase "primeira em" e o default do banco.
 - **Enum cru não vai à frase**: `ROTULO_DE_ENUM` cobre `amortized` ("com juros ao mês") e `fixed_installments`
   ("parcela fixa"), as palavras do seletor do app, e os ícones de pasta; `test_todo_valor_de_enum_tem_rotulo_em_portugues`
   quebra se um enum novo nascer sem rótulo (cores já são palavras em português).

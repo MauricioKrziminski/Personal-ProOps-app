@@ -430,6 +430,8 @@ async def create_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
             {"user_id": ctx.user_id, "workspace_id": ctx.workspace_id, "kind": kind, "amount_cents": valor,
              "category": categoria, "description": action.description,
              "account_id": conta, "rrule": rrule, "dtstart": proxima, "next_run_at": proxima, **extras,
+             # a resposta dela à pergunta das já ocorridas (sem pergunta: o default do banco, como sempre)
+             **({"auto_confirm": bool(pago)} if (pago := (ctx.target or {}).get("entra_como_pago")) is not None else {}),
              **({"subcategory_id": detalhe} if detalhe is not None else {})},
             literais="currency='BRL'",
         )
@@ -437,7 +439,8 @@ async def create_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
         return ToolResult(
             f"{emoji} Recorrente criado: {cents_to_brl(valor)}"
             + (f" em *{categoria}*" if categoria else "")
-            + f" — próxima em {format_date_br(proxima.date())}."
+            + (f" — a partir de {format_date_br(proxima.date())}." if (ctx.target or {}).get("passadas")
+               else f" — próxima em {format_date_br(proxima.date())}.")
             + atributos.aviso_do_detalhe(attrs, categoria),
             result_id=row["id"] if row else None,
         )
