@@ -14,6 +14,7 @@ import {
   conversationRoute,
   markResolved,
   parseInlineBold,
+  parseWhatsApp,
   linksDoPayload,
   parseUiActions,
   plainText,
@@ -796,4 +797,28 @@ test('links de ajuda: só caminho interno estrito vira botão', () => {
   assert.deepEqual(links, [{ rotulo: 'Abrir Cartões', rota: '/finance/cards' }]);
   assert.deepEqual(linksDoPayload({ links: 'x' }), []);
   assert.deepEqual(linksDoPayload(null), []);
+});
+
+const fmt = (t: string) => parseWhatsApp(t).map((x) => [x.text, x.bold ? 'b' : '', x.italic ? 'i' : '', x.strike ? 's' : ''].join('|'));
+
+test('itálico do WhatsApp', () => {
+  assert.deepEqual(fmt('_Nada disso foi salvo._'), ['Nada disso foi salvo.||i|']);
+  assert.deepEqual(fmt('*negrito* e _itálico_'), ['negrito|b||', ' e |||', 'itálico||i|']);
+  assert.deepEqual(fmt('a ~riscado~ b'), ['a |||', 'riscado|||s', ' b|||']);
+});
+
+test('sublinhado dentro de palavra não é itálico', () => {
+  for (const t of ['snake_case', 'arquivo_v2', 'a_b_c', 'http://a.com/x_y_z', 'meu_arquivo_final.txt']) {
+    assert.deepEqual(fmt(t), [`${t}|||`]);
+  }
+});
+
+test('marcador sem par, com espaço ou quebra de linha é texto', () => {
+  assert.deepEqual(fmt('_sem par'), ['_sem par|||']);
+  assert.deepEqual(fmt('_ x _'), ['_ x _|||']);
+  assert.deepEqual(fmt('_a\nb_'), ['_a\nb_|||']);
+});
+
+test('estilos aninham', () => {
+  assert.deepEqual(fmt('*a _b_*'), ['a |b||', 'b|b|i|']);
 });

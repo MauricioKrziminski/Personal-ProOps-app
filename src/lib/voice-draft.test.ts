@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { hrefDoRascunho, perguntasDoParam, type FinanceDraft } from './voice-draft.ts';
+import { hrefDoRascunho, legendaDoProduto, perguntasDoParam, type FinanceDraft } from './voice-draft.ts';
 
 const rascunho: FinanceDraft = {
   tipo: 'uma',
@@ -33,4 +33,10 @@ test('o tipo recorrente leva start e account, como o formulário lê', () => {
   const href = hrefDoRascunho({ tipo: 'recorrente', params: { kind: 'expense', start: '05/10/2026', account: 'c1' }, perguntas: [], entendido: '' });
   assert.equal(href.params.tipo, 'recorrente');
   assert.equal(href.params.start, '05/10/2026');
+});
+
+test('a legenda do "cabe no bolso" leva o parcelamento do anúncio', () => {
+  assert.equal(legendaDoProduto({ parcelas: null }), 'Posso comprar isso?');
+  assert.equal(legendaDoProduto({ parcelas: 1 }), 'Posso comprar isso?');
+  assert.equal(legendaDoProduto({ parcelas: 10 }), 'Posso comprar isso em 10x?');
 });

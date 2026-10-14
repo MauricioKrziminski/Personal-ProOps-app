@@ -79,6 +79,12 @@ O serviço que recebe do WhatsApp, decide e escreve. Substituiu o par
   para UM cartão acrescenta o limite (`queries._linha_do_limite`, `card_limit_context` lido
   `sob_rls` do dono + join em `accounts` por `workspace_id`; `not_set`, `needs_review`, zero/negativo e
   positivo são frases diferentes e ausência nunca vira R$ 0,00); sem cartão citado ou ambíguo, sem linha.
+  **Compartilhar (`POST /internal/finance/draft/media`) faz a mesma leitura** (`nodes.ler_imagem`, uma função para o
+  chat e o rascunho): `produto` responde SEM `finance_node`, com `produto {o_que, preco_cents, parcelas,
+  valor_parcela_cents, frase}` no FIM de `RascunhoOut` (a frase é a do chat sem a pergunta final, `frase_do_produto`) e o
+  rascunho normal de gasto preenchido para o APK antigo; o app mostra a frase com "Ver se cabe no bolso" (conversa nova
+  com a mesma imagem) e "Já comprei, lançar". Comprovante, fatura, outro ou leitura fora do ar seguem o `finance_node`
+  (`llm_calls` 2, ou 1 sem leitura).
 - **Teto MEDIDO do schema: o PRODUTO propriedades × valores de enum, não cada um.** O
   `FinanceAction` está em **308** (22×14, soma 36; teto medido de 720 no Lite em 06/10/2026, ver
   `ia.md`); os outros seguem em 198/31. Passar disso devolve `400 INVALID_ARGUMENT` sem detalhe. `tests/test_schemas.py` prende o limite — somar campo

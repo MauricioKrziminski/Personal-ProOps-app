@@ -128,17 +128,14 @@ def _financas_pela_imagem(chamadas: int) -> dict:
     return {"domains": [Domain.FINANCAS.value], "confidence": 1.0, "llm_calls": chamadas}
 
 
-async def _rotear_pela_imagem(state: AgentState, config: RunnableConfig | None, chamadas: int) -> dict:
-    """Uma chamada: a imagem é comprovante/fatura (finanças, como sempre), produto ou outra coisa.
-
-    Sem os bytes ou com o modelo fora do ar vale o comportamento de antes: finanças.
-    """
-    midia = ((config or {}).get("configurable") or {}).get(CHAVE_MIDIA)
+async def ler_imagem(state: AgentState, midia: dict | None) -> LeituraDaImagem | None:
+    """Uma chamada: o que a imagem É. None sem os bytes ou com o modelo fora do ar (quem chama
+    segue o caminho de sempre: finanças). Compartilhada pelo roteador do chat e pelo rascunho."""
     if not midia or not midia.get("data_b64"):
-        return _financas_pela_imagem(chamadas)
+        return None
     texto = _SEM_LEGENDA_NA_LEITURA if sem_legenda(state) else (state.get("text") or "")
     try:
-        leitura: LeituraDaImagem = await ia.structured(
+        return await ia.structured(
             LeituraDaImagem, ia.PAPEL_PARSE, prazo=ia.PRAZO_LONGO,
             no="leitura_da_imagem", versao=ia.versao_do_prompt(LEITURA_DA_IMAGEM),
         ).ainvoke([
@@ -151,6 +148,14 @@ async def _rotear_pela_imagem(state: AgentState, config: RunnableConfig | None, 
         ])
     except Exception:  # noqa: BLE001 — sem a leitura, o caminho de sempre
         log.warning("leitura da imagem falhou; segue para finanças", exc_info=True)
+        return None
+
+
+async def _rotear_pela_imagem(state: AgentState, config: RunnableConfig | None, chamadas: int) -> dict:
+    """A imagem é comprovante/fatura (finanças, como sempre), produto ou outra coisa."""
+    midia = ((config or {}).get("configurable") or {}).get(CHAVE_MIDIA)
+    leitura = await ler_imagem(state, midia)
+    if leitura is None:
         return _financas_pela_imagem(chamadas)
     chamadas += 1
     if leitura.tipo in ("comprovante_cupom", "fatura_boleto"):
@@ -159,31 +164,51 @@ async def _rotear_pela_imagem(state: AgentState, config: RunnableConfig | None, 
             "leitura_da_imagem": leitura.model_dump()}
 
 
-def _resposta_da_imagem(leitura: dict) -> str:
-    """Template sobre o que a imagem mostrou. Nome é texto de terceiro (cortado, sem marcação)
-    e todo valor passa por `cents_to_brl`: nada do modelo vai cru à resposta."""
-    if leitura.get("tipo") != "produto":
-        return ("🤔 Não vi um comprovante, cupom, fatura nem produto nessa imagem. "
-                "Mande o comprovante ou a fatura para eu lançar, ou o print de um produto com o preço "
-                "para eu ver se cabe no seu bolso.")
+def produto_da_imagem(leitura: dict) -> dict:
+    """O que a leitura de um produto tem de CONFIÁVEL: nome de terceiro (cortado, sem marcação) e
+    números só se inteiros e plausíveis. Nada do modelo vai cru adiante."""
     nome = re.sub(r"[*_`~<>\n\r]+", " ", sanitize_untrusted(leitura.get("o_que"))).strip()[:80] or "um produto"
 
     def valor(chave: str) -> int | None:
         v = leitura.get(chave)
         return v if isinstance(v, int) and 0 < v < 10**10 else None
 
-    preco, n, parcela = valor("preco_cents"), leitura.get("parcelas"), valor("valor_parcela_cents")
-    parcelado = f"{n}x de {cents_to_brl(parcela)}" if isinstance(n, int) and 2 <= n <= 72 and parcela else ""
-    if preco:
-        visto = f"📸 Vi *{nome}* por {cents_to_brl(preco)} no total" + (f" (ou {parcelado})" if parcelado else "") + "."
-    elif parcelado:
-        visto = f"📸 Vi *{nome}* em {parcelado}."
-    else:
-        return (f"📸 Vi *{nome}*, mas não consegui ler o preço. Qual é? "
+    n, parcela = leitura.get("parcelas"), valor("valor_parcela_cents")
+    parcelado = isinstance(n, int) and 2 <= n <= 72 and parcela is not None
+    return {"o_que": nome, "preco_cents": valor("preco_cents"),
+            "parcelas": n if parcelado else None, "valor_parcela_cents": parcela if parcelado else None}
+
+
+def _visto_do_produto(p: dict) -> str | None:
+    """A frase do que foi visto; None quando não há preço legível (nem à vista, nem parcelado)."""
+    parcelado = f"{p['parcelas']}x de {cents_to_brl(p['valor_parcela_cents'])}" if p["parcelas"] else ""
+    if p["preco_cents"]:
+        return (f"📸 Vi *{p['o_que']}* por {cents_to_brl(p['preco_cents'])} no total"
+                + (f" (ou {parcelado})" if parcelado else "") + ".")
+    return f"📸 Vi *{p['o_que']}* em {parcelado}." if parcelado else None
+
+
+def _resposta_da_imagem(leitura: dict) -> str:
+    """Template sobre o que a imagem mostrou (todo valor passa por `cents_to_brl`)."""
+    if leitura.get("tipo") != "produto":
+        return ("🤔 Não vi um comprovante, cupom, fatura nem produto nessa imagem. "
+                "Mande o comprovante ou a fatura para eu lançar, ou o print de um produto com o preço "
+                "para eu ver se cabe no seu bolso.")
+    p = produto_da_imagem(leitura)
+    visto = _visto_do_produto(p)
+    if not visto:
+        return (f"📸 Vi *{p['o_que']}*, mas não consegui ler o preço. Qual é? "
                 "Aí eu vejo se cabe no seu bolso (ex.: \"posso comprar em 10x no cartão?\"), "
                 "ou me diz se você já comprou e quer lançar.")
     return (f"{visto}\nQuer que eu veja se cabe no seu bolso (ex.: \"posso comprar em 10x no cartão?\") "
             "ou você já comprou e quer lançar?")
+
+
+def frase_do_produto(leitura: dict) -> dict:
+    """Para o app (Compartilhar): o produto lido + a MESMA frase do chat, sem a pergunta final (os
+    dois botões da tela já a fazem). Sem preço legível a frase só diz o que viu."""
+    p = produto_da_imagem(leitura)
+    return {**p, "frase": _visto_do_produto(p) or f"📸 Vi *{p['o_que']}*, mas não consegui ler o preço."}
 
 
 # `config: RunnableConfig` EXATAMENTE assim (ver o comentário em `finance_node`).

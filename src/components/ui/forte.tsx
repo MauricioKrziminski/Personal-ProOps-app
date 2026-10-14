@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { StyleSheet, Text } from 'react-native';
 
 import { Fonts } from '@/constants/theme';
-import { parseInlineBold } from '@/lib/agent-chat';
+import { parseWhatsApp } from '@/lib/agent-chat';
 
 /**
  * O nome citado dentro de uma frase, em negrito — o lugar que era das « » (25/09/2026, pedido do
@@ -16,17 +16,25 @@ export function Forte({ children }: { children: ReactNode }) {
 
 /**
  * Texto ESCRITO POR NÓS com os trechos `*assim*` em negrito (dica de vazio, frase do servidor, a
- * fala do agente) — o mesmo leitor do WhatsApp. Dado do usuário não passa por aqui: ele usa `Forte`.
+ * fala do agente) — o mesmo leitor do WhatsApp (`*negrito*`, `_itálico_`, `~riscado~`). Dado do usuário não passa por aqui: ele usa `Forte`.
  */
 export function ComNegrito({ texto }: { texto: string }) {
-  return parseInlineBold(texto).map((t, i) => (
-    <Text key={i} style={t.bold ? styles.forte : undefined}>
+  return parseWhatsApp(texto).map((t, i) => (
+    <Text key={i} style={estiloDe(t)}>
       {t.text}
     </Text>
   ));
 }
 
+/** Itálico é FACE (`Fonts.italic`), nunca `fontStyle`: o Android trocaria pela itálica do sistema. */
+function estiloDe(t: { bold: boolean; italic: boolean; strike: boolean }) {
+  const face = t.bold ? (t.italic ? Fonts.boldItalic : Fonts.bold) : t.italic ? Fonts.italic : undefined;
+  if (!face && !t.strike) return undefined;
+  return [face ? { fontFamily: face } : null, t.strike ? styles.riscado : null];
+}
+
 const styles = StyleSheet.create({
+  riscado: { textDecorationLine: 'line-through' },
   // UM negrito no app inteiro (25/09/2026): eram dois, 600 no chat e nas dicas e 700 nos nomes.
   // 700 porque o negrito também mora dentro de título (`headline` já é 600) e ali 600 não se vê.
   // Peso é FAMÍLIA (§3): `fontWeight` no Android cai no regular com negrito sintético.

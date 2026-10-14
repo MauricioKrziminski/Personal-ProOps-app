@@ -480,6 +480,68 @@ export function parseInlineBold(texto: string): TrechoDeTexto[] {
   return partes.length ? partes : [{ text: texto, bold: false }];
 }
 
+export interface TrechoFormatado {
+  text: string;
+  bold: boolean;
+  italic: boolean;
+  strike: boolean;
+}
+
+const ALFANUM = /[\p{L}\p{N}]/u;
+
+/**
+ * A formatação do WhatsApp inteira: `*negrito*`, `_itálico_` e `~riscado~`, aninháveis.
+ *
+ * `*` segue o leitor de sempre (`parseInlineBold`). `_` e `~` seguem a regra de borda de palavra
+ * do WhatsApp: o marcador só ABRE depois de início/não-alfanumérico e seguido de não-espaço, e só
+ * FECHA depois de não-espaço e antes de não-alfanumérico — por isso `snake_case`, `arquivo_v2` e
+ * `http://a.com/x_y_z` ficam intactos. Nenhum par atravessa quebra de linha; marcador sem par é texto.
+ */
+export function parseWhatsApp(texto: string, base = { bold: false, italic: false, strike: false }): TrechoFormatado[] {
+  const out: TrechoFormatado[] = [];
+  const solto = (t: string) => {
+    if (!t) return;
+    const ult = out[out.length - 1];
+    if (ult && ult.bold === base.bold && ult.italic === base.italic && ult.strike === base.strike) ult.text += t;
+    else out.push({ text: t, ...base });
+  };
+  let i = 0;
+  let desde = 0;
+  while (i < texto.length) {
+    const m = texto[i];
+    if (m === '*' || m === '_' || m === '~') {
+      const fim = fechaEm(texto, i, m);
+      if (fim > 0) {
+        solto(texto.slice(desde, i));
+        const estilo = { ...base, ...(m === '*' ? { bold: true } : m === '_' ? { italic: true } : { strike: true }) };
+        for (const t of parseWhatsApp(texto.slice(i + 1, fim), estilo)) out.push(t);
+        i = fim + 1;
+        desde = i;
+        continue;
+      }
+    }
+    i++;
+  }
+  solto(texto.slice(desde));
+  return out.length ? out : [{ text: texto, ...base }];
+}
+
+/** Índice do marcador que fecha o que abriu em `i`, ou -1. */
+function fechaEm(t: string, i: number, m: string): number {
+  if (m !== '*') {
+    if (i > 0 && ALFANUM.test(t[i - 1])) return -1;
+    if (i + 1 >= t.length || /\s/.test(t[i + 1])) return -1;
+  }
+  for (let j = i + 1; j < t.length; j++) {
+    if (t[j] === '\n') return -1;
+    if (t[j] !== m) continue;
+    if (j === i + 1) return -1;
+    if (m === '*') return j;
+    if (!/\s/.test(t[j - 1]) && (j + 1 >= t.length || !ALFANUM.test(t[j + 1]))) return j;
+  }
+  return -1;
+}
+
 /**
  * O mesmo texto sem a marcação — para onde negrito não cabe.
  *

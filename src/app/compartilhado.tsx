@@ -2,6 +2,7 @@ import { Image } from 'expo-image';
 import { router, useNavigation } from 'expo-router';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { useShareIntentContext } from 'expo-share-intent';
+import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,13 +10,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AutorizarIa, IA_SEM_CONSENTIMENTO } from '@/components/agent/autorizar-ia';
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
+import { ButtonRow } from '@/components/ui/button-row';
+import { ComNegrito } from '@/components/ui/forte';
 import { Note } from '@/components/ui/note';
 import { IOS_26_OU_MAIS } from '@/constants/platform';
 import { Radius, Space } from '@/design/tokens';
+import { agentKeys, useCreateAgentConversation } from '@/hooks/use-agent-chat';
 import { useTheme } from '@/hooks/use-theme';
 import { AgentApiError, createFinanceDraft, rascunhoDaImagem } from '@/lib/agent-api';
 import { localISODate } from '@/lib/dates';
-import { hrefDoRascunho } from '@/lib/voice-draft';
+import { guardarAnexo } from '@/lib/anexos-locais';
+import { abrirConversaNova, conversationRoute, newClientMessageId, novaTravaDeToque, sementeDaConversa } from '@/lib/agent-chat';
+import { hrefDoRascunho, legendaDoProduto, type FinanceDraft } from '@/lib/voice-draft';
 
 /** O teto do agente (MAX_CONTENT): acima dele a rota recusa com 422. */
 const MAX_TEXTO = 4000;
@@ -29,12 +35,20 @@ export default function Compartilhado() {
   const [montando, setMontando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [semConsentimento, setSemConsentimento] = useState(false);
+  // Print de produto: a pergunta antes de lançar (a frase do servidor + os dois caminhos).
+  const [produto, setProduto] = useState<FinanceDraft | null>(null);
+  const qc = useQueryClient();
+  const criar = useCreateAgentConversation();
+  const [trava] = useState(novaTravaDeToque);
   const theme = useTheme();
   const alturaDoHeader = useHeaderHeight();
   const insets = useSafeAreaInsets();
   // O que a tela mostra é o ÚLTIMO compartilhado: o reset da saída não pisca "nada" na transição.
   const [atual, setAtual] = useState(shareIntent);
-  if (shareIntent !== atual && (shareIntent.text || shareIntent.files)) setAtual(shareIntent);
+  if (shareIntent !== atual && (shareIntent.text || shareIntent.files)) {
+    setAtual(shareIntent);
+    setProduto(null);
+  }
   const arquivo = atual.files?.find((f) => f.mimeType?.startsWith('image/'));
   const texto = (atual.text ?? '').trim();
   const nada = !arquivo && !texto;
@@ -53,7 +67,8 @@ export default function Compartilhado() {
       const r = arquivo
         ? await rascunhoDaImagem(arquivo.path, localISODate(), fuso)
         : await createFinanceDraft(texto.slice(0, MAX_TEXTO), localISODate(), fuso);
-      router.replace(hrefDoRascunho(r));
+      if (r.produto && arquivo) setProduto(r);
+      else router.replace(hrefDoRascunho(r));
     } catch (e) {
       // Sem consentimento: o mesmo aviso da voz, e só a pessoa tenta de novo (Apple 5.1.2(i)).
       if (e instanceof AgentApiError && e.code === IA_SEM_CONSENTIMENTO) setSemConsentimento(true);
@@ -61,6 +76,22 @@ export default function Compartilhado() {
     } finally {
       setMontando(false);
     }
+  };
+
+  // "Ver se cabe": conversa NOVA com a mesma imagem (o caminho do anexo do chat); a resposta chega lá.
+  const verSeCabe = () => {
+    if (!arquivo || !produto?.produto) return;
+    const imagem = arquivo.path;
+    abrirConversaNova(legendaDoProduto(produto.produto), {
+      trava,
+      gerarId: newClientMessageId,
+      semear: (id, t) => {
+        guardarAnexo(t.clientMessageId, imagem);
+        qc.setQueryData(agentKeys.messages(id), sementeDaConversa(t.clientMessageId, t.content));
+      },
+      enviar: (v) => criar.mutate({ ...v, anexoUri: imagem }),
+      navegar: (id) => router.replace(conversationRoute(id)),
+    });
   };
 
   /*
@@ -91,7 +122,17 @@ export default function Compartilhado() {
       )}
       {semConsentimento ? <AutorizarIa aoAutorizar={() => setSemConsentimento(false)} /> : null}
       {erro ? <Note icon="exclamationmark.triangle" tone="danger">{erro}</Note> : null}
-      <Button label="Montar lançamento" size="lg" loading={montando} disabled={nada || montando} onPress={montar} block />
+      {produto?.produto ? (
+        <>
+          <ThemedText><ComNegrito texto={produto.produto.frase} /></ThemedText>
+          <ButtonRow>
+            <Button label="Ver se cabe no bolso" size="lg" onPress={verSeCabe} block />
+            <Button label="Já comprei, lançar" size="lg" variant="secondary" onPress={() => router.replace(hrefDoRascunho(produto))} block />
+          </ButtonRow>
+        </>
+      ) : (
+        <Button label="Montar lançamento" size="lg" loading={montando} disabled={nada || montando} onPress={montar} block />
+      )}
     </View>
   );
 }

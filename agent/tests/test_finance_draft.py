@@ -62,6 +62,11 @@ def mundo(monkeypatch):
 
     monkeypatch.setattr(db, "accounts", accounts)
 
+    async def sem_leitura(_estado, _midia):
+        return None  # a leitura da imagem vai ao modelo: o padrão é "falhou", e o teste que quer troca
+
+    monkeypatch.setattr(nodes, "ler_imagem", sem_leitura)
+
     def modelo(acoes):
         async def finance_node(estado):
             visto["estado"] = estado
@@ -343,3 +348,59 @@ def test_heic_chega_ao_modelo_como_jpeg(mundo, monkeypatch):
     assert r.status_code == 200
     assert visto["config"]["configurable"]["midia_do_turno"]["mime_type"] == "image/jpeg"
     assert visto["estado"]["media"] == {"mime_type": "image/jpeg"}
+
+
+def _leitura(**kw):
+    from app.graph.schemas import LeituraDaImagem
+
+    return LeituraDaImagem(**kw)
+
+
+def _node_com_gasto(monkeypatch):
+    async def finance_node(_estado, config=None):
+        return {"finance_actions": [{"type": "create_expense", "amount_cents": 4500, "description": "mercado"}]}
+
+    monkeypatch.setattr(nodes, "finance_node", finance_node)
+
+
+def _com_leitura(monkeypatch, leitura):
+    async def ler(_estado, _midia):
+        return leitura
+
+    monkeypatch.setattr(nodes, "ler_imagem", ler)
+
+
+def test_print_de_produto_pergunta_sem_chamar_o_finance_node(mundo, monkeypatch):
+    async def nao_chama(*_a, **_k):
+        raise AssertionError("produto não passa pelo finance_node")
+
+    monkeypatch.setattr(nodes, "finance_node", nao_chama)
+    _com_leitura(monkeypatch, _leitura(tipo="produto", o_que="Notebook Pro", preco_cents=329900,
+                                       parcelas=10, valor_parcela_cents=32990))
+    j = _pede_imagem().json()
+    assert j["produto"]["preco_cents"] == 329900 and j["produto"]["parcelas"] == 10
+    assert j["produto"]["frase"] == "📸 Vi *Notebook Pro* por R$ 3.299,00 no total (ou 10x de R$ 329,90)."
+    # o APK antigo abre um gasto coerente
+    assert j["params"]["description"] == "Notebook Pro" and j["params"]["amount"] == "329900"
+    assert mundo.visto["auditoria"][0]["result"]["llm_calls"] == 1
+
+
+def test_produto_sem_preco_legivel_abre_gasto_sem_valor(mundo, monkeypatch):
+    _com_leitura(monkeypatch, _leitura(tipo="produto", o_que="Tênis"))
+    j = _pede_imagem().json()
+    assert "amount" not in j["params"] and j["perguntas"]
+    assert j["produto"]["frase"] == "📸 Vi *Tênis*, mas não consegui ler o preço."
+
+
+def test_comprovante_segue_o_caminho_de_sempre(mundo, monkeypatch):
+    _node_com_gasto(monkeypatch)
+    _com_leitura(monkeypatch, _leitura(tipo="comprovante_cupom"))
+    j = _pede_imagem().json()
+    assert "produto" not in j and j["params"]["amount"] == "4500"
+    assert mundo.visto["auditoria"][0]["result"]["llm_calls"] == 2
+
+
+def test_leitura_que_falha_segue_o_caminho_de_sempre(mundo, monkeypatch):
+    _node_com_gasto(monkeypatch)
+    j = _pede_imagem().json()  # `ler_imagem` devolve None
+    assert "produto" not in j and mundo.visto["auditoria"][0]["result"]["llm_calls"] == 1

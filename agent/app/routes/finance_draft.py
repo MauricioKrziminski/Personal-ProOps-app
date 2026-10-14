@@ -72,11 +72,23 @@ class PedidoDeRascunho(Corpo):
     timezone: str = Field(min_length=1, max_length=64)
 
 
+class ProdutoOut(Corpo):
+    """Print de PRODUTO (anúncio com preço): o app pergunta se cabe no bolso em vez de lançar."""
+
+    o_que: str
+    preco_cents: int | None = None
+    parcelas: int | None = None
+    valor_parcela_cents: int | None = None
+    frase: str  # a MESMA do chat (`nodes.frase_do_produto`), com *negrito* do WhatsApp
+
+
 class RascunhoOut(Corpo):
     tipo: Literal["uma", "recorrente", "financiamento"]
     params: dict[str, str]
     perguntas: list[str]
     entendido: str
+    # No FIM e opcional: o APK antigo ignora e abre o gasto normal (que vem preenchido igual).
+    produto: ProdutoOut | None = None
 
 
 def _proxima_data(recorrencia: str, hoje: date) -> date:
@@ -207,7 +219,7 @@ async def _abrir(user_id):
     return perfil
 
 
-@router.post("/draft/media", response_model=RascunhoOut)
+@router.post("/draft/media", response_model=RascunhoOut, response_model_exclude_none=True)
 async def rascunho_da_imagem(
     user_id: Annotated[UUID, Depends(current_user)],
     file: Annotated[UploadFile, File()],
@@ -219,6 +231,28 @@ async def rascunho_da_imagem(
     perfil = await _abrir(user_id)
     fuso = _fuso_valido(timezone)
     texto = "Extraia o lançamento deste comprovante, cupom ou print de notificação."
+    # Uma leitura do que a imagem É (a mesma do chat): produto pergunta, o resto segue como sempre.
+    leitura = await nodes.ler_imagem(
+        {"text": midia_enviada.TEXTO_SEM_LEGENDA, "timezone": fuso, "agora_local": f"{today.isoformat()}T12:00:00"},
+        midia,
+    )
+    chamadas = 1 if leitura is None else 2
+    if leitura is not None and leitura.tipo == "produto":
+        p = nodes.frase_do_produto(leitura.model_dump())
+        await db.record_ai_event(
+            user_id=user_id, workspace_id=perfil["workspace_id"], channel="app",
+            model=ia.modelo(ia.PAPEL_PARSE), confidence=1.0,
+            result={"leitura_da_imagem": leitura.model_dump(), "llm_calls": 1, "draft": True, "media": True},
+        )
+        total = p["preco_cents"] or (p["parcelas"] * p["valor_parcela_cents"] if p["parcelas"] else 0)
+        params = {"kind": "expense", "description": p["o_que"], "data": format_date_br(today.isoformat())}
+        if total:
+            params["amount"] = str(total)
+        return RascunhoOut(
+            tipo="uma", params=params, perguntas=[] if total else ["Não li o valor: informe."],
+            entendido=f"Gasto de {cents_to_brl(total)} · {p['o_que']}" if total else f"Gasto · {p['o_que']}",
+            produto=ProdutoOut(**p),
+        )
     estado = {"text": texto, "timezone": fuso, "workspace_id": perfil["workspace_id"], "messages": None,
               "user_id": str(user_id),
               "agora_local": f"{today.isoformat()}T12:00:00", "media": {"mime_type": mime}}
@@ -233,14 +267,14 @@ async def rascunho_da_imagem(
     await db.record_ai_event(
         user_id=user_id, workspace_id=perfil["workspace_id"], channel="app",
         model=ia.modelo(ia.PAPEL_PARSE), confidence=saida.get("confidence"),
-        result={"finance_actions": saida.get("finance_actions", []), "llm_calls": 1, "draft": True, "media": True},
+        result={"finance_actions": saida.get("finance_actions", []), "llm_calls": chamadas, "draft": True, "media": True},
     )
     if not acoes:
         raise _erro(422, "no_launch", "Não achei um lançamento nessa imagem.")
     return await montar_rascunho(perfil["workspace_id"], texto, acoes, today, None)
 
 
-@router.post("/draft", response_model=RascunhoOut)
+@router.post("/draft", response_model=RascunhoOut, response_model_exclude_none=True)
 async def rascunho(body: PedidoDeRascunho, user_id: Annotated[UUID, Depends(current_user)]) -> RascunhoOut:
     perfil = await _abrir(user_id)
     fuso = _fuso_valido(body.timezone)

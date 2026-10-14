@@ -379,6 +379,12 @@ não reabrir no render seguinte. São duas perguntas diferentes sobre o mesmo pa
 **Formulário novo que se abre por parâmetro nasce com isso** — senão a régua volta a divergir
 tela a tela, que é como ela nasceu.
 
+### Formatação do WhatsApp no texto do agente (13/10/2026)
+
+`ComNegrito` desenha `*negrito*`, `_itálico_` e `~riscado~` (`parseWhatsApp`, `lib/agent-chat.ts`, com teste). `_` e `~`
+só abrem/fecham em borda de palavra e sem atravessar linha, como no WhatsApp: `snake_case` e URLs ficam como estão.
+Itálico é a FACE (`Fonts.italic`/`boldItalic`), nunca `fontStyle`.
+
 ### Os botões do Agente têm DOIS prefixos, e a tela conhecia um só
 
 **`pa:` é HITL; `ds:` é RASCUNHO — e a tela descartava todo `ds:`** (15/09/2026). A queixa
