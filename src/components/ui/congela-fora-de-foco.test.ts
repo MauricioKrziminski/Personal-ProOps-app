@@ -46,18 +46,22 @@ function montar() {
     throw new Error(nome);
   }, module, module.exports, setTimeoutFalso, clearTimeoutFalso);
   const historico: boolean[] = [];
+  /** O que a aba diz às folhas: true = o `Freeze` esconde ao sair; false = a folha fecha sozinha. */
+  const contexto: boolean[] = [];
   /** Renderiza até assentar (o timeout do componente pede outro render). */
   const assentar = () => {
     for (let n = 0; n < 5 && (precisaRenderizar || timeouts.length); n++) {
       precisaRenderizar = false; cursor = 0; efeitos = [];
       const arvore = module.exports.CongelaForaDeFoco({ children: 'filho' });
       historico.push(arvore.props.children.props.freeze);
+      contexto.push(arvore.props.value);
       for (const rodar of efeitos) rodar();
       for (const t of timeouts.splice(0)) t();
     }
   };
   return {
     historico,
+    contexto,
     assentar,
     mudarFoco(valor: boolean, para = '/notes') { focada = valor; caminho = para; precisaRenderizar = true; },
   };
@@ -99,4 +103,14 @@ test('tela empilhada por cima (Categorias aberta do Perfil) NÃO congela a aba d
   aba.mudarFoco(false, '/finance/categories');
   aba.assentar();
   assert.ok(aba.historico.every((f) => f === false), `nunca congela: ${aba.historico}`);
+  // ...e a folha aberta nela não fica por cima da tela nova: o contexto manda ela fechar.
+  assert.equal(aba.contexto.at(-1), false);
+});
+
+test('trocar de aba mantém a folha (o Freeze a esconde e ela volta com o rascunho)', () => {
+  const aba = montar();
+  aba.assentar();
+  aba.mudarFoco(false, '/finance');
+  aba.assentar();
+  assert.ok(aba.contexto.every((v) => v === true), `${aba.contexto}`);
 });

@@ -4,7 +4,7 @@ import { Freeze } from 'react-freeze';
 
 import { ehRaizDeAba } from '@/lib/abas';
 
-/** Verdadeiro dentro da raiz de uma aba: quem esconde o que está nela, ao sair, é o `Freeze`. */
+/** Verdadeiro na raiz de uma aba quando quem esconde o que está nela, ao sair, é o `Freeze` (troca de aba). */
 export const DentroDeAbaCongelavel = createContext(false);
 
 /**
@@ -52,7 +52,9 @@ export function CongelaForaDeFoco({ children }: { children: React.ReactNode }) {
     };
   }, [outraAba]);
   return (
-    <DentroDeAbaCongelavel.Provider value>
+    // Verdadeiro só quando o `Freeze` vai mesmo esconder a aba (em foco, ou indo para outra aba).
+    // Coberta por tela empilhada ela fica desenhada, e a folha aberta nela fecha como em qualquer tela.
+    <DentroDeAbaCongelavel.Provider value={focada || outraAba}>
       <Freeze freeze={outraAba && congelar}>{children}</Freeze>
     </DentroDeAbaCongelavel.Provider>
   );
