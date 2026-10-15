@@ -16,9 +16,11 @@ import Animated, {
   scrollTo,
   useAnimatedStyle,
   useFrameCallback,
+  useReducedMotion,
   useScrollViewOffset,
   useSharedValue,
   withSpring,
+  withTiming,
   type AnimatedRef,
   type SharedValue,
 } from 'react-native-reanimated';
@@ -28,13 +30,16 @@ import * as Haptics from 'expo-haptics';
 import {
   posX,
   posY,
+  decisaoDaReordenacao,
+  itemNoSlot,
   reordenar,
   slotDoIrmao,
+  slotNoMiolo,
   slotSobODedo,
   velocidadeAutoScroll,
 } from '@/design/reorder-math';
 import { Elevation, Motion, Radius, Space } from '@/design/tokens';
-import { useScheme } from '@/hooks/use-theme';
+import { useScheme, useTheme } from '@/hooks/use-theme';
 
 /**
  * Arrastar para reordenar — o caminho ÚNICO do app.
@@ -91,6 +96,12 @@ const DISTANCIA = 4;
 const TOQUE_LONGO = 220;
 /** Abaixo disto, soltar sem ter andado conta como toque, não como arrasto. */
 const PARADO = 6;
+/** Soltar dentro: quanto o ladrilho levantado fica parado no miolo de outro até ele virar alvo. */
+const ESPERA_ALVO = 450;
+/** Soltar dentro: o miolo é o retângulo central com esta fração da largura e da altura. */
+const MIOLO = 0.5;
+/** Soltar dentro ligado: quanto o centro fica no slot novo (fora de alvo) antes de reordenar. */
+const ESPERA_ORDEM = 250;
 
 export interface ReorderRenderInfo<T> {
   item: T;
@@ -162,6 +173,13 @@ export interface ReorderableProps<T> {
    * `paddingBottom` do conteúdo.
    */
   bottomInset?: number;
+  /**
+   * Só na grade: soltar o ladrilho DENTRO de outro (pasta dentro de pasta). Parado ~450 ms sobre o
+   * miolo de um ladrilho para o qual `podeSoltarDentro` diz sim, ele vira alvo (contorno, escala,
+   * háptico) e soltar chama `onSoltarDentro` no lugar de reordenar. Sem as duas props nada muda.
+   */
+  podeSoltarDentro?: (arrastado: T, alvo: T) => boolean;
+  onSoltarDentro?: (arrastado: T, alvo: T) => void;
   style?: ViewStyle;
 }
 
@@ -181,10 +199,13 @@ export function Reorderable<T>({
   topInset = 0,
   viewportHeight,
   bottomInset = 0,
+  podeSoltarDentro,
+  onSoltarDentro,
   style,
 }: ReorderableProps<T>) {
   const grade = columns > 1;
   const scheme = useScheme();
+  const soltarDentro = grade && !!podeSoltarDentro && !!onSoltarDentro;
 
   /** Índice levantado, ou -1. */
   const arrastando = useSharedValue(-1);
@@ -192,6 +213,16 @@ export function Reorderable<T>({
   const alvo = useSharedValue(-1);
   const dx = useSharedValue(0);
   const dy = useSharedValue(0);
+  /** Soltar dentro: item sob o miolo do ladrilho levantado (válido), ou -1. */
+  const candidato = useSharedValue(-1);
+  /** Soltar dentro: o slot sob o dedo agora, ainda não confirmado como ordem nova. */
+  const pendente = useSharedValue(-1);
+  const pendenteVisto = useSharedValue(-1);
+  const desdePendente = useSharedValue(0);
+  /** Soltar dentro: o alvo CONFIRMADO (esperou o tempo), ou -1. */
+  const dentro = useSharedValue(-1);
+  const visto = useSharedValue(-1);
+  const desde = useSharedValue(0);
   /** Quanto o auto-scroll já andou nesta arrastada — soma ao dedo para o item não escapar. */
   const rolado = useSharedValue(0);
   /** Offset do scroll no quadro anterior: é a diferença entre os dois que diz o que andou. */
@@ -204,6 +235,14 @@ export function Reorderable<T>({
   useEffect(() => {
     idsSV.value = ids;
   }, [ids, idsSV]);
+
+  /** Matriz plana `arrastado * n + alvo`: o que `podeSoltarDentro` diz, calculado no JS. */
+  const validosSV = useSharedValue<boolean[]>([]);
+  useEffect(() => {
+    validosSV.value = soltarDentro
+      ? data.flatMap((a) => data.map((b) => a !== b && podeSoltarDentro(a, b)))
+      : [];
+  }, [data, soltarDentro, podeSoltarDentro, validosSV]);
 
   const [largura, setLargura] = useState(0);
   const larguraLadrilho = grade && largura > 0 ? (largura - gap * (columns - 1)) / columns : 0;
@@ -225,6 +264,18 @@ export function Reorderable<T>({
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   }, []);
 
+  const avisarAlvo = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, []);
+
+  const comprometerDentro = useCallback(
+    (de: number, para: number) => {
+      if (de < 0 || para < 0 || de === para || de >= data.length || para >= data.length) return;
+      onSoltarDentro?.(data[de], data[para]);
+    },
+    [data, onSoltarDentro]
+  );
+
   /**
    * Auto-scroll.
    *
@@ -242,9 +293,34 @@ export function Reorderable<T>({
    * Comparar o offset com o do quadro anterior conserta os dois fins de uma vez, sem saber onde
    * o conteúdo termina: se ele não andou, o delta é zero e nada é somado.
    */
-  const quadro = useFrameCallback(() => {
+  const quadro = useFrameCallback((info) => {
     'worklet';
-    if (arrastando.value < 0 || !scrollRef) return;
+    if (arrastando.value < 0) return;
+
+    // Soltar dentro: o candidato precisa ficar ESPERA_ALVO parado para virar alvo. Quem o zera
+    // ao sair do miolo é `mover`; aqui só se conta o tempo.
+    const c = candidato.value;
+    if (c !== visto.value) {
+      visto.value = c;
+      desde.value = info.timestamp;
+    } else if (c >= 0 && dentro.value !== c && info.timestamp - desde.value >= ESPERA_ALVO) {
+      dentro.value = c;
+      scheduleOnRN(avisarAlvo);
+    }
+
+    // Soltar dentro: a ordem só muda depois de ESPERA_ORDEM no slot novo, fora de alvo válido.
+    if (soltarDentro) {
+      if (pendente.value !== pendenteVisto.value) {
+        pendenteVisto.value = pendente.value;
+        desdePendente.value = info.timestamp;
+      }
+      const d = decisaoDaReordenacao(
+        alvo.value, pendente.value, info.timestamp - desdePendente.value, c, ESPERA_ORDEM
+      );
+      if (d === 'reordena') alvo.value = pendente.value;
+    }
+
+    if (!scrollRef) return;
 
     // 1. O que o auto-scroll de FATO andou desde o quadro passado. O dedo não se moveu, mas o
     //    conteúdo sim: sem somar isto o item escorrega para fora da mão.
@@ -319,12 +395,18 @@ export function Reorderable<T>({
           dx={dx}
           dy={dy}
           rolado={rolado}
+          candidato={candidato}
+          pendente={pendente}
+          dentro={dentro}
+          validos={validosSV}
+          miolo={soltarDentro ? MIOLO : 0}
           enabled={enabled}
           activation={activation}
           scheme={scheme}
           onMedir={medir(ids[index])}
           onLevantou={avisarLevantou}
           onSoltou={comprometer}
+          onSoltouDentro={comprometerDentro}
           onTapItem={onTapItem}
           onArrastando={ligarQuadro}>
           {(active, drag) => renderItem({ item, index, active, drag })}
@@ -350,15 +432,34 @@ interface Eixo {
   dx: SharedValue<number>;
   dy: SharedValue<number>;
   rolado: SharedValue<number>;
+  candidato: SharedValue<number>;
+  pendente: SharedValue<number>;
+  dentro: SharedValue<number>;
 }
 
 function levantar(eixo: Eixo, index: number) {
   'worklet';
   eixo.arrastando.value = index;
   eixo.alvo.value = index;
+  eixo.pendente.value = index;
   eixo.dx.value = 0;
   eixo.dy.value = 0;
   eixo.rolado.value = 0;
+  eixo.candidato.value = -1;
+  eixo.dentro.value = -1;
+}
+
+/** O slot sob o dedo agora (a conta de sempre). */
+function slotAtual(eixo: Eixo, index: number, total: number, geo: Geometria): number {
+  'worklet';
+  const x = posX(index, geo.larguraLadrilho, geo.gap, geo.columns) + eixo.dx.value;
+  const y =
+    posY(index, geo.ids.value, geo.alturas.value, geo.tileHeight, geo.gap, geo.columns) +
+    eixo.dy.value;
+  return slotSobODedo(
+    index, total, x, y, geo.ids.value, geo.alturas.value,
+    geo.tileHeight, geo.larguraLadrilho, geo.gap, geo.columns
+  );
 }
 
 function mover(
@@ -372,14 +473,24 @@ function mover(
   'worklet';
   eixo.dx.value = translationX;
   eixo.dy.value = translationY + eixo.rolado.value;
-  const x = posX(index, geo.larguraLadrilho, geo.gap, geo.columns) + eixo.dx.value;
-  const y =
-    posY(index, geo.ids.value, geo.alturas.value, geo.tileHeight, geo.gap, geo.columns) +
-    eixo.dy.value;
-  eixo.alvo.value = slotSobODedo(
-    index, total, x, y, geo.ids.value, geo.alturas.value,
-    geo.tileHeight, geo.larguraLadrilho, geo.gap, geo.columns
-  );
+
+  // Soltar dentro: o centro do ladrilho levantado está no MIOLO de um ladrilho (como ele está
+  // desenhado agora) para o qual soltar dentro vale? Então é candidato, e o leque HOLD: a ordem
+  // não muda enquanto se mira, senão o alvo fugiria de baixo do dedo.
+  let candidato = -1;
+  if (geo.miolo > 0) {
+    const cx = posX(index, geo.larguraLadrilho, geo.gap, geo.columns) + eixo.dx.value + geo.larguraLadrilho / 2;
+    const cy =
+      posY(index, geo.ids.value, geo.alturas.value, geo.tileHeight, geo.gap, geo.columns) +
+      eixo.dy.value + geo.tileHeight / 2;
+    const slot = slotNoMiolo(cx, cy, geo.larguraLadrilho, geo.tileHeight, geo.gap, geo.columns, total, geo.miolo);
+    const k = slot >= 0 ? itemNoSlot(slot, index, eixo.alvo.value, total) : -1;
+    if (k >= 0 && geo.validos.value[index * total + k] === true) candidato = k;
+  }
+  eixo.candidato.value = candidato;
+  if (eixo.dentro.value !== candidato) eixo.dentro.value = -1;
+  if (geo.miolo > 0) eixo.pendente.value = slotAtual(eixo, index, total, geo);
+  else eixo.alvo.value = slotAtual(eixo, index, total, geo);
 }
 
 function pousar(eixo: Eixo) {
@@ -389,9 +500,14 @@ function pousar(eixo: Eixo) {
   eixo.dx.value = 0;
   eixo.dy.value = 0;
   eixo.rolado.value = 0;
+  eixo.candidato.value = -1;
+  eixo.dentro.value = -1;
 }
 
 interface Geometria {
+  validos: SharedValue<boolean[]>;
+  /** Fração do miolo; 0 = soltar dentro desligado. */
+  miolo: number;
   ids: SharedValue<string[]>;
   alturas: SharedValue<Record<string, number>>;
   larguraLadrilho: number;
@@ -418,6 +534,11 @@ interface CelulaProps {
   dx: SharedValue<number>;
   dy: SharedValue<number>;
   rolado: SharedValue<number>;
+  candidato: SharedValue<number>;
+  pendente: SharedValue<number>;
+  dentro: SharedValue<number>;
+  validos: SharedValue<boolean[]>;
+  miolo: number;
   scrollRef?: AnimatedRef<Animated.ScrollView>;
   enabled: boolean;
   activation: 'alça' | 'toque-longo';
@@ -425,6 +546,7 @@ interface CelulaProps {
   onMedir: (e: LayoutChangeEvent) => void;
   onLevantou: () => void;
   onSoltou: (de: number, para: number) => void;
+  onSoltouDentro: (de: number, para: number) => void;
   onTapItem?: (index: number) => void;
   onArrastando: (ativo: boolean) => void;
   children: (active: boolean, drag: ComposedGesture | GestureType) => React.ReactNode;
@@ -446,6 +568,11 @@ function Celula({
   dx,
   dy,
   rolado,
+  candidato,
+  pendente,
+  dentro,
+  validos,
+  miolo,
   scrollRef,
   enabled,
   activation,
@@ -453,19 +580,22 @@ function Celula({
   onMedir,
   onLevantou,
   onSoltou,
+  onSoltouDentro,
   onTapItem,
   onArrastando,
   children,
 }: CelulaProps) {
   const [ativo, setAtivo] = useState(false);
+  const theme = useTheme();
+  const reduzir = useReducedMotion();
 
   const eixo = useMemo<Eixo>(
-    () => ({ arrastando, alvo, dx, dy, rolado }),
-    [arrastando, alvo, dx, dy, rolado]
+    () => ({ arrastando, alvo, dx, dy, rolado, candidato, pendente, dentro }),
+    [arrastando, alvo, dx, dy, rolado, candidato, pendente, dentro]
   );
   const geo = useMemo<Geometria>(
-    () => ({ ids: idsSV, alturas, larguraLadrilho, tileHeight, gap, columns }),
-    [idsSV, alturas, larguraLadrilho, tileHeight, gap, columns]
+    () => ({ ids: idsSV, alturas, larguraLadrilho, tileHeight, gap, columns, validos, miolo }),
+    [idsSV, alturas, larguraLadrilho, tileHeight, gap, columns, validos, miolo]
   );
 
   const pan = useMemo(() => {
@@ -483,7 +613,8 @@ function Celula({
       .onEnd(() => {
         const parado = Math.abs(eixo.dx.value) < PARADO && Math.abs(eixo.dy.value) < PARADO;
         if (parado && activation === 'toque-longo' && onTapItem) scheduleOnRN(onTapItem, index);
-        else scheduleOnRN(onSoltou, index, eixo.alvo.value);
+        else if (eixo.dentro.value >= 0) scheduleOnRN(onSoltouDentro, index, eixo.dentro.value);
+        else scheduleOnRN(onSoltou, index, slotAtual(eixo, index, total, geo));
       })
       .onFinalize(() => {
         // Sempre, inclusive em cancelamento: sem isto um item fica levantado para sempre depois
@@ -516,7 +647,7 @@ function Celula({
       : comGatilho;
   }, [
     enabled, index, total, eixo, geo, activation, scrollRef,
-    onTapItem, onLevantou, onSoltou, onArrastando,
+    onTapItem, onLevantou, onSoltou, onSoltouDentro, onArrastando,
   ]);
 
   /**
@@ -557,7 +688,8 @@ function Celula({
             transform: [
               { translateX: withSpring(baseX, Motion.spring.settle) },
               { translateY: withSpring(baseY, Motion.spring.settle) },
-              { scale: withSpring(1, Motion.spring.settle) },
+              // Alvo de soltar dentro: cresce um pouco (sem movimento com Reduzir Movimento).
+              { scale: withSpring(dentro.value === index && !reduzir ? 1.06 : 1, Motion.spring.settle) },
             ],
           };
     }
@@ -583,7 +715,12 @@ function Celula({
         { scale: withSpring(1, Motion.spring.settle) },
       ],
     };
-  }, [index, larguraLadrilho, tileHeight, gap, columns, grade]);
+  }, [index, larguraLadrilho, tileHeight, gap, columns, grade, reduzir]);
+
+  /** Contorno de alvo: só cor/opacidade, vale com Reduzir Movimento. */
+  const contornoAlvo = useAnimatedStyle(() => ({
+    opacity: withTiming(dentro.value === index ? 1 : 0, { duration: Motion.duration.fast }),
+  }), [index]);
 
   /**
    * Elevação e empilhamento saem do ESTADO, não do worklet: os dois trocam uma vez por arrasto
@@ -617,6 +754,16 @@ function Celula({
       que remove a disputa de vez em vez de negociar prioridade entre dois reconhecedores.
     */
     <Animated.View onLayout={onMedir} style={[posicao, camada, movimento]}>
+      {miolo > 0 ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.contornoAlvo,
+            { borderColor: theme.tint, backgroundColor: theme.accentSoft },
+            contornoAlvo,
+          ]}
+        />
+      ) : null}
       {activation === 'toque-longo' ? (
         <GestureDetector gesture={pan}>
           <View style={styles.preenche}>{children(ativo, pan)}</View>
@@ -630,4 +777,16 @@ function Celula({
 
 const styles = StyleSheet.create({
   preenche: { flex: 1 },
+  /** Atrás do ladrilho (vem antes na ordem): a tinta de seleção aparece como aro em volta dele. */
+  contornoAlvo: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    margin: -3,
+    borderWidth: 2,
+    borderRadius: Radius.md + 3,
+    borderCurve: 'continuous',
+  },
 });

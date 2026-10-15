@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, { FadeInDown, type useAnimatedRef } from 'react-native-reanimated';
 
@@ -7,6 +7,7 @@ import { Reorderable } from '@/components/ui/reorderable';
 import { Motion, Space } from '@/design/tokens';
 import type { NoteFolder } from '@/hooks/use-notes';
 import { usarDica } from '@/hooks/use-dicas';
+import { destinosDePasta } from '@/lib/pastas';
 
 /**
  * A grade de pastas — a home (pastas raiz) e a tela de uma pasta (subpastas).
@@ -43,8 +44,14 @@ export function FolderGrid({
   onOpen,
   onMenu,
   onReorder,
+  todas,
+  onSoltarDentro,
 }: {
   pastas: NoteFolder[];
+  /** Todas as pastas (para saber onde uma pode entrar). Com `onSoltarDentro`, liga o soltar dentro. */
+  todas?: NoteFolder[];
+  /** Soltou uma pasta sobre o miolo de outra: mover para dentro dela. */
+  onSoltarDentro?: (arrastada: NoteFolder, alvo: NoteFolder) => void;
   enabled: boolean;
   scrollRef: ReturnType<typeof useAnimatedRef<Animated.ScrollView>>;
   topInset: number;
@@ -60,6 +67,21 @@ export function FolderGrid({
 }) {
   const { fontScale } = useWindowDimensions();
   const [gridWidth, setGridWidth] = useState(0);
+
+  // Por pasta arrastada: onde ela pode entrar (sem ciclo, sem passar do 5º nível, nem a mãe atual).
+  const destinos = useMemo(() => {
+    if (!todas || !onSoltarDentro) return null;
+    return new Map(
+      pastas.map((p) => [
+        p.id,
+        new Set(destinosDePasta(todas, p).filter((d) => d.id !== p.parent_id).map((d) => d.id)),
+      ])
+    );
+  }, [pastas, todas, onSoltarDentro]);
+  const podeSoltarDentro = useCallback(
+    (a: NoteFolder, b: NoteFolder) => destinos?.get(a.id)?.has(b.id) ?? false,
+    [destinos]
+  );
 
   return (
     <View onLayout={(event) => setGridWidth(event.nativeEvent.layout.width)}>
@@ -82,6 +104,8 @@ export function FolderGrid({
         }}
         onTapItem={(i) => onMenu(pastas[i])}
         onReorder={onReorder}
+        podeSoltarDentro={destinos ? podeSoltarDentro : undefined}
+        onSoltarDentro={destinos ? onSoltarDentro : undefined}
         renderItem={({ item, index, active }) => (
           // A grade se MONTA, em cascata — é explicação, não enfeite: o olho lê a ordem dos
           // ladrilhos enquanto eles chegam, e o teto de `Motion.stagger.cap` impede que a última

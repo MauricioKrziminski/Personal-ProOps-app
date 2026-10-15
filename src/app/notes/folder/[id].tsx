@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { mensagemDoErroDePasta } from '@/lib/pastas';
 import { RefreshControl, StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedRef } from 'react-native-reanimated';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
@@ -8,7 +9,7 @@ import { ColorPicker } from '@/components/notes/color-picker';
 import { FolderGrid } from '@/components/notes/folder-grid';
 import { FolderPicker } from '@/components/notes/folder-picker';
 import { confirmarApagarPasta } from '@/components/notes/note-actions';
-import { NovaPastaSheet, useMoverPasta } from '@/components/notes/nova-pasta';
+import { NovaPastaSheet, useMoverPasta, useSoltarPastaDentro } from '@/components/notes/nova-pasta';
 import { NoteList } from '@/components/notes/note-list';
 import { useFolderMenu } from '@/components/notes/use-folder-menu';
 import { TagPicker } from '@/components/notes/tag-picker';
@@ -170,6 +171,7 @@ export default function FolderScreen() {
 
   const [renomeandoPasta, setRenomeandoPasta] = useState<NoteFolder | null>(null);
   const moverPasta = useMoverPasta(folders);
+  const soltarPastaDentro = useSoltarPastaDentro();
   const menuDaSubpasta = useFolderMenu({ onColor: setPintandoPasta, onRename: setRenomeandoPasta, pastas: folders });
 
   const pronta = useTelaPronta(list, foldersQuery);
@@ -180,7 +182,7 @@ export default function FolderScreen() {
     confirmarApagarPasta(folder, () =>
       deleteFolder.mutate(folder.id, {
         onSuccess: () => router.back(),
-        onError: () => toast({ message: 'Não deu para apagar a pasta.', tone: 'error' }),
+        onError: (e) => toast({ message: mensagemDoErroDePasta(e, 'Não deu para apagar a pasta.'), tone: 'error' }),
       }),
     );
   };
@@ -335,6 +337,8 @@ export default function FolderScreen() {
                 <SectionHead title="Subpastas" inset={false} />
                 <FolderGrid
                   pastas={subpastas}
+                  todas={folders}
+                  onSoltarDentro={soltarPastaDentro}
                   enabled={podeArrastar}
                   scrollRef={scrollRef}
                   topInset={topoSubpastas}

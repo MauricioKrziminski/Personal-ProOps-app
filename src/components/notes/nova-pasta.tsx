@@ -7,18 +7,20 @@ import { Button } from '@/components/ui/button';
 import { Field, TextField } from '@/components/ui/field';
 import { Forte } from '@/components/ui/forte';
 import { Icon } from '@/components/ui/icon';
+import { SelectField, type SelectOption } from '@/components/ui/select-field';
 import { Sheet, SheetScroll } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { useToast } from '@/components/ui/toast';
 import { HitTarget, Radius, Space } from '@/design/tokens';
 import { useSaveFolder, type NoteFolder } from '@/hooks/use-notes';
 import { useTheme } from '@/hooks/use-theme';
+import { destinosDePasta, mensagemDoErroDePasta, nomeRepetidoEntreIrmas } from '@/lib/pastas';
 import { normalizeFolderName } from '@/lib/search';
 
 /**
  * Criar e renomear pasta, uma regra só — "Organizar pastas" e a folha "Nova pasta" chamam esta.
  *
- * Nome repetido é ERRO aqui (diferente do "Mover para", onde a nota vai para a pasta que já existe):
+ * Nome repetido (entre irmãs, na mesma mãe) é ERRO aqui (diferente do "Mover para", onde a nota vai para a pasta que já existe):
  * o caminho de criação é `.upsert()`, que com nome repetido atualizaria a pasta existente em
  * silêncio. `23505` é outro aparelho criando a mesma pasta entre a checagem e o insert.
  */
@@ -34,7 +36,9 @@ export function useSalvarPasta(pastas: NoteFolder[]) {
     const nome = normalizeFolderName(entrada.nome);
     if (!nome) return { erro: 'Dá um nome para a pasta.' };
     const repetida = <>Já existe uma pasta chamada <Forte>{nome}</Forte>.</>;
-    if (pastas.some((f) => f.name === nome && f.id !== entrada.id)) return { erro: repetida };
+    // Sem `paiId` (editar sem mexer na mãe) vale a mãe que a pasta já tem.
+    const paiDestino = entrada.paiId !== undefined ? entrada.paiId : (pastas.find((f) => f.id === entrada.id)?.parent_id ?? null);
+    if (nomeRepetidoEntreIrmas(pastas, nome, paiDestino, entrada.id)) return { erro: repetida };
     try {
       const id = await saveFolder.mutateAsync({
         id: entrada.id,
@@ -46,27 +50,11 @@ export function useSalvarPasta(pastas: NoteFolder[]) {
       return { id };
     } catch (e) {
       if ((e as { code?: string }).code === '23505') return { erro: repetida };
-      toast({ message: 'Não deu para salvar a pasta.', tone: 'error' });
+      toast({ message: mensagemDoErroDePasta(e, 'Não deu para salvar a pasta.'), tone: 'error' });
       return {};
     }
   };
   return { salvar, salvando: saveFolder.isPending };
-}
-
-/** Para onde uma pasta pode ir: nem ela mesma, nem as DESCENDENTES dela (sumiriam da árvore). */
-export function destinosDaPasta(pastas: NoteFolder[], folder: NoteFolder): NoteFolder[] {
-  const descendentes = new Set<string>([folder.id]);
-  let cresceu = true;
-  while (cresceu) {
-    cresceu = false;
-    for (const f of pastas) {
-      if (f.parent_id && descendentes.has(f.parent_id) && !descendentes.has(f.id)) {
-        descendentes.add(f.id);
-        cresceu = true;
-      }
-    }
-  }
-  return pastas.filter((f) => !descendentes.has(f.id));
 }
 
 /**
@@ -78,20 +66,54 @@ export function useMoverPasta(pastas: NoteFolder[]) {
   const saveFolder = useSaveFolder();
   const toast = useToast();
   return (folder: NoteFolder) => {
-    const destinos = destinosDaPasta(pastas, folder);
+    const destinos = destinosDePasta(pastas, folder);
     actionSheet(
       {
         title: `Mover a pasta ${folder.name} para`,
-        options: ['Raiz (nenhuma pasta)', ...destinos.map((f) => f.name)],
+        options: ['Raiz (nenhuma pasta)', ...destinos.map((f) => f.caminho)],
       },
       (index) => {
         if (index === undefined) return;
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         saveFolder.mutate(
           { id: folder.id, name: folder.name, icon: folder.icon, parentId: index === 0 ? null : destinos[index - 1].id },
-          { onError: () => toast({ message: 'Não deu para mover a pasta.', tone: 'error' }) },
+          { onError: (e) => toast({ message: mensagemDoErroDePasta(e, 'Não deu para mover a pasta.'), tone: 'error' }) },
         );
       },
+    );
+  };
+}
+
+/**
+ * Soltar o ladrilho de uma pasta sobre outra (grade de pastas): move para dentro dela, pela mesma
+ * escrita do "Mover para". Sucesso traz "Desfazer" (devolve a mãe de antes); o erro do banco
+ * (ciclo, 5 níveis, nome repetido na mãe) vira toast com a frase.
+ */
+export function useSoltarPastaDentro() {
+  const saveFolder = useSaveFolder();
+  const toast = useToast();
+  return (arrastada: NoteFolder, alvo: NoteFolder) => {
+    const mover = (paiId: string | null) =>
+      saveFolder.mutateAsync({ id: arrastada.id, name: arrastada.name, icon: arrastada.icon, parentId: paiId });
+    mover(alvo.id).then(
+      () => {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        toast({
+          message: <>Movida para <Forte>{alvo.name}</Forte></>,
+          tone: 'success',
+          action: {
+            label: 'Desfazer',
+            onPress: () =>
+              mover(arrastada.parent_id).catch((e) =>
+                toast({ message: mensagemDoErroDePasta(e, 'Não deu para desfazer.'), tone: 'error' })
+              ),
+          },
+        });
+      },
+      (e) => {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        toast({ message: mensagemDoErroDePasta(e, 'Não deu para mover a pasta.'), tone: 'error' });
+      }
     );
   };
 }
@@ -140,8 +162,7 @@ export function GradeDeIcones({ valor, onChange }: { valor: string; onChange: (i
  * ícone abre esta mesma folha com `pasta`. Organizar pastas deixou de criar: tinha um editor
  * próprio no topo que repetia este.
  *
- * Com `pasta`, o nome e o ícone nascem dela e a pasta-mãe NÃO muda (mudar de nível é "Mover para
- * dentro de…"). Quem abre para editar troca a `key` ao trocar de pasta, para os campos nascerem
+ * Com `pasta`, o nome, o ícone e o "Dentro de" nascem dela; trocar o "Dentro de" MOVE a pasta. Quem abre para editar troca a `key` ao trocar de pasta, para os campos nascerem
  * de novo.
  */
 export function NovaPastaSheet({
@@ -162,8 +183,20 @@ export function NovaPastaSheet({
   const [nome, setNome] = useState(pasta?.name ?? '');
   const [icone, setIcone] = useState(pasta?.icon ?? 'folder');
   const [erro, setErro] = useState<ReactNode>(null);
+  // `undefined` = a pessoa não mexeu: vale `paiId` (criar) ou a mãe da pasta (editar).
+  const [paiEscolhido, setPaiEscolhido] = useState<string | null | undefined>(undefined);
+  const paiAtual = paiEscolhido !== undefined ? paiEscolhido : pasta ? pasta.parent_id : (paiId ?? null);
+  const opcoesDeMae: SelectOption[] = [
+    { id: null, label: 'Nenhuma (raiz)', icon: 'tray', neutral: true },
+    ...destinosDePasta(pastas, pasta).map((d) => ({
+      id: d.id,
+      label: d.caminho,
+      icon: symbol(d.icon),
+    })),
+  ];
 
   const fechar = () => {
+    setPaiEscolhido(undefined);
     setNome('');
     setIcone('folder');
     setErro(null);
@@ -171,8 +204,9 @@ export function NovaPastaSheet({
   };
 
   const criar = async () => {
-    // Editando, a pasta-mãe fica como está (`undefined` não escreve `parent_id`).
-    const r = await salvar({ id: pasta?.id, nome, icone, paiId: pasta ? undefined : (paiId ?? null) });
+    // Editando, só escreve `parent_id` se a pessoa trocou o "Dentro de" (aí a pasta MOVE).
+    const moveu = !!pasta && paiAtual !== pasta.parent_id;
+    const r = await salvar({ id: pasta?.id, nome, icone, paiId: pasta && !moveu ? undefined : paiAtual });
     if (r.erro) {
       setErro(r.erro);
       return;
@@ -188,7 +222,7 @@ export function NovaPastaSheet({
   return (
     <Sheet visible={visible} onClose={fechar}>
       <TaskHeader
-        title={pasta ? 'Editar pasta' : paiId ? 'Nova subpasta' : 'Nova pasta'}
+        title={pasta ? 'Editar pasta' : paiAtual ? 'Nova subpasta' : 'Nova pasta'}
         onClose={fechar}
         action={<Button label={pasta ? 'Salvar' : 'Criar'} size="sm" loading={salvando} onPress={() => void criar()} />}
       />
@@ -207,6 +241,16 @@ export function NovaPastaSheet({
             invalid={!!erro}
             accessibilityLabel="Nome da pasta"
             onSubmitEditing={() => void criar()}
+          />
+        </Field>
+        <Field label="Dentro de">
+          <SelectField
+            options={opcoesDeMae}
+            value={paiAtual}
+            onChange={(id) => {
+              setPaiEscolhido(id);
+              setErro(null);
+            }}
           />
         </Field>
         <Field label="Ícone">

@@ -62,36 +62,7 @@ export interface NoteFolder {
   notes_count: number;
 }
 
-/**
- * Ordena as pastas em ÁRVORE, achatada para lista, com o nível de cada uma.
- *
- * A lista vem plana do banco e ordenada por nome; assim "Trabalho / 2026" apareceria longe de
- * "Trabalho". Aqui as filhas ficam logo abaixo da mãe, e `depth` diz quanto recuar.
- *
- * Pasta cuja mãe não está na lista (mãe apagada entre um fetch e outro) é tratada como raiz —
- * some da árvore é pior do que aparecer no lugar errado por um instante.
- */
-export function folderTree(folders: NoteFolder[]): (NoteFolder & { depth: number })[] {
-  const filhas = new Map<string | null, NoteFolder[]>();
-  const ids = new Set(folders.map((f) => f.id));
-  for (const f of folders) {
-    const mae = f.parent_id && ids.has(f.parent_id) ? f.parent_id : null;
-    filhas.set(mae, [...(filhas.get(mae) ?? []), f]);
-  }
-
-  const saida: (NoteFolder & { depth: number })[] = [];
-  const desce = (mae: string | null, depth: number) => {
-    // Teto de profundidade: `parent_id` não impede um ciclo (A mãe de B, B mãe de A) e sem o
-    // corte isto seria recursão infinita — tela branca, sem erro no log.
-    if (depth > 4) return;
-    for (const f of filhas.get(mae) ?? []) {
-      saida.push({ ...f, depth });
-      desce(f.id, depth + 1);
-    }
-  };
-  desce(null, 0);
-  return saida;
-}
+export { folderTree } from '@/lib/pastas';
 
 /**
  * Como a lista é ordenada.
@@ -578,7 +549,7 @@ export function useSaveFolder() {
             parent_id: input.parentId ?? null,
             user_id: await currentUserId(),
           },
-          { onConflict: 'workspace_id,name' }
+          { onConflict: 'workspace_id,parent_id,name' }
         )
         .select('id')
         .single();
@@ -598,10 +569,25 @@ export function useSaveFolder() {
  */
 export function useDeleteFolder() {
   const invalidate = useInvalidateNotes();
+  const client = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from('note_folders').delete().eq('id', id);
-      if (error) throw error;
+      if (error) {
+        // As filhas sobem para a raiz; 23505 = já há na raiz uma pasta com o nome de uma delas.
+        if (error.code === '23505') {
+          const todas = client.getQueryData<NoteFolder[]>(['notes', 'folders']) ?? [];
+          const raiz = new Set(todas.filter((p) => !p.parent_id && p.id !== id).map((p) => p.name));
+          const nome = todas.find((p) => p.parent_id === id && raiz.has(p.name))?.name;
+          throw {
+            code: 'P0001',
+            message: nome
+              ? `Já existe na raiz uma pasta chamada ${nome}. Renomeie a subpasta antes de apagar.`
+              : 'Já existe na raiz uma pasta com o nome de uma subpasta. Renomeie a subpasta antes de apagar.',
+          };
+        }
+        throw error;
+      }
     },
     onSuccess: invalidate,
   });

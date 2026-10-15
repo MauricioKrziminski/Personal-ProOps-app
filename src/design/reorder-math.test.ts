@@ -133,3 +133,35 @@ test('o pé da faixa desconta a DOCK — senão o dedo nunca alcança', () => {
     'sem descontar a dock a faixa fica fora do alcance — era este o bug'
   );
 });
+
+test('slotNoMiolo: só o miolo conta; borda, vão e fora dão -1', async () => {
+  const { slotNoMiolo } = await import('./reorder-math.ts');
+  // 2 colunas, ladrilho 100x60, vão 10, 3 itens. Centro do slot 1: (160, 30).
+  const f = (x: number, y: number) => slotNoMiolo(x, y, 100, 60, 10, 2, 3, 0.5);
+  assert.equal(f(160, 30), 1);
+  assert.equal(f(180, 40), 1); // dentro de ±25 x ±15
+  assert.equal(f(190, 30), -1); // borda do ladrilho
+  assert.equal(f(105, 30), -1); // vão
+  assert.equal(f(50, 100), 2); // slot 2 (linha 1, coluna 0)
+  assert.equal(f(160, 100), -1); // slot 3 não existe
+  assert.equal(f(-5, 30), -1);
+  assert.equal(slotNoMiolo(160, 30, 100, 60, 10, 2, 3, 0), -1); // desligado
+});
+
+test('itemNoSlot: acompanha o deslocamento dos irmãos', async () => {
+  const { itemNoSlot } = await import('./reorder-math.ts');
+  // arrastando 0 para 2 em 4 itens: 1->0, 2->1; slot 2 é o vão do arrastado
+  assert.equal(itemNoSlot(0, 0, 2, 4), 1);
+  assert.equal(itemNoSlot(1, 0, 2, 4), 2);
+  assert.equal(itemNoSlot(2, 0, 2, 4), -1);
+  assert.equal(itemNoSlot(3, 0, 2, 4), 3);
+  assert.equal(itemNoSlot(1, 1, 1, 4), -1);
+});
+
+test('decisaoDaReordenacao: alvo congela, slot novo só reordena depois da espera', async () => {
+  const { decisaoDaReordenacao: d } = await import('./reorder-math.ts');
+  assert.equal(d(0, 1, 1000, 1, 250), 'alvo');
+  assert.equal(d(0, 1, 100, -1, 250), 'espera');
+  assert.equal(d(0, 1, 250, -1, 250), 'reordena');
+  assert.equal(d(1, 1, 999, -1, 250), 'espera');
+});

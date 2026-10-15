@@ -45,6 +45,7 @@ function montar() {
     '@/components/notes/note-actions': acoes,
     '@/components/notes/nova-pasta': { useMoverPasta: () => (f: { id: string }) => movidas.push(f.id) },
     '@/components/ui/toast': { useToast: () => () => {} },
+    '@/lib/pastas': { mensagemDoErroDePasta: (_: unknown, padrao: string) => padrao },
     '@/hooks/use-notes': {
       useUpdateFolder: () => ({ mutate: () => {} }),
       useDeleteFolder: () => ({ mutate: (id: string) => apagadas.push(id) }),

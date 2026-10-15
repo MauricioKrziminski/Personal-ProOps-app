@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { mensagemDoErroDePasta } from '@/lib/pastas';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
@@ -67,7 +68,7 @@ export function useFolderMenu({
         confirmarApagarPasta(folder, () => {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
           deleteFolder.mutate(folder.id, {
-            onError: () => toast({ message: 'Não deu para apagar a pasta.', tone: 'error' }),
+            onError: (e) => toast({ message: mensagemDoErroDePasta(e, 'Não deu para apagar a pasta.'), tone: 'error' }),
           });
         });
       // Editar ONDE a pasta está (25/09/2026): renomear e mover só existiam em Organizar pastas.

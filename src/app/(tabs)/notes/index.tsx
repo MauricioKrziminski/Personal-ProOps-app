@@ -9,7 +9,7 @@ import * as Haptics from 'expo-haptics';
 import { ColorPicker } from '@/components/notes/color-picker';
 import { FolderGrid } from '@/components/notes/folder-grid';
 import { FolderPicker } from '@/components/notes/folder-picker';
-import { NovaPastaSheet } from '@/components/notes/nova-pasta';
+import { NovaPastaSheet, useSoltarPastaDentro } from '@/components/notes/nova-pasta';
 import type { NoteCardActions } from '@/components/notes/note-card';
 import { NoteList } from '@/components/notes/note-list';
 import { useFolderMenu } from '@/components/notes/use-folder-menu';
@@ -348,6 +348,7 @@ export default function NotesScreen() {
   };
 
   const [renomeandoPasta, setRenomeandoPasta] = useState<NoteFolder | null>(null);
+  const soltarPastaDentro = useSoltarPastaDentro();
   const menuDaPasta = useFolderMenu({ onColor: setPintandoPasta, onRename: setRenomeandoPasta, pastas: folders });
 
   /*
@@ -581,6 +582,8 @@ export default function NotesScreen() {
             {pastasRecolhidas ? null : (
             <FolderGrid
               pastas={pastas}
+              todas={folders}
+              onSoltarDentro={soltarPastaDentro}
               enabled={podeArrastar}
               scrollRef={scrollRef}
               topInset={topoPastas}

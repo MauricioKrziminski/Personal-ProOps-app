@@ -7,11 +7,13 @@ import { Icon } from '@/components/ui/icon';
 import { Row, Section } from '@/components/ui/row';
 import { Sheet, SheetScroll } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
-import { TextField } from '@/components/ui/field';
+import { Field, TextField } from '@/components/ui/field';
+import { SelectField, type SelectOption } from '@/components/ui/select-field';
 import { useToast } from '@/components/ui/toast';
 import { Space } from '@/design/tokens';
 import { symbol } from '@/components/notes/note-actions';
 import { useSaveFolder, type NoteFolder } from '@/hooks/use-notes';
+import { destinosDePasta, folderTree, mensagemDoErroDePasta } from '@/lib/pastas';
 import { normalizeFolderName } from '@/lib/search';
 
 /** Quando o campo de busca deixa de ser ruído e passa a ser necessário. */
@@ -43,10 +45,21 @@ export function FolderPicker({
   const saveFolder = useSaveFolder();
   const [query, setQuery] = useState('');
   const [newName, setNewName] = useState<string | null>(null);
+  const [newParent, setNewParent] = useState<string | null>(null);
 
-  const visibleFolders = query
-    ? folders.filter((f) => f.name.includes(normalizeFolderName(query)))
-    : folders;
+  // Árvore (filhas abaixo da mãe, recuadas); na busca, lista plana com o CAMINHO para distinguir
+  // "trabalho / 2026" de "casa / 2026".
+  const termo = normalizeFolderName(query);
+  const destinos = destinosDePasta(folders);
+  const visibleFolders = termo
+    ? folderTree(folders)
+        .map((f) => ({ ...f, caminho: destinos.find((d) => d.id === f.id)?.caminho ?? f.name }))
+        .filter((f) => f.caminho.includes(termo))
+    : folderTree(folders).map((f) => ({ ...f, caminho: f.name }));
+  const opcoesDeMae: SelectOption[] = [
+    { id: null, label: 'Nenhuma (raiz)', icon: 'tray', neutral: true },
+    ...destinos.map((d) => ({ id: d.id, label: d.caminho, icon: symbol(d.icon) })),
+  ];
 
   const check = (selected: boolean) =>
     selected ? <Icon name="checkmark" size="md" color="tint" /> : null;
@@ -55,13 +68,14 @@ export function FolderPicker({
     const name = normalizeFolderName(newName ?? '');
     if (!name) return;
     try {
-      const id = await saveFolder.mutateAsync({ name, icon: 'folder' });
+      const id = await saveFolder.mutateAsync({ name, icon: 'folder', parentId: newParent });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setNewName(null);
+      setNewParent(null);
       setQuery('');
       onPick(id);
-    } catch {
-      toast({ message: 'Não deu para criar a pasta.', tone: 'error' });
+    } catch (e) {
+      toast({ message: mensagemDoErroDePasta(e, 'Não deu para criar a pasta.'), tone: 'error' });
     }
   };
 
@@ -95,12 +109,13 @@ export function FolderPicker({
           {visibleFolders.map((f) => (
             <Row
               key={f.id}
-              title={f.name}
+              indent={termo ? 0 : f.depth}
+              title={termo ? f.caminho : f.name}
               subtitle={`${f.notes_count} nota${f.notes_count === 1 ? '' : 's'}`}
               icon={symbol(f.icon)}
               chevron={false}
               accessibilityState={{ selected: current === f.id }}
-              accessibilityLabel={`${f.name}, ${f.notes_count} notas`}
+              accessibilityLabel={`${f.caminho}, ${f.notes_count} notas`}
               trailing={check(current === f.id)}
               onPress={() => onPick(f.id)}
             />
@@ -124,6 +139,9 @@ export function FolderPicker({
                 accessibilityLabel="Nome da nova pasta"
                 onSubmitEditing={() => void createAndMove()}
               />
+              <Field label="Dentro de">
+                <SelectField options={opcoesDeMae} value={newParent} onChange={setNewParent} />
+              </Field>
               <Button
                 label="Criar e mover"
                 size="sm"

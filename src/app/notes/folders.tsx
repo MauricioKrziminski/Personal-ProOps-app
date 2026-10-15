@@ -1,4 +1,5 @@
 import { useQuery } from '@/lib/consulta-em-foco';
+import { mensagemDoErroDePasta } from '@/lib/pastas';
 import { Stack, router } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -88,7 +89,7 @@ export default function FoldersScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       if (editando?.id === folder.id) setEditando(null);
       deleteFolder.mutate(folder.id, {
-        onError: () => toast({ message: 'Não deu para apagar a pasta.', tone: 'error' }),
+        onError: (e) => toast({ message: mensagemDoErroDePasta(e, 'Não deu para apagar a pasta.'), tone: 'error' }),
       });
     });
   };

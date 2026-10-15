@@ -112,3 +112,64 @@ export function velocidadeAutoScroll(
   if (y + altura > pe - borda) return velocidade * ((y + altura - (pe - borda)) / borda);
   return 0;
 }
+
+/**
+ * Soltar DENTRO (só na grade): o slot cujo MIOLO contém o ponto `(cx, cy)`, ou -1.
+ *
+ * O miolo é o retângulo central do ladrilho com `fracao` da largura e da altura. Borda, vão e
+ * fora da grade dão -1 — ali o arrasto continua sendo reordenar. `fracao <= 0` desliga tudo.
+ */
+export function slotNoMiolo(
+  cx: number,
+  cy: number,
+  larguraLadrilho: number,
+  tileHeight: number,
+  gap: number,
+  columns: number,
+  total: number,
+  fracao: number
+): number {
+  'worklet';
+  if (fracao <= 0 || columns < 2 || cx < 0 || cy < 0) return -1;
+  const col = Math.floor(cx / (larguraLadrilho + gap));
+  const lin = Math.floor(cy / (tileHeight + gap));
+  const slot = lin * columns + col;
+  if (col >= columns || slot >= total) return -1;
+  const dx = cx - (col * (larguraLadrilho + gap) + larguraLadrilho / 2);
+  const dy = cy - (lin * (tileHeight + gap) + tileHeight / 2);
+  const dentro = Math.abs(dx) <= (larguraLadrilho * fracao) / 2 && Math.abs(dy) <= (tileHeight * fracao) / 2;
+  return dentro ? slot : -1;
+}
+
+/**
+ * Qual item está VISUALMENTE no `slot` enquanto `de` é arrastado para `para` (os irmãos entre os
+ * dois já andaram um slot). -1 se o slot é o vão do próprio arrastado.
+ */
+export function itemNoSlot(slot: number, de: number, para: number, total: number): number {
+  'worklet';
+  for (let k = 0; k < total; k++) {
+    if (k !== de && slotDoIrmao(k, de, para) === slot) return k;
+  }
+  return -1;
+}
+
+/**
+ * Com "soltar dentro" ligado, a ordem não troca na hora: o centro cruza a borda do slot antes de
+ * chegar ao miolo, e reordenar ali tiraria o alvo de baixo do dedo.
+ *
+ * - `alvo`: há candidato (miolo de alvo válido) — congela a ordem e conta a espera de virar alvo;
+ * - `reordena`: o slot novo difere do atual e o centro ficou nele `espera` ms fora de alvo;
+ * - `espera`: o resto.
+ */
+export function decisaoDaReordenacao(
+  slotAtual: number,
+  slotNovo: number,
+  tempoNoSlot: number,
+  candidato: number,
+  espera: number
+): 'alvo' | 'reordena' | 'espera' {
+  'worklet';
+  if (candidato >= 0) return 'alvo';
+  if (slotNovo >= 0 && slotNovo !== slotAtual && tempoNoSlot >= espera) return 'reordena';
+  return 'espera';
+}

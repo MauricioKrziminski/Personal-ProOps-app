@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { mensagemDoErroDePasta } from '@/lib/pastas';
 import { StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { router } from 'expo-router';
@@ -114,7 +115,7 @@ export default function ArchivedScreen() {
           confirmarApagarPasta({ name: f.name, notes_count: null }, () => {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
             deleteFolder.mutate(f.id, {
-              onError: () => toast({ message: 'Não deu para apagar a pasta.', tone: 'error' }),
+              onError: (e) => toast({ message: mensagemDoErroDePasta(e, 'Não deu para apagar a pasta.'), tone: 'error' }),
             });
           }),
       },
