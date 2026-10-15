@@ -54,7 +54,7 @@ escolheu** a partir de uma mensagem do WhatsApp.
 | O quê | Hook | Fonte |
 |---|---|---|
 | Pastas + contagem | `useNoteFolders()` → `['notes','folders']` | `note_folders` + RPC `note_folder_counts()` (`Promise.all`) |
-| Criar / renomear / ícone | `useSaveFolder()` | `.upsert(..., { onConflict: 'workspace_id,name' })` — funciona porque o unique é **completo** |
+| Criar / renomear / ícone | `useSaveFolder()` | `.upsert(..., { onConflict: 'workspace_id,parent_id,name' })` — funciona porque o unique é **completo** (`nulls not distinct`) |
 | Apagar | `useDeleteFolder()` | `on delete set null` nas notas |
 | Mover nota | `useSaveNote()` | só `folder_id` |
 

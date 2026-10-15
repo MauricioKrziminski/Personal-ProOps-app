@@ -58,7 +58,7 @@ em português, captura instantânea e uma lixeira que perdoa. Editor de blocos n
 
 | Conceito | Como é feito | Por que não do outro jeito |
 |---|---|---|
-| **Pasta** | `note_folders`, **um nível**, `unique (workspace_id, name)` completo, `icon` = nome de SF Symbol | Aninhamento exige breadcrumb, seletor recursivo, anti-ciclo e CTE. Unique completo mantém o `.upsert()` legal (parcial cairia no `42P10`). |
+| **Pasta** | `note_folders`, aninhadas (até 5 níveis), `unique nulls not distinct (workspace_id, parent_id, name)` completo (mesmo nome em mães diferentes), `icon` = nome de SF Symbol | Ciclo, profundidade e mãe de outro workspace são travados por trigger (`20261015120000`). Unique completo mantém o `.upsert()` legal (parcial cairia no `42P10`). |
 | **Nota → pasta** | `notes.folder_id`, `on delete set null` | Apagar pasta **nunca** apaga nota. |
 | **Tag** | `notes.tags text[]` **gerado** dos `#hashtag` do próprio conteúdo, + GIN. No detalhe há chips: tocar num chip TIRA a tag, o `+ tag` abre o seletor. | Tabela de tags nasceria vazia: ninguém digita tag no WhatsApp. O usuário já digita `#`. Zero caminho de escrita, zero tela de gestão, zero mudança no contrato da IA. **O seletor edita o TEXTO** (acrescenta/remove o token `#tag`), porque a coluna é `GENERATED ALWAYS` e não aceita escrita — é o que dá chip de verdade sem quebrar o round-trip da nota para o WhatsApp. Helpers e testes em `src/lib/search.ts`. |
 | **Título** | primeira linha do conteúdo, calculada na tela | Coluna `title` viria null em 100% das notas do WhatsApp → lista com duas aparências. |
