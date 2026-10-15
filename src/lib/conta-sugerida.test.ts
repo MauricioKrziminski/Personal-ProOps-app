@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { contaQuePaga, contaSugerida } from './conta-sugerida.ts';
+import { contaNoConflito, contaQuePaga, contaSugerida } from './conta-sugerida.ts';
 
 const contas = [
   { id: 'c1', type: 'checking' },
@@ -49,4 +49,14 @@ test('quem paga: a própria, depois a padrão, só entre pagadoras ativas', () =
   assert.equal(contaQuePaga(null, 'old', pag), null);
   assert.equal(contaQuePaga(null, 'k1', contas), null);
   assert.equal(contaQuePaga(null, null, pag), null);
+});
+
+test('conflito: corrente no crédito vira o cartão padrão; cartão no débito vira a conta padrão', () => {
+  assert.equal(contaNoConflito({ ...base, forma: 'credit', valor: 'c1' }), 'k1');
+  assert.equal(contaNoConflito({ ...base, forma: 'debit', valor: 'k1' }), 'c1');
+});
+test('conflito: conta compatível, campo vazio ou sem padrão compatível não mexe', () => {
+  assert.equal(contaNoConflito({ ...base, forma: 'pix', valor: 'c1' }), null);
+  assert.equal(contaNoConflito({ ...base, forma: 'credit', valor: null }), null);
+  assert.equal(contaNoConflito({ ...base, forma: 'credit', valor: 'c1', cartaoPadrao: null }), null);
 });

@@ -162,7 +162,8 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
   const form = formBase.id ? { ...formBase, inicioOriginal: pisoDoInicio(formBase.inicioOriginal, primeira.data) } : formBase;
   const setForm = (form: SerieForm) => setEstado((anterior) => ({ ...anterior, form }));
   const conta = useContaSugerida({
-    ativo: Boolean(props.sugerirConta) && !alvo && !editandoId && !converter, contas: accounts.data, forma: formBase.paymentMethod,
+    ativo: Boolean(props.sugerirConta) && !alvo && !editandoId && !converter,
+    resolver: !alvo && !editandoId && !converter, contas: accounts.data, forma: formBase.paymentMethod,
     valor: formBase.accountId, aplicar: (accountId) => setEstado((anterior) => ({ ...anterior, form: { ...anterior.form, accountId } })),
   });
   // A pessoa mexeu na conta: a sugestão para de valer.

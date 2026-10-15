@@ -504,7 +504,7 @@ export function FormularioDoLancamento(props: Props) {
     if (!next) resetParcelasSeEscondeu();
   };
   const conta = useContaSugerida({
-    ativo: Boolean(props.sugerirConta) && !editing, contas: accounts, forma: paymentMethod,
+    ativo: Boolean(props.sugerirConta) && !editing, resolver: !editing, contas: accounts, forma: paymentMethod,
     valor: accountId ?? null, aplicar: trocarConta,
   });
 

@@ -1434,7 +1434,9 @@ cópia, favorito, voz, captura e "Aplicar" valem como vieram; forma crédito -> 
 débito, boleto, transferência e dinheiro -> conta padrão compatível (`paymentMethodAccounts`); sem
 forma -> conta padrão. Padrão arquivado ou ausente é ignorado. **Nunca silenciosa**: a linha do
 seletor diz "· padrão". Enquanto o campo é o que a sugestão pôs, trocar a forma recalcula; escolhido
-pela pessoa (inclusive "Sem conta"), nunca mais. Financiamento sugere só a conta padrão. Na folha de
+pela pessoa (inclusive "Sem conta"), nunca mais. **Exceção: a forma mudou e a conta escolhida não serve para ela** (corrente no
+crédito, cartão no débito): entra o padrão da forma nova em vez do erro (`contaNoConflito`), em toda criação —
+inclusive depois de trocar de tipo ou "Salvar e criar outro" —, nunca editando. Sem padrão compatível, fica o erro. Financiamento sugere só a conta padrão. Na folha de
 pagar fatura e de pagar dívida a ordem é a conta do registro -> a conta padrão (`contaQuePaga`).
 
 ### Criar a origem no fluxo, saldo e limite no seletor, prévia (F02, F03, F04)

@@ -331,7 +331,7 @@ Dívidas), costurados por `?de=`, "Voltar" e `dismiss(2)`. Hoje é uma tela moda
 
 - **Conta/cartão padrão pré-seleciona só criando do zero** (`sugerirConta` do hospedeiro, `useContaSugerida`):
   nunca editando, convertendo ou com qualquer preenchimento da rota; o seletor marca "· padrão" e a
-  escolha da pessoa vence (`finance.md` → *Conta padrão e cartão padrão*).
+  escolha da pessoa vence, salvo quando a forma nova a torna incompatível (aí entra o padrão da forma) (`finance.md` → *Conta padrão e cartão padrão*).
 - **Três corpos, um contrato.** `components/finance/formulario-do-lancamento.tsx`,
   `formulario-da-serie.tsx` e `formulario-da-divida.tsx` recebem `CorpoProps`
   (`corpo-do-lancar.ts`). O hospedeiro (`app/finance/lancar.tsx`) desenha o seletor, lê os campos

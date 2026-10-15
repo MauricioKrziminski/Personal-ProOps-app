@@ -29,3 +29,21 @@ export function contaQuePaga(propria: string | null | undefined, contaPadrao: st
   const ok = (id: string | null | undefined) => pagadoras.find((c) => c.id === id && !c.archived && c.type !== 'credit_card')?.id ?? null;
   return ok(propria) ?? ok(contaPadrao);
 }
+
+/**
+ * A forma mudou e a conta do campo não serve mais para ela (corrente no crédito, cartão no débito):
+ * a sugestão da forma nova entra no lugar, mesmo que a conta tenha sido escolhida à mão — a
+ * alternativa era o erro "escolha uma conta compatível". Sem sugestão compatível, null (fica o erro).
+ */
+export function contaNoConflito(a: {
+  forma: PaymentMethod | null | undefined;
+  valor: string | null;
+  contaPadrao: string | null | undefined;
+  cartaoPadrao: string | null | undefined;
+  contas: readonly Conta[];
+}): string | null {
+  const atual = a.contas.find((c) => c.id === a.valor);
+  if (!atual || paymentMethodAccounts(a.forma, [atual]).length) return null;
+  const sug = contaSugerida(a);
+  return sug !== a.valor ? sug : null;
+}

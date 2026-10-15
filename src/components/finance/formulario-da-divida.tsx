@@ -328,7 +328,8 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
   const pagadoras = paymentMethodAccounts(form.paymentMethod ?? null, (accounts.data ?? []).filter((a) => a.type !== 'credit_card'));
   // Financiamento sai de conta, nunca de cartão: só a conta padrão (forma crédito não escolhe cartão).
   const conta = useContaSugerida({
-    ativo: Boolean(props.sugerirConta) && !alvo && !editandoId && !converter, contas: accounts.data,
+    ativo: Boolean(props.sugerirConta) && !alvo && !editandoId && !converter,
+    resolver: !alvo && !editandoId && !converter, contas: accounts.data,
     forma: form.paymentMethod === 'credit' ? null : form.paymentMethod, valor: form.accountId,
     aplicar: (accountId) => setForm((f) => ({ ...f, accountId })),
   });

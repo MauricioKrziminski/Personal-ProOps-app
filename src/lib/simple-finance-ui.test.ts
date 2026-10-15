@@ -9028,12 +9028,18 @@ test('Conta padrão: criar do zero pré-seleciona a conta padrão; crédito troc
   assert.equal(camposDaSerie(ui).props.value, 'cc');
 });
 
-test('Conta padrão: a escolha da pessoa nunca é sobrescrita', () => {
+test('Conta padrão: a escolha da pessoa só cede quando a forma nova a torna incompatível', () => {
   const ui = serieComPadrao();
   ui.interact(() => camposDaSerie(ui).props.onChange('cc2'));
   assert.equal(camposDaSerie(ui).props.value, 'cc2');
+  ui.interact(() => metodo(ui).props.onChange('pix'));
+  assert.equal(camposDaSerie(ui).props.value, 'cc2', 'compatível: a forma não mexe depois da escolha');
   ui.interact(() => metodo(ui).props.onChange('credit'));
-  assert.equal(camposDaSerie(ui).props.value, 'cc2', 'a forma não mexe depois da escolha');
+  assert.equal(camposDaSerie(ui).props.value, 'k1', 'corrente no crédito: entra o cartão padrão em vez do erro');
+  const sem = serieComPadrao({ cartaoPadrao: null });
+  sem.interact(() => camposDaSerie(sem).props.onChange('cc2'));
+  sem.interact(() => metodo(sem).props.onChange('credit'));
+  assert.equal(camposDaSerie(sem).props.value, 'cc2', 'sem cartão padrão: não adivinha');
   // "Sem conta" escolhido também é escolha
   const vazio = serieComPadrao();
   vazio.interact(() => camposDaSerie(vazio).props.onChange(null));
