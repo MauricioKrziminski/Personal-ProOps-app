@@ -1811,15 +1811,16 @@ test('Fatura: tudo que se faz com ela se desfaz — pagamento, quitar à mão e 
   assert.equal(adiada.writes[0].operation, 'unrollInvoice');
 });
 
-test('Fatura: bloco Pagamentos lista do mais recente ao mais antigo e desfaz exatamente o escolhido', () => {
+test('Fatura: bloco Pagamentos na ordem em que foram pagos, numerados, e desfaz exatamente o escolhido', () => {
+  // dois de R$ 500,00 no mesmo dia: o número (pela hora do registro) é o que os separa
   const pagamentos = [
-    { id: 'pg-a', amount_cents: 50000, occurred_at: '2026-08-05', account_id: 'cc' },
-    { id: 'pg-c', amount_cents: 47000, occurred_at: '2026-08-18', account_id: 'cc' },
-    { id: 'pg-b', amount_cents: 50000, occurred_at: '2026-08-12', account_id: 'cc' },
+    { id: 'pg-c', amount_cents: 47000, occurred_at: '2026-08-18', account_id: 'cc', created_at: '2026-08-18T10:00:00Z' },
+    { id: 'pg-b', amount_cents: 50000, occurred_at: '2026-08-05', account_id: 'cc', created_at: '2026-08-05T15:00:00Z' },
+    { id: 'pg-a', amount_cents: 50000, occurred_at: '2026-08-05', account_id: 'cc', created_at: '2026-08-05T09:00:00Z' },
   ];
   const ui = screen('src/app/finance/invoice/[id].tsx', { invoiceStatus: 'paid', datasReais: true, pagamentos, forecastAccounts: [{ id: 'cc', name: 'Conta', type: 'checking' }] });
   const linhas = ui.nodes().filter((n: any) => n.type === 'Row' && /^Pagamento de/.test(String(n.props.accessibilityLabel)));
-  assert.deepEqual(linhas.map((n: any) => n.props.subtitle), ['18/08/2026 · Conta', '12/08/2026 · Conta', '05/08/2026 · Conta']);
+  assert.deepEqual(linhas.map((n: any) => n.props.subtitle), ['1º pagamento · 05/08/2026 · Conta', '2º pagamento · 05/08/2026 · Conta', '3º pagamento · 18/08/2026 · Conta']);
   linhas[1].props.onPress();
   assert.deepEqual(ui.actions.map((a: any) => a.label), ['Ver o lançamento', 'Desfazer este pagamento']);
   ui.actions.find((a: any) => a.label === 'Desfazer este pagamento').onPress();

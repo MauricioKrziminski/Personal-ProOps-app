@@ -1061,8 +1061,8 @@ fica tem motivo lógico escrito na frase. O que isso mudou no domínio:
   reabre (as linhas que a quitação baixou voltam a `pending`) ou move a data de pagamento. Fatura
   ADIADA recusa mudar o pagamento ("desfaça o adiamento antes"), exceto em cascata (apagar a conta
   ou o espaço). **Na tela da fatura os pagamentos ficam à vista** (15/10/2026, *"eu devo conseguir
-  escolher qual pagamento voltar"*): o bloco "Pagamentos" lista cada um (valor, data, conta, o mais
-  recente primeiro) e o toque oferece "Desfazer este pagamento" — apagar AQUELA transferência, com a
+  escolher qual pagamento voltar"*): o bloco "Pagamentos" lista cada um (valor, data, conta) NA ORDEM EM
+  QUE FORAM PAGOS, numerado ("1º pagamento"; no mesmo dia, pela hora do registro) e o toque oferece "Desfazer este pagamento" — apagar AQUELA transferência, com a
   confirmação dizendo para que conta o dinheiro volta e quanto fica em aberto. Sem RPC nova: o gatilho
   acima refaz a fatura (`pagamento_da_fatura_se_desfaz.sql`, seção 6: três parciais, desfazer o do
   meio). Fatura adiada não oferece o desfazer. "Marcar como paga" se desfaz (`unsettle_invoice`); "Jogar para a próxima" também

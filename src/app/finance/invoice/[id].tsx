@@ -62,7 +62,7 @@ import type { SelectOption } from '@/components/ui/select-field';
 import { AccountPicker } from '@/components/finance/account-picker';
 import { rotuloDaCompra } from '@/lib/data-da-compra';
 import { hrefDoLancamento, hrefDoLancar } from '@/lib/lancar';
-import { faltaDepoisDeDesfazer, mensagemDeDesfazer } from '@/lib/pagamentos-da-fatura';
+import { faltaDepoisDeDesfazer, mensagemDeDesfazer, naOrdemDoPagamento, nomeDoPagamento } from '@/lib/pagamentos-da-fatura';
 
 /**
  * Fatura — "o que tem nesta fatura, e como eu marco como paga?".
@@ -167,11 +167,12 @@ export default function InvoiceScreen() {
     () => (invoice.isError ? [] : (invoice.data?.transactions ?? [])),
     [invoice.data, invoice.isError]
   );
-  // Do mais recente para o mais antigo (frontend.md); o desempate é a ordem que veio do banco.
+  // Na ordem em que foram pagos, numerados (`naOrdemDoPagamento`): é como se escolhe qual desfazer.
   const pagamentos = useMemo(
-    () => (invoice.isError ? [] : [...(invoice.data?.pagamentos ?? [])].sort((a, b) => b.occurred_at.localeCompare(a.occurred_at))),
+    () => (invoice.isError ? [] : naOrdemDoPagamento(invoice.data?.pagamentos ?? [])),
     [invoice.data, invoice.isError],
   );
+  const nomeDe = (p: (typeof pagamentos)[number]) => nomeDoPagamento(pagamentos.indexOf(p));
   const cartao = (accounts.data ?? []).find((a) => a.id === fatura?.account_id);
   // O nome pinta a face (a cor do emissor sai dele). Os cartões da Carteira já estão em cache;
   // as contas talvez não — sem este segundo caminho o cartão chegaria cinza e trocaria de cor.
@@ -433,7 +434,7 @@ export default function InvoiceScreen() {
     if (!fatura || adiada || remove.isPending) return;
     const conta = nomeDaConta(p.account_id);
     confirmDestructive(
-      `Desfazer o pagamento de ${formatBRL(p.amount_cents)}?`,
+      `Desfazer o ${nomeDe(p)}, de ${formatBRL(p.amount_cents)}?`,
       'Desfazer',
       () => {
         if (remove.isPending) return;
@@ -448,7 +449,7 @@ export default function InvoiceScreen() {
   };
 
   const opcoesDoPagamento = (p: (typeof pagamentos)[number]) =>
-    showItemActions(`${brl(p.amount_cents)} em ${formatDateBR(p.occurred_at)}`, [
+    showItemActions(`${nomeDe(p)} · ${brl(p.amount_cents)} em ${formatDateBR(p.occurred_at)}`, [
       { label: 'Ver o lançamento', icon: 'arrow.left.arrow.right', onPress: () => abrirPagamentoNoLancamento(p) },
       {
         label: adiada ? 'Desfazer pagamento: desfaça o adiamento antes' : 'Desfazer este pagamento',
@@ -464,7 +465,7 @@ export default function InvoiceScreen() {
     showItemActions(
       'Qual pagamento desfazer?',
       pagamentos.map((p) => ({
-        label: `${brl(p.amount_cents)} em ${formatDateBR(p.occurred_at)}${nomeDaConta(p.account_id) ? ` · ${nomeDaConta(p.account_id)}` : ''}`,
+        label: `${nomeDe(p)} · ${brl(p.amount_cents)} em ${formatDateBR(p.occurred_at)}${nomeDaConta(p.account_id) ? ` · ${nomeDaConta(p.account_id)}` : ''}`,
         onPress: () => desfazerPagamento(p),
       })),
     );
@@ -606,7 +607,7 @@ export default function InvoiceScreen() {
             <Row
               key={p.id}
               title={brl(p.amount_cents)}
-              subtitle={[formatDateBR(p.occurred_at), nomeDaConta(p.account_id)].filter(Boolean).join(' · ')}
+              subtitle={[nomeDe(p), formatDateBR(p.occurred_at), nomeDaConta(p.account_id)].filter(Boolean).join(' · ')}
               icon="arrow.left.arrow.right"
               accessibilityLabel={`Pagamento de ${brl(p.amount_cents)} em ${formatDateBR(p.occurred_at)}`}
               onPress={() => opcoesDoPagamento(p)}

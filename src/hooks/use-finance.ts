@@ -190,7 +190,7 @@ export type CardInvoice = Pick<
 > & { status: InvoiceStatus };
 
 /** A transferência que pagou (parte de) uma fatura — `transactions.pays_invoice_id`. */
-export type PagamentoDaFatura = Pick<Tables['transactions']['Row'], 'id' | 'amount_cents' | 'occurred_at' | 'account_id'>;
+export type PagamentoDaFatura = Pick<Tables['transactions']['Row'], 'id' | 'amount_cents' | 'occurred_at' | 'account_id' | 'created_at'>;
 
 export type AccountBalance = Fns['account_balances']['Returns'][number];
 
@@ -927,9 +927,11 @@ export function invoiceQuery(invoiceId: string) {
         // Os pagamentos: é por eles que o pagamento se edita e se apaga (`20260926180000`).
         supabase
           .from('transactions')
-          .select('id, amount_cents, occurred_at, account_id')
+          .select('id, amount_cents, occurred_at, account_id, created_at')
           .eq('pays_invoice_id', invoiceId)
-          .order('occurred_at', { ascending: false }),
+          // Na ordem em que foram feitos: dois do mesmo dia se separam pela hora do registro.
+          .order('occurred_at', { ascending: true })
+          .order('created_at', { ascending: true }),
       ]);
       if (invoiceRes.error) throw invoiceRes.error;
       // Apagada, de outro espaço ou sem permissão: a tela mostra "Isto não existe mais".
