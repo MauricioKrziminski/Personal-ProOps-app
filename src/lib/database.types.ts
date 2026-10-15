@@ -1102,17 +1102,17 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "captured_notifications_recurring_id_fkey"
-            columns: ["recurring_id"]
-            isOneToOne: false
-            referencedRelation: "recurring_transactions"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "captured_notifications_match_transaction_id_fkey"
             columns: ["match_transaction_id"]
             isOneToOne: false
             referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "captured_notifications_recurring_id_fkey"
+            columns: ["recurring_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_transactions"
             referencedColumns: ["id"]
           },
           {
