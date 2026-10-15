@@ -755,7 +755,7 @@ def describe_for_confirmation(
             partes = [p for p in (((target or {}).get("atributos") or {}).get("frase"),
                                   *_da_regra_do_usuario(target)) if p]
             entendido = f" ({' · '.join(partes)})" if partes else ""
-            return f"registrar {valor}{nome} em {action.installments}x{cada} no cartão {action.account or 'a informar'}{entendido}: {paid} parcelas iniciais pagas e {(action.installments or 0)-paid} pendentes"
+            return f"registrar {valor}{nome} em {action.installments}x{cada} no cartão {action.account or 'a informar'}{' (padrão)' if (target or {}).get('default_card') else ''}{entendido}: {paid} parcelas iniciais pagas e {(action.installments or 0)-paid} pendentes"
         if tipo == "create_goal":
             nome = action.target_ref or action.description or "a meta"
             prazo = f" até {format_date_br(action.occurred_at)}" if action.occurred_at else ""
@@ -779,7 +779,7 @@ def describe_for_confirmation(
         if sem_conta_explicita(action.account) and tipo in {"create_expense", "create_income"}:
             onde = ", sem conta"
         elif action.account and citada:
-            onde = f", {onde_fica(citada)}"
+            onde = f", {onde_fica(citada)}" + (" (padrão)" if (target or {}).get("default_card") else "")
         elif action.account:
             onde = f", no {action.account}"
         elif padrao is not None:

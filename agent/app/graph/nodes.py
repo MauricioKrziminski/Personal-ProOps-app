@@ -1290,6 +1290,11 @@ async def resolve_node(state: AgentState) -> dict:
     if aviso_do_contrato:
         state = {**state, "finance_actions": financas, "avisos": [*(state.get("avisos") or []), aviso_do_contrato],
                  "results": [*state.get("results", []), aviso_do_contrato]}
+    # cartão padrão (preferência gravada) para a compra no crédito sem cartão citado: vira a citação ANTES do
+    # esclarecimento, e o id congela no alvo (`resolve.cartao_padrao`)
+    financas, cartoes_padrao = await resolve.cartao_padrao(state["workspace_id"], state.get("text", ""), financas)
+    if cartoes_padrao:
+        state = {**state, "finance_actions": financas}
     acoes = _actions(state)
     if not acoes:
         return {"finance_actions": financas, "avisos": state["avisos"], "results": state["results"]} \
@@ -1321,8 +1326,10 @@ async def resolve_node(state: AgentState) -> dict:
     # não existe, e a pessoa só descobria DEPOIS de dizer sim. Vale para os dois
     # ramos acima: criação pura nem passa por `for_actions`.
     alvos = await resolve.contas_citadas(
-        state["workspace_id"], acoes, alvos, pular=set(_incompletas(state, acoes))
+        state["workspace_id"], acoes, alvos, pular=set(_incompletas(state, acoes)) | set(cartoes_padrao)
     )
+    for i, cartao in cartoes_padrao.items():  # o tipo é conhecido: a forma "crédito" combina sem reler pelo nome
+        alvos[i] = {**alvos[i], "cited_account": {"name": cartao["name"], "type": "credit_card"}, "default_card": cartao}
     # toda escrita pede SIM (21/09/2026): a frase diz qual conta recebe o que
     # o usuário não disse de onde saiu
     alvos = await resolve.conta_padrao(state["workspace_id"], acoes, alvos)
@@ -1370,6 +1377,8 @@ async def resolve_node(state: AgentState) -> dict:
              "draft": _rascunho(state, acoes, alvos)}
     if aviso_do_contrato:
         saida.update(finance_actions=financas, avisos=state["avisos"])
+    elif cartoes_padrao:
+        saida["finance_actions"] = financas
     return saida
 
 

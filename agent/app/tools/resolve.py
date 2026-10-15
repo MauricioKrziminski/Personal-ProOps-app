@@ -13,6 +13,7 @@ a direção é sempre `resolve -> tools`, sem ciclo.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from typing import Any, Literal
 
@@ -1246,6 +1247,48 @@ async def conta_padrao(workspace_id, acoes: list, alvos: list[dict]) -> list[dic
                 and (not a.counterparty_account or (not a.account and not padrao["id"]))):
             alvos[i] = {**alvos[i], "correction_error": SEM_DUAS_CONTAS}
     return alvos
+
+
+log = logging.getLogger(__name__)
+
+
+async def cartao_padrao(workspace_id, texto: str, financas: list[dict]) -> tuple[list[dict], dict[int, dict]]:
+    """Cartão padrão (preferência gravada) para a compra no CRÉDITO sem cartão citado (15/10/2026).
+
+    Só vale quando a frase SUSTENTA o crédito (`atributos.forma_proposta`, a mesma âncora da escrita; "pix" +
+    "crédito" na frase é dúvida e continua perguntando) e nenhum cartão/conta foi citado: gasto à vista ou
+    compra parcelada, sem recorrência. "comprei uma tv em 10x" sem crédito dito segue pedindo o cartão.
+    Devolve as ações com `account` = nome do padrão (a citação que a pessoa não fez, mas gravou) e
+    `{índice: {id, name}}` para o alvo congelar o ID — a tool grava esse (`finance._cartao_padrao`).
+    Padrão ausente, arquivado ou que não é cartão = sem padrão: pergunta, como antes.
+    """
+    from app.domain import atributos as dom
+
+    tipos = {FinanceActionType.CREATE_EXPENSE.value, FinanceActionType.CREATE_INSTALLMENT_PURCHASE.value}
+    indices = [
+        i for i, a in enumerate(financas)
+        if a.get("type") in tipos and not (a.get("account") or "").strip() and not a.get("recurrence")
+        and (forma := dom.forma_proposta(a.get("payment_method"), texto)) == "credit"
+        and not dom.forma_em_duvida(forma, texto)
+    ]
+    if not indices:
+        return financas, {}
+    try:
+        linha = await db.fetch_one(
+            "select a.id, a.name, a.archived, a.type from public.workspaces w "
+            "join public.accounts a on a.id = w.default_card_id and a.workspace_id = w.id where w.id = %s",
+            workspace_id,
+        )
+    except Exception:  # noqa: BLE001 — coluna ausente (migration pendente) = sem padrão
+        log.warning("cartão padrão não lido", exc_info=True)
+        return financas, {}
+    if not linha or linha["archived"] or linha["type"] != "credit_card":
+        return financas, {}
+    card = {"id": str(linha["id"]), "name": linha["name"]}
+    saida = [*financas]
+    for i in indices:
+        saida[i] = {**saida[i], "account": card["name"]}
+    return saida, {i: card for i in indices}
 
 
 async def primeira_ocorrencia(timezone_name: str, acoes: list, alvos: list[dict], pular=frozenset()) -> list[dict]:

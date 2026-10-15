@@ -685,3 +685,97 @@ async def test_padrao_relido_ignora_conta_arquivada(monkeypatch):
 
     monkeypatch.setattr(db, "fetch_one", arquivada)
     assert await finance.default_account("w1") is None
+
+
+# --- cartão padrão: preferência gravada para a compra no crédito sem cartão citado (15/10/2026) ---
+
+def _credito(**kw):
+    return {"type": "create_expense", "amount_cents": 4500, "payment_method": "credit", **kw}
+
+
+def _padrao(monkeypatch, linha):
+    from app import db
+
+    async def fetch_one(sql, *args):
+        assert "default_card_id" in sql
+        return linha
+
+    monkeypatch.setattr(db, "fetch_one", fetch_one)
+
+
+@pytest.mark.asyncio
+async def test_cartao_padrao_vale_no_credito_sem_cartao_citado(monkeypatch):
+    _padrao(monkeypatch, {"id": "c1", "name": "Nubank", "archived": False, "type": "credit_card"})
+    parcelada = {"type": "create_installment_purchase", "amount_cents": 90000, "installments": 10,
+                 "payment_method": "credit"}
+    financas, padroes = await resolve.cartao_padrao("w1", "gastei 45 no crédito no mercado", [_credito(), parcelada])
+    assert [a["account"] for a in financas] == ["Nubank", "Nubank"]
+    assert padroes == {0: {"id": "c1", "name": "Nubank"}, 1: {"id": "c1", "name": "Nubank"}}
+
+
+@pytest.mark.asyncio
+async def test_cartao_padrao_nao_vale_sem_credito_dito_citado_pix_ou_recorrente(monkeypatch):
+    _padrao(monkeypatch, {"id": "c1", "name": "Nubank", "archived": False, "type": "credit_card"})
+    texto = "comprei uma tv em 10x"  # nenhuma pista de crédito: segue perguntando o cartão
+    tv = {"type": "create_installment_purchase", "amount_cents": 90000, "installments": 10, "payment_method": "credit"}
+    assert (await resolve.cartao_padrao("w1", texto, [tv]))[1] == {}
+    sem_forma = {k: v for k, v in tv.items() if k != "payment_method"}
+    assert (await resolve.cartao_padrao("w1", "tv em 10x no crédito", [sem_forma]))[1] == {}
+    cred = "gastei 45 no crédito"
+    assert (await resolve.cartao_padrao("w1", cred, [_credito(account="Inter")]))[1] == {}  # citado vence
+    assert (await resolve.cartao_padrao("w1", cred, [_credito(recurrence="FREQ=MONTHLY")]))[1] == {}
+    assert (await resolve.cartao_padrao("w1", "gastei 45 no pix", [_credito(payment_method="pix")]))[1] == {}
+    assert (await resolve.cartao_padrao("w1", "paguei 45 com pix no crédito", [_credito()]))[1] == {}  # dúvida
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("linha", [
+    None,
+    {"id": "c1", "name": "Nubank", "archived": True, "type": "credit_card"},
+    {"id": "c1", "name": "Nubank", "archived": False, "type": "checking"},
+])
+async def test_cartao_padrao_ausente_arquivado_ou_nao_cartao_continua_perguntando(monkeypatch, linha):
+    _padrao(monkeypatch, linha)
+    financas, padroes = await resolve.cartao_padrao("w1", "gastei 45 no crédito", [_credito()])
+    assert padroes == {} and "account" not in financas[0]
+
+
+@pytest.mark.asyncio
+async def test_cartao_padrao_coluna_ausente_nao_quebra(monkeypatch):
+    from app import db
+
+    async def explode(sql, *args):
+        raise RuntimeError("column default_card_id does not exist")
+
+    monkeypatch.setattr(db, "fetch_one", explode)
+    assert (await resolve.cartao_padrao("w1", "gastei 45 no crédito", [_credito()]))[1] == {}
+
+
+def test_frase_do_sim_diz_cartao_padrao():
+    from app.graph.policy import describe_for_confirmation
+
+    acao = FinanceAction(type=FinanceActionType.CREATE_EXPENSE, amount_cents=4500, category="mercado", account="Nubank")
+    alvo = {"cited_account": {"name": "Nubank", "type": "credit_card"}, "default_card": {"id": "c1", "name": "Nubank"}}
+    assert describe_for_confirmation(acao, alvo) == "registrar gasto de R$ 45,00 em mercado, no cartão Nubank (padrão)"
+    assert "(padrão)" not in describe_for_confirmation(acao, {"cited_account": alvo["cited_account"]})
+
+
+@pytest.mark.asyncio
+async def test_tool_grava_no_cartao_padrao_CONGELADO_e_recusa_arquivado(monkeypatch):
+    from app import db
+    from app.tools.base import ExecContext
+    from app.tools.guards import Level1Error
+
+    linha = {"archived": False, "type": "credit_card"}
+
+    async def fetch_one(sql, *args):
+        return linha
+
+    monkeypatch.setattr(db, "fetch_one", fetch_one)
+    ctx = ExecContext("u1", "w1", None, "America/Sao_Paulo", "gastei 45", "m1")
+    assert await finance._cartao_padrao(ctx) is None  # sem a chave: o cartão é o citado
+    ctx.target = {"default_card": {"id": "c1", "name": "Nubank"}}
+    assert await finance._cartao_padrao(ctx) == "c1"
+    linha = {"archived": True, "type": "credit_card"}
+    with pytest.raises(Level1Error):
+        await finance._cartao_padrao(ctx)

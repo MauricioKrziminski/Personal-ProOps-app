@@ -199,6 +199,29 @@ async def default_account(workspace_id: UUID) -> UUID | None:
     return linha["default_account_id"] if linha and not linha.get("archived") else None
 
 
+async def _cartao_padrao(ctx: ExecContext) -> UUID | None:
+    """O cartão padrão que a frase do SIM citou "(padrão)" — o id congelado em `resolve.cartao_padrao`.
+
+    Sem a chave no alvo, None: o cartão é o citado, como sempre. Com ela, posse (o id veio do checkpoint),
+    atividade e tipo conferidos numa consulta: arquivado entre a pergunta e o SIM, a frase citou um cartão
+    que não pode mais receber a compra.
+    """
+    congelado = (ctx.target or {}).get("default_card")
+    if not congelado or not congelado.get("id"):
+        return None
+    linha = await db.fetch_one(
+        "select archived, type from public.accounts where id = %s and workspace_id = %s",
+        congelado["id"], ctx.workspace_id,
+    )
+    if linha is None:
+        raise Level1Error("🤷 Não achei esse item por aqui.", f"accounts:{congelado['id']} fora do workspace")
+    if linha["archived"] or linha["type"] != "credit_card":
+        raise Level1Error(
+            f"🤔 O cartão *{congelado.get('name') or 'padrão'}* não está mais disponível. "
+            "Me manda de novo dizendo o cartão. Ainda não registrei nada.")
+    return congelado["id"]
+
+
 async def _conta_padrao(ctx: ExecContext) -> UUID | None:
     """A conta padrão que a frase do SIM citou — congelada no alvo, nunca relida.
 
@@ -415,7 +438,8 @@ async def create_transaction(ctx: ExecContext, action: FinanceAction) -> ToolRes
     if matching.sem_conta_explicita(action.account):
         conta = None
     else:
-        conta = await conta_citada(ctx.workspace_id, action.account) or await _conta_padrao(ctx)
+        conta = (await _cartao_padrao(ctx) or await conta_citada(ctx.workspace_id, action.account)
+                 or await _conta_padrao(ctx))
     rrule = guards.clean_rrule(action.recurrence)
 
     if rrule:
@@ -515,7 +539,7 @@ async def create_installment_purchase(
     parcelas = guards.require_installments(action.installments)
     atual = guards.require_current_installment(action.current_installment, parcelas)
     quando = guards.require_date(action.occurred_at, ctx.timezone)
-    conta = await conta_citada(
+    conta = await _cartao_padrao(ctx) or await conta_citada(
         ctx.workspace_id, action.account, only_cards=True, papel="o cartão"
     )
     if not conta:

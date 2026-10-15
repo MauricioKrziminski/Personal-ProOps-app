@@ -300,6 +300,14 @@ checklist, numerada continua a contagem) — o modelo não vê a nota. Casos em
   (no fuso do usuário) e **"repete …"** quando há recorrência. **Transferência sem origem (nem
   citada, nem padrão) ou sem destino** vira `correction_error` antes da pergunta — aprovar e só
   então ouvir "preciso das duas contas" é a pergunta sem resposta.
+- **Cartão padrão é preferência gravada, e vale só para o crédito** (15/10/2026, `workspaces.default_card_id`).
+  Compra à vista ou parcelada em que a frase SUSTENTA o crédito (`atributos.forma_proposta`, a mesma âncora
+  da escrita) e que não cita cartão nem conta usa o padrão em vez de perguntar "qual cartão?": `resolve.cartao_padrao`
+  põe o nome em `account`, congela o ID no alvo (`default_card`) e a tool grava esse id depois de conferir posse,
+  atividade e tipo (`finance._cartao_padrao`); a frase diz "no cartão X (padrão)". Fora do escopo, segue
+  perguntando: "tv em 10x" sem crédito dito (e o caminho "contrato descrito é dívida"), cartão citado que não
+  casa, Pix/"pix no crédito" em dúvida, recorrente, padrão arquivado, ausente ou que não é cartão. Nunca vale
+  para forma que não é crédito; a conta padrão não muda. Coluna ausente (migration pendente) = sem padrão.
 - **Corrigir a proposta ANTES do SIM refaz o pedido** (21/09/2026). "Comprei em 2x no cartão"
   em resposta a "Confirma registrar gasto de R$ 104,99 na conta Poupança?" caía em
   `keep_pending` com "diga o que deseja mudar" — e o código DESCARTAVA o que a pessoa dizia; só
