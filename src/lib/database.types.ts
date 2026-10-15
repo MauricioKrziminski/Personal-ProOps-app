@@ -4273,6 +4273,7 @@ export type Database = {
           cycle_close_day: number | null
           cycle_view: string
           default_account_id: string | null
+          default_card_id: string | null
           id: string
           name: string
           owner_id: string
@@ -4284,6 +4285,7 @@ export type Database = {
           cycle_close_day?: number | null
           cycle_view?: string
           default_account_id?: string | null
+          default_card_id?: string | null
           id?: string
           name?: string
           owner_id: string
@@ -4295,6 +4297,7 @@ export type Database = {
           cycle_close_day?: number | null
           cycle_view?: string
           default_account_id?: string | null
+          default_card_id?: string | null
           id?: string
           name?: string
           owner_id?: string
@@ -4305,6 +4308,13 @@ export type Database = {
           {
             foreignKeyName: "workspaces_default_account_id_fkey"
             columns: ["default_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspaces_default_card_id_fkey"
+            columns: ["default_card_id"]
             isOneToOne: false
             referencedRelation: "accounts"
             referencedColumns: ["id"]

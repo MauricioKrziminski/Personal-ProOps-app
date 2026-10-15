@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 
 import type { CorpoProps } from '@/components/finance/corpo-do-lancar';
 import { Presenca, TrocaSuave } from '@/components/motion/presenca';
+import { useContaSugerida } from '@/hooks/use-conta-sugerida';
 import { OriginAccountPicker } from '@/components/finance/origin-creation-host';
 import { FinanceWritePreview } from '@/components/finance/finance-write-preview';
 import { escritaDoFinanciamento } from '@/lib/finance-write-input';
@@ -325,6 +326,12 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
     : paymentMethodError(form.paymentMethod ?? null, contaEscolhida)
       ?? (form.accountId && !accounts.isPending && !accounts.isError && !contaEscolhida ? 'Esta conta não está disponível. Escolha outra conta.' : null);
   const pagadoras = paymentMethodAccounts(form.paymentMethod ?? null, (accounts.data ?? []).filter((a) => a.type !== 'credit_card'));
+  // Financiamento sai de conta, nunca de cartão: só a conta padrão (forma crédito não escolhe cartão).
+  const conta = useContaSugerida({
+    ativo: Boolean(props.sugerirConta) && !alvo && !editandoId && !converter, contas: accounts.data,
+    forma: form.paymentMethod === 'credit' ? null : form.paymentMethod, valor: form.accountId,
+    aplicar: (accountId) => setForm((f) => ({ ...f, accountId })),
+  });
 
   const fracao = parseTaxa(form.taxa);
   const totalDeParcelas = /^\d+$/.test(form.parcelas) ? Number(form.parcelas) : 0;
@@ -667,7 +674,7 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
         <PaymentMethodField value={form.paymentMethod ?? null} onChange={(paymentMethod) => setForm({ ...form, paymentMethod })} error={erroPagamento ?? undefined} />
         <Field label="Conta que paga" error={accounts.isError ? 'Não consegui carregar suas contas. Tente novamente.' : undefined}
           hint={erroPagamento && contaEscolhida ? `Conta escolhida: ${contaEscolhida.name}. Escolha uma conta compatível ou mude a forma de pagamento.` : undefined}>
-          <OriginAccountPicker paymentMethod={form.paymentMethod} excludeCredit accounts={pagadoras} value={form.accountId} selectedAccount={contaEscolhida} onChange={(accountId: string | null) => setForm({ ...form, accountId })} emptyLabel="Não informar" />
+          <OriginAccountPicker paymentMethod={form.paymentMethod} excludeCredit accounts={pagadoras} value={form.accountId} selectedAccount={contaEscolhida} onChange={(accountId: string | null) => { conta.escolheu(); setForm({ ...form, accountId }); }} emptyLabel="Não informar" />
         </Field>
         <Field label="Categoria dos pagamentos"><CategoryPicker value={form.payment_category ?? null} onChange={(payment_category) => {
           if (salvando || salvarBloqueadoAtual.current) return;

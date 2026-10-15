@@ -2443,6 +2443,23 @@ export function useDefaultAccount() {
   });
 }
 
+/** O cartão padrão do espaço: o que o formulário sugere quando a forma de pagamento é crédito. */
+export function useDefaultCard() {
+  useRealtimeInvalidate('workspaces', ['default-card']);
+  return useQuery({
+    queryKey: ['default-card'],
+    queryFn: async (): Promise<string | null> => {
+      const { data, error } = await supabase
+        .from('workspaces')
+        .select('default_card_id')
+        .eq('id', await workspaceId())
+        .maybeSingle();
+      if (error) throw error;
+      return data?.default_card_id ?? null;
+    },
+  });
+}
+
 /**
  * Onde o mês financeiro do usuário começa e termina.
  *
@@ -2681,6 +2698,20 @@ export function useSetDefaultAccount() {
       if (error) throw error;
     },
     onSuccess: () => invalidateKeys(queryClient, [['default-account']]),
+  });
+}
+
+export function useSetDefaultCard() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (cardId: string | null) => {
+      const { error } = await supabase
+        .from('workspaces')
+        .update({ default_card_id: cardId })
+        .eq('id', await workspaceId());
+      if (error) throw error;
+    },
+    onSuccess: () => invalidateKeys(queryClient, [['default-card']]),
   });
 }
 

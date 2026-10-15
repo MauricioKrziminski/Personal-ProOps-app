@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { contaQuePaga } from '@/lib/conta-sugerida';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Redirect, Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -37,6 +38,7 @@ import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import {
   DEBT_KINDS,
   useAccounts,
+  useDefaultAccount,
   useArchiveDebt,
   useArchivedDebts,
   useDebtDeclaredEstimates,
@@ -106,6 +108,7 @@ export default function DebtsScreen() {
   const [ordemJaVeio, setOrdemJaVeio] = useState(false);
   if (payoff.data && !ordemJaVeio) setOrdemJaVeio(true);
   const accounts = useAccounts();
+  const contaPadrao = useDefaultAccount();
   const accountsForFilters = useAccounts(undefined, true);
   const filterSelects: readonly FilterSelect[] = [
     { key: 'tipo', label: 'Tipo', options: DEBT_KINDS.map((kind) => ({ id: kind.value, label: kind.label })) },
@@ -220,7 +223,7 @@ export default function DebtsScreen() {
 
   const abrirPagamento = (d: Debt) => {
     setPagoCents(Number((detalhe?.id === d.id ? schedule.data?.[0]?.payment_cents : null) ?? d.installment_cents ?? 0));
-    setContaId(d.account_id);
+    setContaId(d.account_id ?? contaQuePaga(null, contaPadrao.data, pagadoras));
     setNasProximas(false);
     setPagoEm(isoToBR(localISODate()));
     setPagando(d);
@@ -238,6 +241,8 @@ export default function DebtsScreen() {
   // "Paguei esta parcela" na tela da parcela volta para a ficha JÁ no pagamento
   // (`volta-da-parcela.ts`). ⚠️ `useCallback`: sem ele o efeito roda a cada render, não só no foco.
   const listaDeDividas = debts.data;
+  const contaPadraoId = contaPadrao.data;
+  const contasPagadoras = accounts.data;
   useFocusEffect(
     useCallback(() => {
       // Chegando de FORA (o "Paguei" de Lançamentos), a lista ainda não veio: lido agora, o
@@ -247,11 +252,11 @@ export default function DebtsScreen() {
       const d = pedido ? listaDeDividas.find((x) => x.id === pedido.divida) : null;
       if (!pedido || !d) return;
       setPagoCents(pedido.cents ?? Number(d.installment_cents ?? 0));
-      setContaId(d.account_id);
+      setContaId(d.account_id ?? contaQuePaga(null, contaPadraoId, contasPagadoras ?? []));
       setNasProximas(false);
       setPagoEm(isoToBR(localISODate()));
       setPagandoId(d.id);
-    }, [listaDeDividas, setPagoCents, setContaId, setNasProximas, setPagandoId, setPagoEm]),
+    }, [listaDeDividas, contaPadraoId, contasPagadoras, setPagoCents, setContaId, setNasProximas, setPagandoId, setPagoEm]),
   );
 
   /**

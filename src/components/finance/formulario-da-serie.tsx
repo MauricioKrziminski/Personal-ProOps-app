@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import type { CorpoProps } from '@/components/finance/corpo-do-lancar';
 import { ErrorCard } from '@/components/error-card';
 import { useBRL } from '@/components/ui/conceal';
+import { useContaSugerida } from '@/hooks/use-conta-sugerida';
 import { CamposDaSerie } from '@/components/finance/serie-form';
 import { FinanceWritePreview } from '@/components/finance/finance-write-preview';
 import { escritaDaRecorrente } from '@/lib/finance-write-input';
@@ -160,6 +161,12 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
   const primeira = useRecurringFirstDate(formBase.id ?? null);
   const form = formBase.id ? { ...formBase, inicioOriginal: pisoDoInicio(formBase.inicioOriginal, primeira.data) } : formBase;
   const setForm = (form: SerieForm) => setEstado((anterior) => ({ ...anterior, form }));
+  const conta = useContaSugerida({
+    ativo: Boolean(props.sugerirConta) && !alvo && !editandoId && !converter, contas: accounts.data, forma: formBase.paymentMethod,
+    valor: formBase.accountId, aplicar: (accountId) => setEstado((anterior) => ({ ...anterior, form: { ...anterior.form, accountId } })),
+  });
+  // A pessoa mexeu na conta: a sugestão para de valer.
+  const mudar = (novo: SerieForm) => { if (novo.accountId !== formBase.accountId) conta.escolheu(); setForm(novo); };
 
   const classification = useExpenseClassificationDraft(form.expenseClassification, form.category, form.kind,
     Boolean(editandoId || form.id), baseline?.workspace_id);
@@ -376,7 +383,7 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
       <SheetScroll contentContainerStyle={styles.corpo}>
         {props.topo}
         <View style={styles.conteudo}>
-          <CamposDaSerie form={resolvedForm} onChange={setForm} contas={accounts.data ?? []} workspaceId={baseline?.workspace_id}
+          <CamposDaSerie form={resolvedForm} onChange={mudar} contas={accounts.data ?? []} workspaceId={baseline?.workspace_id}
             classificationDefaults={classification.defaults}
             onUseCategoryDefaults={classification.defaults ? () => setForm({ ...form, expenseClassification: classification.adoptCategoryDefaults() }) : undefined} />
           {classification.isError ? <ErrorCard onRetry={() => void classification.refetch()} /> : null}

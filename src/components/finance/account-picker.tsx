@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useBRL, useConceal } from '@/components/ui/conceal';
 import { usePresencaAtiva } from '@/components/motion/presenca';
 import { Space } from '@/design/tokens';
-import { useAccountBalances, useCardLimitContext } from '@/hooks/use-finance';
+import { useAccountBalances, useCardLimitContext, useDefaultAccount, useDefaultCard } from '@/hooks/use-finance';
 import { accountSelectOptions, type AccountOptionAccount, type AccountPickerContext } from '@/lib/accounts';
 
 /** O mínimo que o seletor precisa saber. Aceita `Account` inteiro sem conversão. */
@@ -44,7 +44,9 @@ function FinancialAccountPicker(props: AccountPickerProps) {
   const cards = useCardLimitContext(active && hasCards);
   const { concealed, ready } = useConceal();
   const format = useBRL();
-  const context: AccountPickerContext = { balances, cards, format, concealed: concealed || !ready };
+  const padrao = useDefaultAccount();
+  const cartaoPadrao = useDefaultCard();
+  const context: AccountPickerContext = { balances, cards, format, concealed: concealed || !ready, padroes: [padrao.data, cartaoPadrao.data] };
   const options = accountSelectOptions(visible, undefined, null, context);
   const retryBanks = hasBanks && (balances.isError || options.some(option => option.icon !== 'creditcard' && 'detailUnavailable' in option && option.detailUnavailable));
   const retryCards = hasCards && (cards.isError || options.some(option => option.icon === 'creditcard' && 'detailUnavailable' in option && option.detailUnavailable));

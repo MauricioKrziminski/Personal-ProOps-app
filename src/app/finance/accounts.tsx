@@ -36,11 +36,13 @@ import {
   useAccounts,
   useArchiveAccount,
   useDefaultAccount,
+  useDefaultCard,
   useSaveAccount,
   useCreateAccount,
   type CreateAccountResult,
   useContaTemLancamentos,
   useSetDefaultAccount,
+  useSetDefaultCard,
   type Account,
   type AccountBalance,
 } from '@/hooks/use-finance';
@@ -116,6 +118,8 @@ export default function AccountsScreen() {
   const accounts = useAccounts();
   const contaPadrao = useDefaultAccount();
   const definirPadrao = useSetDefaultAccount();
+  const cartaoPadrao = useDefaultCard();
+  const definirCartaoPadrao = useSetDefaultCard();
   const save = useSaveAccount();
   const createAccount = useCreateAccount();
   const savingRef = useRef(false);
@@ -176,6 +180,7 @@ export default function AccountsScreen() {
   const contaDe = (id: string | null) => (accounts.data ?? []).find((a) => a.id === id);
   /** Candidatas a conta padrão: guardar dinheiro é requisito, e o banco também exige. */
   const guardamDinheiro = (accounts.data ?? []).filter((a) => a.type !== 'credit_card');
+  const cartoesAtivos = (accounts.data ?? []).filter((a) => a.type === 'credit_card');
 
   // erro de contas NÃO é lista vazia: sem esta guarda a tela mandava cadastrar conta para quem
   // já tem cinco cadastradas e só perdeu a rede
@@ -439,6 +444,28 @@ export default function AccountsScreen() {
     </Section>
   ) : null;
 
+  const defaultCard = cartoesAtivos.length > 0 ? (
+    <Section title="Cartão padrão">
+      <Row
+        title="Não definir"
+        onPress={() => definirCartaoPadrao.mutate(null)}
+        chevron={false}
+        accessibilityState={{ selected: cartaoPadrao.data == null }}
+        trailing={cartaoPadrao.data == null ? <Icon name="checkmark" size="sm" color="tint" /> : undefined}
+      />
+      {cartoesAtivos.map((a) => (
+        <Row
+          key={a.id}
+          title={a.name}
+          onPress={() => definirCartaoPadrao.mutate(a.id)}
+          chevron={false}
+          accessibilityState={{ selected: cartaoPadrao.data === a.id }}
+          trailing={cartaoPadrao.data === a.id ? <Icon name="checkmark" size="sm" color="tint" /> : undefined}
+        />
+      ))}
+    </Section>
+  ) : null;
+
   const noAccount = semConta && Number(semConta.balance_cents) !== 0 ? (
     <Section>
       <Row
@@ -484,6 +511,7 @@ export default function AccountsScreen() {
       {accountSections}
       {/* Como no tablet: com o esqueleto na tela, nada aparece embaixo dele (25/09/2026). */}
       {!balances.isLoading ? defaultAccount : null}
+      {!balances.isLoading ? defaultCard : null}
       {noAccount}
       {!balances.isLoading ? arquivadas : null}
       {empty}
@@ -512,6 +540,7 @@ export default function AccountsScreen() {
       {!balances.isLoading ? hero : null}
       {accountsError}
       {!balances.isLoading ? defaultAccount : null}
+      {!balances.isLoading ? defaultCard : null}
     </View>
   );
 

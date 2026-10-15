@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { contaQuePaga } from '@/lib/conta-sugerida';
 import { FlatList, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { MaxContentWidth } from '@/constants/theme';
 import { chartWidthForPane, rootContentMaxWidth } from '@/design/adaptive-window';
@@ -33,6 +34,7 @@ import { HitTarget, Motion, Radius, Space, tabular } from '@/design/tokens';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import {
   useAccounts,
+  useDefaultAccount,
   useCardInvoices,
   useCardSummary,
   useDeleteTransaction,
@@ -141,6 +143,7 @@ export default function InvoiceScreen() {
   const tablet = windowClass !== 'compact';
   const invoice = useInvoice(id);
   const accounts = useAccounts();
+  const contaPadrao = useDefaultAccount();
   const pay = usePayInvoice();
   const settle = useSettleInvoice();
   const roll = useRollInvoice();
@@ -296,9 +299,9 @@ export default function InvoiceScreen() {
     // pré-seleciona a conta cadastrada como pagadora do cartão — sem isso o usuário escolhe
     // a mesma conta todo mês. Só vale se ela ainda for uma pagadora válida (pode ter sido
     // arquivada ou virado cartão), senão o banco recusaria e o usuário não saberia por quê.
-    const sugerida = pagadoras.find((a) => a.id === cartao?.payment_account_id);
-    // Uma conta só (a que acabou de ser cadastrada daqui, por exemplo) já vem escolhida.
-    setPayerId(sugerida?.id ?? (pagadoras.length === 1 ? pagadoras[0].id : null));
+    // Depois, a conta padrão; uma conta só (a que acabou de ser cadastrada daqui) já vem escolhida.
+    setPayerId(contaQuePaga(cartao?.payment_account_id, contaPadrao.data, pagadoras)
+      ?? (pagadoras.length === 1 ? pagadoras[0].id : null));
     setDataBR(formatDateBR(localISODate()));
     setValorCents(falta);
     setPagando(true);
@@ -449,7 +452,7 @@ export default function InvoiceScreen() {
   };
 
   const opcoesDoPagamento = (p: (typeof pagamentos)[number]) =>
-    showItemActions(`${nomeDe(p)} · ${brl(p.amount_cents)} em ${formatDateBR(p.occurred_at)}`, [
+    showItemActions(`${nomeDe(p)} · ${brl(p.amount_cents)}`, [
       { label: 'Ver o lançamento', icon: 'arrow.left.arrow.right', onPress: () => abrirPagamentoNoLancamento(p) },
       {
         label: adiada ? 'Desfazer pagamento: desfaça o adiamento antes' : 'Desfazer este pagamento',
@@ -465,7 +468,8 @@ export default function InvoiceScreen() {
     showItemActions(
       'Qual pagamento desfazer?',
       pagamentos.map((p) => ({
-        label: `${nomeDe(p)} · ${brl(p.amount_cents)} em ${formatDateBR(p.occurred_at)}${nomeDaConta(p.account_id) ? ` · ${nomeDaConta(p.account_id)}` : ''}`,
+        // Curto (cabe numa linha com fonte grande): o número separa os de mesmo valor; a conta está na linha da fatura.
+        label: `${pagamentos.indexOf(p) + 1}º · ${brl(p.amount_cents)} · ${diaCurtoBR(p.occurred_at)}`,
         onPress: () => desfazerPagamento(p),
       })),
     );
@@ -604,12 +608,15 @@ export default function InvoiceScreen() {
       {fatura && pagamentos.length > 0 ? (
         <Section title={`Pagamentos · ${pagamentos.length}`}>
           {pagamentos.map((p) => (
+            /* A mesma linha das compras abaixo: nome à esquerda, valor à direita — com valor ou
+               conta longos o `Row` manda o valor para a linha de baixo em vez de espremer. */
             <Row
               key={p.id}
-              title={brl(p.amount_cents)}
-              subtitle={[nomeDe(p), formatDateBR(p.occurred_at), nomeDaConta(p.account_id)].filter(Boolean).join(' · ')}
+              title={nomeDe(p)}
+              subtitle={[formatDateBR(p.occurred_at), nomeDaConta(p.account_id)].filter(Boolean).join(' · ')}
+              trailing={<Money cents={p.amount_cents} variant="headline" />}
               icon="arrow.left.arrow.right"
-              accessibilityLabel={`Pagamento de ${brl(p.amount_cents)} em ${formatDateBR(p.occurred_at)}`}
+              accessibilityLabel={`${nomeDe(p)}, ${brl(p.amount_cents)} em ${formatDateBR(p.occurred_at)}`}
               onPress={() => opcoesDoPagamento(p)}
             />
           ))}

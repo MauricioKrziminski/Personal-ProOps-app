@@ -61,7 +61,7 @@ const fixtureDate = new Proxy(Date, {
 
 // Execute the screen JSX and its event handlers. Native components/query boundaries
 // are inert; state persists across renders so each interaction uses current props.
-function screen(file: string, options: { realMoney?: boolean; planningState?: any; planningError?: boolean; planningFetching?: boolean; planningPending?: boolean; planningUnconfirmed?: any; freshPlanning?: (...args: any[]) => Promise<any>; hook?: string; hookArgs?: any[]; reserveState?: any; reserveError?: boolean; reservePending?: boolean; reserveUnconfirmed?: any;  categoryDefaultsCached?: boolean; categoryDefaults?: any[]; categoryDefaultsPending?: boolean; categoryDefaultsError?: boolean; debtsPending?: boolean; debtsError?: boolean; plansPending?: boolean; plansError?: boolean; txPending?: boolean; txError?: boolean; downPayment?: any; downPaymentPending?: boolean; downPaymentError?: boolean; fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; invoiceTxs?: any[]; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; notesPending?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; resumoErro?: boolean; arquivados?: any[]; mudaram?: string[]; errosDosAdiantamentos?: Record<string, string>; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any; goalMoney?: any; linkCandidates?: any[]; investments?: any; assetValuations?: any[]; assets?: any[]; budgetPlan?: any; spending?: any; invoiceMissing?: boolean; primeiraOcorrencia?: string | null; milestones?: Record<string, number[]>; marcosPendentes?: boolean; favoritos?: any[]; favoritosArquivados?: any[]; billReminders?: any[]; billRemindersPending?: boolean; pausaPrevia?: any; pausaBuscando?: boolean; carencias?: any[]; carenciaPrevia?: any; carenciaBuscando?: boolean; carenciasPendentes?: boolean; carenciasErro?: boolean; carenciaErro?: boolean; access?: string; ofertas?: any[]; capturas?: any[] } = {}) {
+function screen(file: string, options: { realMoney?: boolean; planningState?: any; planningError?: boolean; planningFetching?: boolean; planningPending?: boolean; planningUnconfirmed?: any; freshPlanning?: (...args: any[]) => Promise<any>; hook?: string; hookArgs?: any[]; reserveState?: any; reserveError?: boolean; reservePending?: boolean; reserveUnconfirmed?: any;  categoryDefaultsCached?: boolean; categoryDefaults?: any[]; categoryDefaultsPending?: boolean; categoryDefaultsError?: boolean; debtsPending?: boolean; debtsError?: boolean; plansPending?: boolean; plansError?: boolean; txPending?: boolean; txError?: boolean; downPayment?: any; downPaymentPending?: boolean; downPaymentError?: boolean; fontScale?: number; datasReais?: boolean; concealed?: boolean; executarEfeitos?: boolean; controlarTimers?: boolean; noteTags?: { tag: string; count: number }[]; reduzirMovimento?: boolean; tablet?: boolean; debts?: any[]; archivedDebts?: any[]; debtSchedule?: any[]; payoff?: any[]; invoiceStatus?: string; invoiceTxs?: any[]; create?: boolean; monthLines?: any[]; monthSummary?: any; cycleLines?: any[]; cycleRow?: any; rangeError?: boolean; rangePending?: boolean; rangePendingMonths?: string[]; bills?: any[]; billsError?: boolean; charges?: any[]; reminders?: any[]; budgets?: any[]; setupPassos?: any[]; proximo?: any; activity?: any[]; activityError?: boolean; forecastAccounts?: any[]; anticipation?: any[] | ((pagarEm: string) => any[]); cards?: any[]; params?: Record<string, string>; paymentsError?: boolean; debtPayments?: any[]; declaredEstimates?: any[]; expectedLines?: any[]; expectedError?: boolean; expectedInTransit?: any[]; listError?: boolean; importItems?: any[]; importBatch?: any; unmatched?: any[]; forecastMonths?: any[]; categoriasUsadas?: any[]; maisPaginas?: boolean; alerts?: any[]; buscaNotas?: any[]; faturas?: any[]; balances?: any[]; balancesError?: boolean; plan?: string; planPending?: boolean; txStatus?: string; recent?: any[]; rules?: any[]; recurring?: any[]; goals?: any[]; componente?: string; props?: any; folders?: any[]; notes?: any[]; conversations?: any[]; conversationsPending?: boolean; batches?: any[]; plans?: any[]; contributions?: any[]; txs?: any[]; arquivadas?: number; pastasArquivadas?: any[]; budgetsPending?: boolean; spendable?: any; spendableError?: boolean; budgetsError?: boolean; cycleError?: boolean; gastos?: any[]; gastosError?: boolean; notesError?: boolean; notesPending?: boolean; cycleSeriesPending?: boolean; cycleSeriesError?: boolean; buscaPendente?: boolean; resumoPendente?: boolean; resumoErro?: boolean; arquivados?: any[]; mudaram?: string[]; errosDosAdiantamentos?: Record<string, string>; preferencias?: Record<string, any>; simulacao?: any; cicloSimulado?: any; segurarMutacoes?: boolean; horizonte?: any; goalMoney?: any; linkCandidates?: any[]; investments?: any; assetValuations?: any[]; assets?: any[]; budgetPlan?: any; spending?: any; invoiceMissing?: boolean; primeiraOcorrencia?: string | null; milestones?: Record<string, number[]>; marcosPendentes?: boolean; favoritos?: any[]; favoritosArquivados?: any[]; billReminders?: any[]; billRemindersPending?: boolean; pausaPrevia?: any; pausaBuscando?: boolean; carencias?: any[]; carenciaPrevia?: any; carenciaBuscando?: boolean; carenciasPendentes?: boolean; carenciasErro?: boolean; carenciaErro?: boolean; access?: string; ofertas?: any[]; capturas?: any[]; contaPadrao?: string | null; cartaoPadrao?: string | null; padroesPendentes?: boolean } = {}) {
   const state: any[] = [];
   // Metro executes these modules in one realm. Per-module VMs reject valid records in the
   // strict classification domain, so all production modules share a context here as well.
@@ -276,6 +276,10 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
     },
     useMonthSummary: () => ({ ...query, data: options.monthSummary ?? null }),
     useAccounts: () => ({ ...query, data: options.forecastAccounts ?? [] }),
+    useDefaultAccount: () => ({ ...query, isPending: Boolean(options.padroesPendentes), data: options.contaPadrao ?? null }),
+    useDefaultCard: () => ({ ...query, isPending: Boolean(options.padroesPendentes), data: options.cartaoPadrao ?? null }),
+    useSetDefaultAccount: () => mutation('setDefaultAccount'),
+    useSetDefaultCard: () => mutation('setDefaultCard'),
     useCashFlowForecast: () => ({ ...query, data: [{ day: '2026-09-18', balance_cents: 10000, in_cents: 0, out_cents: 0 }] }),
     useCashHistory: () => ({ ...query, data: [] }),
     useAnticipationCandidates: (pagarEm: string) => ({ ...query, isSuccess: true,
@@ -470,6 +474,8 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
         }];
       } };
       if (name === '@/hooks/use-rascunho') return load('src/hooks/use-rascunho.ts');
+      if (name === '@/hooks/use-conta-sugerida') return load('src/hooks/use-conta-sugerida.ts');
+      if (name === '@/lib/conta-sugerida') return load('src/lib/conta-sugerida.ts');
       // Import relativo dentro de `src/lib` (o `rascunho.ts` importa `./escrita.ts`): o módulo de verdade.
       if (name.startsWith('./') && path.startsWith('src/lib/')) return load(`src/lib/${name.slice(2)}`);
       if (name === 'react/jsx-runtime') return require(name);
@@ -1819,8 +1825,11 @@ test('Fatura: bloco Pagamentos na ordem em que foram pagos, numerados, e desfaz 
     { id: 'pg-a', amount_cents: 50000, occurred_at: '2026-08-05', account_id: 'cc', created_at: '2026-08-05T09:00:00Z' },
   ];
   const ui = screen('src/app/finance/invoice/[id].tsx', { invoiceStatus: 'paid', datasReais: true, pagamentos, forecastAccounts: [{ id: 'cc', name: 'Conta', type: 'checking' }] });
-  const linhas = ui.nodes().filter((n: any) => n.type === 'Row' && /^Pagamento de/.test(String(n.props.accessibilityLabel)));
-  assert.deepEqual(linhas.map((n: any) => n.props.subtitle), ['1º pagamento · 05/08/2026 · Conta', '2º pagamento · 05/08/2026 · Conta', '3º pagamento · 18/08/2026 · Conta']);
+  const linhas = ui.nodes().filter((n: any) => n.type === 'Row' && /º pagamento, /.test(String(n.props.accessibilityLabel)));
+  assert.deepEqual(linhas.map((n: any) => [n.props.title, n.props.subtitle]), [
+    ['1º pagamento', '05/08/2026 · Conta'], ['2º pagamento', '05/08/2026 · Conta'], ['3º pagamento', '18/08/2026 · Conta'],
+  ]);
+  assert.ok(linhas.every((n: any) => n.props.trailing), 'o valor mora à direita, como nas compras');
   linhas[1].props.onPress();
   assert.deepEqual(ui.actions.map((a: any) => a.label), ['Ver o lançamento', 'Desfazer este pagamento']);
   ui.actions.find((a: any) => a.label === 'Desfazer este pagamento').onPress();
@@ -1829,9 +1838,23 @@ test('Fatura: bloco Pagamentos na ordem em que foram pagos, numerados, e desfaz 
   assert.deepEqual(ui.writes.map((w: any) => [w.operation, w.value]), [['deleteTransaction', 'pg-b']]);
 });
 
+test('Fatura: "Desfazer um pagamento…" lista opções curtas, numeradas na ordem do pagamento', () => {
+  const pagamentos = [
+    { id: 'pg-2', amount_cents: 1234567, occurred_at: '2026-08-12', account_id: 'cc', created_at: '2026-08-12T10:00:00Z' },
+    { id: 'pg-1', amount_cents: 1234567, occurred_at: '2026-08-05', account_id: 'cc', created_at: '2026-08-05T10:00:00Z' },
+  ];
+  const ui = screen('src/app/finance/invoice/[id].tsx', { invoiceStatus: 'paid', datasReais: true, pagamentos, forecastAccounts: [{ id: 'cc', name: 'Conta com um nome bem comprido', type: 'checking' }] });
+  ui.nodes().find((n: any) => n.type === 'HeaderActions').props.menu.actions.find((a: any) => a.label === 'Desfazer um pagamento…').onPress();
+  const rotulos = ui.actions.map((a: any) => a.label);
+  assert.equal(rotulos.length, 2);
+  assert.match(rotulos[0], /^1º · .+ · .*5 ago$/);
+  assert.match(rotulos[1], /^2º · .+ · .*12 ago$/);
+  assert.ok(rotulos.every((r: string) => !r.includes('comprido')), 'a conta mora na linha da fatura, não no menu');
+});
+
 test('Fatura adiada: o pagamento não se desfaz por aqui', () => {
   const ui = screen('src/app/finance/invoice/[id].tsx', { invoiceStatus: 'rolled', pagamentos: [{ id: 'pg-1', amount_cents: 1000, occurred_at: '2026-08-05', account_id: 'cc' }] });
-  const linha = ui.nodes().find((n: any) => n.type === 'Row' && /^Pagamento de/.test(String(n.props.accessibilityLabel)));
+  const linha = ui.nodes().find((n: any) => n.type === 'Row' && /º pagamento, /.test(String(n.props.accessibilityLabel)));
   linha.props.onPress();
   const desfazer = ui.actions.find((a: any) => /^Desfazer pagamento/.test(a.label));
   assert.equal(desfazer.disabled, true);
@@ -8981,4 +9004,110 @@ test('Cartões: o card e o painel mostram o MESMO número (o total) e a frase do
   const dinheiro = ui.nodes().filter((n: any) => n.type === 'Money').map((n: any) => n.props.cents);
   assert.ok(dinheiro.filter((c: number) => c === 10000).length >= 1);
   assert.ok(!dinheiro.includes(6000), 'o aberto não vira número grande: ele aparece como "falta"');
+});
+
+// ---- Conta padrão e cartão padrão (15/10/2026) ----
+const padraoContas = [
+  { id: 'cc', name: 'Itaú', type: 'checking', archived: false },
+  { id: 'cc2', name: 'Inter', type: 'checking', archived: false },
+  { id: 'k1', name: 'Nubank', type: 'credit_card', archived: false, closing_day: 3 },
+];
+const comumVazio = { kind: 'expense', descricao: '', valorCents: 0, contaId: null, dataBR: '15/10/2026', categoria: null };
+const serieComPadrao = (opts: any = {}, props: any = {}) => screen('src/components/finance/formulario-da-serie.tsx', {
+  componente: 'FormularioDaSerie', executarEfeitos: true, forecastAccounts: padraoContas, contaPadrao: 'cc', cartaoPadrao: 'k1', ...opts,
+  props: { comum: comumVazio, registrarComum: () => {}, registrarEstado: () => {}, onSalvo: () => {}, onFechar: () => {}, sugerirConta: true, ...props } });
+const camposDaSerie = (ui: any) => ui.nodes().find((n: any) => n.type === 'AccountPicker' && n.props.emptyLabel === 'Não informar');
+const metodo = (ui: any) => ui.nodes().find((n: any) => n.type === 'PaymentMethodField');
+
+test('Conta padrão: criar do zero pré-seleciona a conta padrão; crédito troca para o cartão padrão enquanto automática', () => {
+  const ui = serieComPadrao();
+  assert.equal(camposDaSerie(ui).props.value, 'cc');
+  ui.interact(() => metodo(ui).props.onChange('credit'));
+  assert.equal(camposDaSerie(ui).props.value, 'k1');
+  ui.interact(() => metodo(ui).props.onChange('pix'));
+  assert.equal(camposDaSerie(ui).props.value, 'cc');
+});
+
+test('Conta padrão: a escolha da pessoa nunca é sobrescrita', () => {
+  const ui = serieComPadrao();
+  ui.interact(() => camposDaSerie(ui).props.onChange('cc2'));
+  assert.equal(camposDaSerie(ui).props.value, 'cc2');
+  ui.interact(() => metodo(ui).props.onChange('credit'));
+  assert.equal(camposDaSerie(ui).props.value, 'cc2', 'a forma não mexe depois da escolha');
+  // "Sem conta" escolhido também é escolha
+  const vazio = serieComPadrao();
+  vazio.interact(() => camposDaSerie(vazio).props.onChange(null));
+  assert.equal(camposDaSerie(vazio).props.value, null);
+});
+
+test('Conta padrão: editando, com preenchimento ou sem o sinal do hospedeiro, não pré-seleciona', () => {
+  assert.equal(camposDaSerie(serieComPadrao({}, { sugerirConta: false })).props.value, null);
+  assert.equal(camposDaSerie(serieComPadrao({}, { comum: { ...comumVazio, contaId: 'cc2' } })).props.value, 'cc2', 'o contexto vence');
+  assert.equal(camposDaSerie(serieComPadrao({}, { editandoId: 'r1', recurring: [] })), undefined, 'editando não cria');
+});
+
+test('Conta padrão: padrão arquivado ou ausente é ignorado; padrões ainda carregando esperam', () => {
+  assert.equal(camposDaSerie(serieComPadrao({ forecastAccounts: [{ ...padraoContas[0], archived: true }, padraoContas[1]] })).props.value, null);
+  assert.equal(camposDaSerie(serieComPadrao({ contaPadrao: 'sumiu' })).props.value, null);
+  assert.equal(camposDaSerie(serieComPadrao({ padroesPendentes: true })).props.value, null);
+});
+
+test('Conta padrão: o financiamento usa só a conta padrão, nunca o cartão', () => {
+  const ui = screen('src/components/finance/formulario-da-divida.tsx', { componente: 'FormularioDaDivida', executarEfeitos: true,
+    forecastAccounts: padraoContas, contaPadrao: 'cc', cartaoPadrao: 'k1',
+    props: { comum: comumVazio, registrarComum: () => {}, registrarEstado: () => {}, onSalvo: () => {}, onFechar: () => {}, sugerirConta: true } });
+  const picker = () => ui.nodes().find((n: any) => n.type === 'AccountPicker' && n.props.emptyLabel === 'Não informar');
+  assert.equal(picker().props.value, 'cc');
+  ui.interact(() => picker().props.onChange('cc2'));
+  assert.equal(picker().props.value, 'cc2');
+  const sem = screen('src/components/finance/formulario-da-divida.tsx', { componente: 'FormularioDaDivida', executarEfeitos: true,
+    forecastAccounts: padraoContas, contaPadrao: 'k1',
+    props: { comum: comumVazio, registrarComum: () => {}, registrarEstado: () => {}, onSalvo: () => {}, onFechar: () => {}, sugerirConta: true } });
+  assert.equal(sem.nodes().find((n: any) => n.type === 'AccountPicker' && n.props.emptyLabel === 'Não informar').props.value, null);
+});
+
+test('Conta padrão: o hospedeiro só pede a sugestão ao abrir do zero', () => {
+  const sugere = (params: any, opts: any = {}) => screen(lancarFile, { params, ...opts }).nodes().find((n: any) => n.type === 'FormularioDoLancamento')?.props.sugerirConta;
+  assert.equal(sugere({ tipo: 'uma' }), true);
+  assert.equal(sugere({ tipo: 'uma', month: '2026-10' }), true);
+  assert.equal(sugere({ tipo: 'uma', conta: 'cc' }), false, 'conta de contexto');
+  assert.equal(sugere({ tipo: 'uma', description: 'Pizza', amount: '4500' }), false, 'voz, cópia ou favorito');
+  assert.equal(sugere({ tipo: 'uma', captura: 'c1' }), false, 'captura');
+  assert.equal(sugere({ tipo: 'uma', deHipotese: 'h', kind: 'expense' }), false, 'Aplicar');
+  const lancar = screen(lancarFile, { params: { tipo: 'uma' } });
+  lancar.interact(() => lancar.nodes().find((n: any) => n.type === 'FormularioDoLancamento').props.onSalvo(true));
+  assert.equal(lancar.nodes().find((n: any) => n.type === 'FormularioDoLancamento').props.sugerirConta, false, 'criar outro mantém o que tem');
+});
+
+test('Contas: "Cartão padrão" só com cartão ativo e grava/limpa a escolha', () => {
+  const sem = screen('src/app/finance/accounts.tsx', { params: {}, forecastAccounts: [padraoContas[0]] });
+  assert.equal(sem.nodes().some((n: any) => n.type === 'Section' && n.props.title === 'Cartão padrão'), false);
+  const ui = screen('src/app/finance/accounts.tsx', { params: {}, forecastAccounts: padraoContas, cartaoPadrao: 'k1' });
+  const secao = () => ui.nodes().find((n: any) => n.type === 'Section' && n.props.title === 'Cartão padrão');
+  assert.ok(secao());
+  const linhas = () => {
+    const i = ui.nodes().indexOf(secao());
+    return ui.nodes().slice(i).filter((n: any) => n.type === 'Row' && ['Não definir', 'Nubank'].includes(n.props.title) && n.props.chevron === false);
+  };
+  ui.interact(() => linhas().find((n: any) => n.props.title === 'Não definir').props.onPress());
+  assert.deepEqual(ui.writes.at(-1), { operation: 'setDefaultCard', value: null });
+  ui.interact(() => linhas().find((n: any) => n.props.title === 'Nubank').props.onPress());
+  assert.deepEqual(ui.writes.at(-1), { operation: 'setDefaultCard', value: 'k1' });
+});
+
+test('Conta padrão: o lançamento "Uma vez" começa na padrão, segue a forma enquanto automática e respeita a escolha', () => {
+  const ui = screen('src/components/finance/formulario-do-lancamento.tsx', { componente: 'FormularioDoLancamento', executarEfeitos: true,
+    forecastAccounts: padraoContas, contaPadrao: 'cc', cartaoPadrao: 'k1',
+    props: { comum: comumVazio, registrarComum: () => {}, registrarEstado: () => {}, onSalvo: () => {}, onFechar: () => {}, sugerirConta: true } });
+  const picker = () => ui.nodes().find((n: any) => n.type === 'AccountPicker' && n.props.emptyLabel === 'Sem conta');
+  const forma = () => ui.nodes().find((n: any) => n.type === 'PaymentMethodField');
+  ui.interact(() => {}); // o react-hook-form de verdade re-renderiza no setValue; o dublê pede o render
+  assert.equal(picker().props.value, 'cc');
+  ui.interact(() => forma().props.onChange('credit'));
+  ui.interact(() => {});
+  assert.equal(picker().props.value, 'k1');
+  ui.interact(() => picker().props.onChange('cc2'));
+  ui.interact(() => forma().props.onChange('credit'));
+  ui.interact(() => {});
+  assert.equal(picker().props.value, 'cc2');
 });

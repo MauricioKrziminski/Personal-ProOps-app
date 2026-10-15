@@ -36,5 +36,7 @@ export type CorpoProps = {
   salvando?: boolean;
   /** A subtask is open: save waits without showing mutation progress. */
   salvarBloqueado?: boolean;
+  /** Aberto do zero: o campo de conta começa na conta/cartão padrão (`useContaSugerida`). */
+  sugerirConta?: boolean;
 
 };

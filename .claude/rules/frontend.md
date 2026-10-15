@@ -329,6 +329,9 @@ Dívidas), costurados por `?de=`, "Voltar" e `dismiss(2)`. Hoje é uma tela moda
 `FormatoDoLancamento` no topo: escolha atual em destaque e alternativas **Uma vez | Recorrente | Financiamento** abertas no lugar (spec
 `2026-09-29-formulario-unico-e-categorias-design.md`):
 
+- **Conta/cartão padrão pré-seleciona só criando do zero** (`sugerirConta` do hospedeiro, `useContaSugerida`):
+  nunca editando, convertendo ou com qualquer preenchimento da rota; o seletor marca "· padrão" e a
+  escolha da pessoa vence (`finance.md` → *Conta padrão e cartão padrão*).
 - **Três corpos, um contrato.** `components/finance/formulario-do-lancamento.tsx`,
   `formulario-da-serie.tsx` e `formulario-da-divida.tsx` recebem `CorpoProps`
   (`corpo-do-lancar.ts`). O hospedeiro (`app/finance/lancar.tsx`) desenha o seletor, lê os campos

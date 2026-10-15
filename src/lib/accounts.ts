@@ -99,6 +99,8 @@ export type AccountPickerContext = {
   cards: FinancialQuery<{ account_id: string; credit_limit_cents: unknown; available_limit_cents: unknown; limit_status?: string }>;
   format: (cents: number) => string;
   concealed: boolean;
+  /** Conta e cartão padrão do espaço: a linha deles diz "padrão". */
+  padroes?: readonly (string | null | undefined)[];
 };
 
 /**
@@ -154,8 +156,9 @@ export function accountSelectOptions(accounts: readonly AccountOptionAccount[], 
   };
   const option = (a: typeof accounts[number]) => {
     const tipo = accountTypeLabel(a);
+    const meta = a.archived ? `${tipo} · arquivada` : a.type === 'credit_card' && a.closing_day ? `${tipo} · fecha dia ${a.closing_day}` : tipo;
     return { id: a.id, label: a.name,
-      meta: a.archived ? `${tipo} · arquivada` : a.type === 'credit_card' && a.closing_day ? `${tipo} · fecha dia ${a.closing_day}` : tipo,
+      meta: !a.archived && context?.padroes?.includes(a.id) ? `${meta} · padrão` : meta,
       icon: ACCOUNT_TYPES.find(t => t.value === a.type)?.icon ?? 'building.columns',
       group: agrupado ? a.type === 'credit_card' ? 'CARTÕES' : 'CONTAS' : undefined,
       ...financialDetail(a),

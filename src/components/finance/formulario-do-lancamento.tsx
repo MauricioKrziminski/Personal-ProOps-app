@@ -38,6 +38,7 @@ import { molduraEmTela } from '@/components/ui/sheet';
 import { TaskHeader } from '@/components/ui/task-header';
 import { useRascunho } from '@/hooks/use-rascunho';
 import { pendenciaDoAplicar } from '@/lib/hipotese';
+import { useContaSugerida } from '@/hooks/use-conta-sugerida';
 import { abreComDuasDatas, abreComDuasDatasGuardado, aoTrocarDeConta, dataUnicaEVencimento, oferecerOutraData, rotuloOutraData, vencimentoAGravar, type PendenciaReservada } from '@/lib/uma-data';
 import { argsDaParcelada, dadosDoLancamento, detalheDaEscrita, mudancaDoDetalhe } from '@/lib/escrita';
 import { prepararLancamento, type LancamentoPreparado } from '@/lib/lancamento-write';
@@ -479,6 +480,33 @@ export function FormularioDoLancamento(props: Props) {
       setValue('paid_installments', '0');
     }
   };
+
+  /** Troca a conta (a pessoa escolhendo ou a sugestão da conta/cartão padrão) e acerta o que depende dela. */
+  const trocarConta = (next: string | null) => {
+    setValue('account_id', next, { shouldDirty: true });
+    // Trocar para cartão desliga "vou pagar depois" em vez de só escondê-lo.
+    const escolhida = (accounts ?? []).find((a) => a.id === next);
+    const antes = pendenciaReservada.current;
+    const paraCartao = escolhida?.type === 'credit_card';
+    const trocou = aoTrocarDeConta({
+      paraCartao,
+      pending: getValues('pending'),
+      due_at: getValues('due_at') ?? null,
+      reservada: antes,
+    });
+    pendenciaReservada.current = trocou.reservada;
+    if (paraCartao || antes) {
+      setValue('pending', trocou.pending);
+      setValue('due_at', trocou.pending && !outraData ? getValues('occurred_at') : trocou.due_at);
+    }
+    // Limpar a conta esconde a fileira de parcelas (`podeParcelarAqui`);
+    // escolher OUTRA conta (inclusive cartão) mantém `installments`.
+    if (!next) resetParcelasSeEscondeu();
+  };
+  const conta = useContaSugerida({
+    ativo: Boolean(props.sugerirConta) && !editing, contas: accounts, forma: paymentMethod,
+    valor: accountId ?? null, aplicar: trocarConta,
+  });
 
   /* A ocorrência começa com os campos da linha. Em Salvar, a pessoa escolhe o alcance; os
      campos da série, quando abertos, usam o mesmo grupo de Recorrentes. */
@@ -1392,27 +1420,7 @@ export function FormularioDoLancamento(props: Props) {
                   accounts={paymentMethodAccounts(paymentMethod, (accounts ?? []).filter((a) => !editing?.debt_id || a.type !== 'credit_card'))}
                   value={field.value ?? null}
                   selectedAccount={account}
-                  onChange={(next: string | null) => {
-                    field.onChange(next);
-                    // Trocar para cartão desliga "vou pagar depois" em vez de só escondê-lo.
-                    const escolhida = (accounts ?? []).find((a) => a.id === next);
-                    const antes = pendenciaReservada.current;
-                    const paraCartao = escolhida?.type === 'credit_card';
-                    const trocou = aoTrocarDeConta({
-                      paraCartao,
-                      pending: getValues('pending'),
-                      due_at: getValues('due_at') ?? null,
-                      reservada: antes,
-                    });
-                    pendenciaReservada.current = trocou.reservada;
-                    if (paraCartao || antes) {
-                      setValue('pending', trocou.pending);
-                      setValue('due_at', trocou.pending && !outraData ? getValues('occurred_at') : trocou.due_at);
-                    }
-                    // Limpar a conta esconde a fileira de parcelas (`podeParcelarAqui`);
-                    // escolher OUTRA conta (inclusive cartão) mantém `installments`.
-                    if (!next) resetParcelasSeEscondeu();
-                  }}
+                  onChange={(next: string | null) => { conta.escolheu(); trocarConta(next); }}
                   emptyLabel="Sem conta"
                 />
               )}

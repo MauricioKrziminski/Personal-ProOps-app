@@ -59,6 +59,14 @@ export function comumParaSerie(c: Comum): Comum {
   return { ...c, ...detalheDaEscrita(c, c.kind), ...(c.kind === 'transfer' ? { categoria: null } : {}) };
 }
 
+/**
+ * "Aberto do zero": a rota não traz nada além do tipo (e do mês de contexto). Qualquer outro
+ * parâmetro — id, conta, voz, captura, cópia, favorito, "Aplicar" — é um preenchimento e vale como está.
+ */
+export function abertoDoZero(p: Record<string, string | undefined>): boolean {
+  return Object.keys(p).every((k) => k === 'tipo' || k === 'month');
+}
+
 export function hrefDoLancar(tipo: TipoDeLancamento, extra: Record<string, string> = {}) {
   return { pathname: '/finance/lancar' as const, params: { tipo, ...extra } };
 }

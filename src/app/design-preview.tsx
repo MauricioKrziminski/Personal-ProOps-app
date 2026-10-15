@@ -702,6 +702,7 @@ function seedClient() {
 
   client.setQueryData(['account-balances'], previewAccountBalances);
   client.setQueryData(['default-account'], null);
+  client.setQueryData(['default-card'], null);
   client.setQueryData(['accounts'], [
     { id: 'prev-a1', name: 'Conta corrente', type: 'checking', initial_balance_cents: 0 },
     { id: 'prev-a2', name: 'Carteira', type: 'cash', initial_balance_cents: 0 },

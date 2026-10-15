@@ -18,7 +18,7 @@ export const FINANCE_KEYS = [
   ['debt-payments'], ['debt-payment-versions'], ['debt-declared-estimates'], ['payoff'], ['assets'],
   ['net-worth'], ['net-worth-series'], ['cash-history'], ['financial-health'],
   ['annual-report'], ['goal-contributions'], ['goal-milestones'], ['search', 'transactions'],
-  ['ai-month-stats'], ['month-lines'], ['month-summary'], ['month-breakdown'], ['default-account'],
+  ['ai-month-stats'], ['month-lines'], ['month-summary'], ['month-breakdown'], ['default-account'], ['default-card'],
   ['ledger-expected'], ['finance-write-preview'],
   ['categories-used'], ['category-classification-defaults'], ['subcategories'], ['category-breakdown'],
   ['emergency-reserve'], ['goal-planning'], ['goal-money'], ['goal-link-candidates'], ['investments'],

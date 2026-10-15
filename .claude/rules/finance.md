@@ -1424,6 +1424,19 @@ domínio nova; o que o agente NÃO faz de cada um está em `docs/AGENTE-PARIDADE
   usa a mesma seleção (`filterExpectedLines`) e o resumo global some com qualquer recorte. Valor
   desconhecido no link é recusado, nunca vira "Não informado".
 
+### Conta padrão e cartão padrão (15/10/2026)
+
+`workspaces.default_account_id` (não-cartão) e `default_card_id` (cartão de crédito ativo), ambos do
+próprio espaço (`20260909035000`, `20261015150000`), definidos em Contas. O formulário único os usa só
+**ao criar do zero** (`abertoDoZero`: a rota sem nada além de tipo e mês) e a regra é pura
+(`contaSugerida`, `lib/conta-sugerida.ts`): **contexto > forma > padrão**. Conta passada pela rota,
+cópia, favorito, voz, captura e "Aplicar" valem como vieram; forma crédito -> cartão padrão; Pix,
+débito, boleto, transferência e dinheiro -> conta padrão compatível (`paymentMethodAccounts`); sem
+forma -> conta padrão. Padrão arquivado ou ausente é ignorado. **Nunca silenciosa**: a linha do
+seletor diz "· padrão". Enquanto o campo é o que a sugestão pôs, trocar a forma recalcula; escolhido
+pela pessoa (inclusive "Sem conta"), nunca mais. Financiamento sugere só a conta padrão. Na folha de
+pagar fatura e de pagar dívida a ordem é a conta do registro -> a conta padrão (`contaQuePaga`).
+
 ### Criar a origem no fluxo, saldo e limite no seletor, prévia (F02, F03, F04)
 
 - `create_account(p_input, p_request_id)` é a criação atômica e idempotente de conta/cartão; a tela

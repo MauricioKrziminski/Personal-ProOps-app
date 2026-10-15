@@ -30,6 +30,7 @@ import type { RegistroSimulado } from '@/lib/hipotese';
 import { confirmDestructive, showItemActions } from '@/lib/item-actions';
 import {
   comumDepoisDeSalvar,
+  abertoDoZero,
   comumParaSerie,
   hrefDoResultadoDaConversao,
   opcoesDaConversao,
@@ -121,6 +122,7 @@ export default function LancarScreen() {
   const tipoAtivo = useRef(tipo);
   useLayoutEffect(() => { tipoAtivo.current = tipo; }, [tipo]);
   const [focarAoAbrir, setFocarAoAbrir] = useState(true);
+  const [trocouDeTipo, setTrocouDeTipo] = useState(false);
   useEffect(() => {
     montado.current = true;
     return () => { montado.current = false; };
@@ -168,6 +170,7 @@ export default function LancarScreen() {
     setEstados((e) => ({ ...e, [tipo]: guardado }));
     setComum(novo === 'recorrente' ? comumParaSerie(atual) : atual);
     setFocarAoAbrir(false);
+    setTrocouDeTipo(true);
     setTipo(novo);
   };
 
@@ -273,6 +276,8 @@ export default function LancarScreen() {
     salvarBloqueado: creatingOrigin,
     salvando: converter.isPending || (tipo !== tipoOriginal && conferindoHistorico),
     focarAoAbrir,
+    // Conta/cartão padrão: só criando do zero, no primeiro corpo, sem troca de tipo.
+    sugerirConta: abertoDoZero(p) && geracao === 0 && !trocouDeTipo,
   };
 
   return (

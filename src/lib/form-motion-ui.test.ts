@@ -135,7 +135,7 @@ function montar(file: string, name: string, initial: any, config: { reduzir: boo
       if (id === 'react') return react;
       if (id === 'expo-router') return { useIsFocused: () => config.focused ?? true };
       if (id === 'expo-router/react-navigation') return { usePreventRemove: (active: boolean, callback: any) => { config.preventRemove = { active, callback }; } };
-      if (id === '@/hooks/use-finance') return { useAccounts: () => ({ data: [] }), useCreateAccount: () => config.creation, useAccountBalances: (enabled: boolean) => { config.finance?.calls?.push(['balances', enabled]); return config.finance?.balances; }, useCardLimitContext: (enabled: boolean) => { config.finance?.calls?.push(['cards', enabled]); return config.finance?.cards; } };
+      if (id === '@/hooks/use-finance') return { useAccounts: () => ({ data: [] }), useDefaultAccount: () => ({ data: null, isPending: false }), useDefaultCard: () => ({ data: null, isPending: false }), useCreateAccount: () => config.creation, useAccountBalances: (enabled: boolean) => { config.finance?.calls?.push(['balances', enabled]); return config.finance?.balances; }, useCardLimitContext: (enabled: boolean) => { config.finance?.calls?.push(['cards', enabled]); return config.finance?.cards; } };
       if (id === '@/components/ui/conceal') return { useConceal: () => config.conceal ?? { ready: true, concealed: false }, concealText: () => '••••••', useBRL: () => (cents: number) => { config.moneyCalls?.push(cents); return `${cents} centavos`; } };
       if (id === '@/hooks/use-finance-write-preview') return { useFinanceWritePreview: () => config.preview };
       if (id === '@/lib/finance-write-preview') return load('src/lib/finance-write-preview.ts');
