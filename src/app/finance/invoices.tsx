@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ScrollView, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -18,7 +18,7 @@ import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { HeroLabel } from '@/components/ui/section-head';
 import { AdaptivePanes } from '@/components/ui/adaptive-panes';
-import { Chip } from '@/components/finance/chip';
+import { Chip, FileiraDeChips } from '@/components/finance/chip';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
 import { useAccounts, useCardInvoices, type CardInvoiceHistory } from '@/hooks/use-finance';
@@ -265,10 +265,7 @@ export default function InvoicesScreen() {
         um FILTRO (escolhe o que a tela mostra), não um valor que vai ser gravado.
       */}
       {cartoes.length > 1 ? (
-        <ScrollView keyboardShouldPersistTaps="handled"
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chipsCartoes}>
+        <FileiraDeChips>
           {cartoes.map((c) => (
             <Chip
               key={c.id}
@@ -280,7 +277,7 @@ export default function InvoicesScreen() {
               }}
             />
           ))}
-        </ScrollView>
+        </FileiraDeChips>
       ) : null}
 
       {/* Com UM cartão o nome solto no topo não desambigua nada — a tela inteira é dele.
@@ -503,7 +500,6 @@ export default function InvoicesScreen() {
 }
 
 const styles = StyleSheet.create({
-  chipsCartoes: { flexDirection: 'row', gap: Space.sm, paddingRight: Space.lg },
   aviso: {
     gap: Space.sm,
   },

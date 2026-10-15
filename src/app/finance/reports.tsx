@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ScrollView, Share, StyleSheet, View } from 'react-native';
+import { Share, StyleSheet, View } from 'react-native';
 import { Stack, router } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
@@ -17,7 +17,7 @@ import { Row, Section } from '@/components/ui/row';
 import { Screen } from '@/components/ui/screen';
 import { HeroLabel } from '@/components/ui/section-head';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
-import { Chip } from '@/components/finance/chip';
+import { Chip, FileiraDeChips } from '@/components/finance/chip';
 import { ProgressBar } from '@/components/ui/sparkline';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Space, tabular } from '@/design/tokens';
@@ -279,10 +279,7 @@ export default function ReportsScreen() {
           no destaque ("Sobrou em 2026") e no título de Bens e Direitos. Mesma régua do badge de
           aba e do card que soma uma lista de um item. */}
       {anos.length > 1 ? (
-        <ScrollView keyboardShouldPersistTaps="handled"
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.anos}>
+        <FileiraDeChips>
           {anos.map((a) => (
             <Chip
               key={a}
@@ -294,7 +291,7 @@ export default function ReportsScreen() {
               }}
             />
           ))}
-        </ScrollView>
+        </FileiraDeChips>
       ) : null}
 
       {isError ? <ErrorCard onRetry={refetch} /> : null}
@@ -331,10 +328,6 @@ export default function ReportsScreen() {
 }
 
 const styles = StyleSheet.create({
-  anos: {
-    flexDirection: 'row',
-    gap: Space.sm,
-  },
   hero: {
     gap: Space.sm,
   },

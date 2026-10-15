@@ -1,5 +1,5 @@
-import { useLayoutEffect, useRef } from 'react';
-import { StyleSheet, useWindowDimensions, View } from 'react-native';
+import { createContext, useContext, useLayoutEffect, useRef, type ReactNode } from 'react';
+import { ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, { cancelAnimation, interpolateColor, ReduceMotion, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
@@ -33,6 +33,28 @@ interface ChipProps {
   tinta?: NoteColorName | null;
 }
 
+/**
+ * Chip dentro de rolagem HORIZONTAL não leva o vidro (15/10/2026, iPhone): o Liquid Glass de um
+ * chip dentro de uma `UIScrollView` horizontal pintava uma faixa cinza do tamanho da rolagem
+ * inteira por trás da fileira (Faturas, cartões). Com a superfície sólida a faixa some. Fileira
+ * de chips que rola é `FileiraDeChips`, nunca um `ScrollView horizontal` montado na tela.
+ */
+const SemVidro = createContext(false);
+
+export function FileiraDeChips({ children }: { children: ReactNode }) {
+  return (
+    <SemVidro.Provider value>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.fileira}>
+        {children}
+      </ScrollView>
+    </SemVidro.Provider>
+  );
+}
+
 /** Chip de seleção (categorias, filtros, tipos de conta). */
 export function Chip({ label, selected, onPress, count, icon, tinta }: ChipProps) {
   const theme = useTheme();
@@ -44,7 +66,8 @@ export function Chip({ label, selected, onPress, count, icon, tinta }: ChipProps
   const pressao = useSharedValue(1);
   const montado = useRef(false);
   const tintaCheia = tinta ? noteInk(tinta, scheme) ?? undefined : undefined;
-  const vidro = supportsLiquidGlass();
+  const semVidro = useContext(SemVidro);
+  const vidro = supportsLiquidGlass() && !semVidro;
   useLayoutEffect(() => {
     if (!montado.current) { montado.current = true; return; }
     if (reduzir) {
@@ -132,6 +155,8 @@ export function Chip({ label, selected, onPress, count, icon, tinta }: ChipProps
 }
 
 const styles = StyleSheet.create({
+  // A calha da direita deixa o último chip sair da borda ao rolar, sem colar no fim da tela.
+  fileira: { flexDirection: 'row', gap: Space.sm, paddingRight: Space.lg },
   base: { borderRadius: Radius.pill, borderCurve: 'continuous' },
   chip: {
     flexDirection: 'row',

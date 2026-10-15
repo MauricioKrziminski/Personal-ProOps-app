@@ -1933,3 +1933,13 @@ test('toda pilha de aba congela quando a aba não está em foco (ocultar valores
   assert.match(prim, /const outraAba = !focada && ehRaizDeAba\(caminho\)/);
   assert.match(prim, /<Freeze freeze=\{outraAba && congelar\}>/);
 });
+
+test('chip em rolagem horizontal é FileiraDeChips (o vidro do chip pintava uma faixa cinza na rolagem, 15/10/2026)', () => {
+  const montadas = walk(SRC).filter((file) => {
+    if (!/\.tsx$/.test(file) || file.endsWith('components/finance/chip.tsx')) return false;
+    const t = stripComments(readFileSync(file, 'utf8'));
+    // um ScrollView horizontal que tenha um <Chip dentro dele
+    return [...t.matchAll(/<ScrollView\b[^>]*\bhorizontal\b[^>]*>([\s\S]*?)<\/ScrollView>/g)].some((m) => /<Chip\b/.test(m[1]));
+  });
+  assert.deepEqual(montadas, [], 'use <FileiraDeChips> de components/finance/chip.tsx');
+});

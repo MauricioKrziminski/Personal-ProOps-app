@@ -27,6 +27,9 @@ function mountChip(glass: boolean, selected = false) {
   let props = { label: 'Eletrônicos completos', selected, count: 3, icon: 'iphone', tinta: 'musgo', onPress: () => presses++ };
   const react = {
     useRef: (initial: any) => { const index = cursor++; return slots[index] ??= { current: initial }; },
+    // FileiraDeChips: fora dela o chip lê o padrão do contexto (com vidro).
+    createContext: (padrao: any) => ({ Provider: 'Provider', padrao }),
+    useContext: (ctx: any) => ctx.padrao,
     useLayoutEffect: (fn: () => any, deps: any[]) => {
       const index = cursor++;
       if (!slots[index] || deps.some((value, i) => !Object.is(value, slots[index].deps[i]))) effects.push({ index, fn, deps });
