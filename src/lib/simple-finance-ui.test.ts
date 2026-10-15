@@ -736,7 +736,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
       if (name === '@tanstack/react-query') return { useQuery: () => query, useMutation: () => mutation('mutation'), useQueryClient: () => ({ invalidateQueries: async () => {} }) };
       if (name === '@/lib/account-form') return load('src/lib/account-form.ts');
       if (name === '@/components/finance/account-form') return load('src/components/finance/account-form.tsx');
-      if (name === '@/lib/lancamento-write' || name === '@/lib/finance-write-input' || name === '@/lib/list-filters' || name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/uma-data' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas' || name === '@/lib/recurring-state' || name === '@/lib/serie' || name === '@/lib/compra' || name === '@/lib/rascunho-no-ciclo' || name === '@/lib/rascunho' || name === '@/lib/escrita' || name === '@/lib/hipotese' || name === '@/lib/onde-muda' || name === '@/lib/atalhos-de-lancamento' || name === '@/lib/lancar' || name === '@/lib/voice-draft' || name === '@/lib/categorias' || name === '@/lib/comecar' || name === '@/lib/duplicar' || name === '@/lib/favoritos' || name === '@/lib/apagar-com-alcance' || name === '@/lib/carencia' || name === '@/lib/pagar-fatura' || name === '@/lib/hipoteses-por-periodo' || name === '@/lib/previsto' || name === '@/lib/detalhe-do-ciclo' || name === '@/lib/ver-lancamentos') return load(`src/lib/${name.split('/').at(-1)}.ts`);
+      if (name === '@/lib/lancamento-write' || name === '@/lib/finance-write-input' || name === '@/lib/list-filters' || name === '@/lib/finance-form' || name === '@/lib/dates' || name === '@/lib/forecast-months' || name === '@/lib/month-view' || name === '@/lib/settle-labels' || name === '@/lib/uma-data' || name === '@/lib/accounts' || name === '@/lib/cycle-label' || name === '@/lib/card-status' || name === '@/lib/today-sections' || name === '@/lib/runway' || name === '@/lib/budget-tight' || name === '@/lib/setup-steps' || name === '@/lib/activity-feed' || name === '@/lib/account-cash' || name === '@/lib/today-spend' || name === '@/lib/anticipation' || name === '@/lib/widget-snapshot' || name === '@/lib/debt-history' || name === '@/lib/import-preview' || name === '@/lib/arrasto' || name === '@/lib/text' || name === '@/lib/installment-progress' || name === '@/lib/aos-poucos' || name === '@/lib/categories' || name === '@/lib/categories-merge' || name === '@/lib/alert-history' || name === '@/lib/data-da-compra' || name === '@/lib/dicas' || name === '@/lib/recurring-state' || name === '@/lib/serie' || name === '@/lib/compra' || name === '@/lib/rascunho-no-ciclo' || name === '@/lib/rascunho' || name === '@/lib/escrita' || name === '@/lib/hipotese' || name === '@/lib/onde-muda' || name === '@/lib/atalhos-de-lancamento' || name === '@/lib/lancar' || name === '@/lib/voice-draft' || name === '@/lib/categorias' || name === '@/lib/comecar' || name === '@/lib/duplicar' || name === '@/lib/favoritos' || name === '@/lib/apagar-com-alcance' || name === '@/lib/carencia' || name === '@/lib/pagar-fatura' || name === '@/lib/pagamentos-da-fatura' || name === '@/lib/hipoteses-por-periodo' || name === '@/lib/previsto' || name === '@/lib/detalhe-do-ciclo' || name === '@/lib/ver-lancamentos') return load(`src/lib/${name.split('/').at(-1)}.ts`);
       // o `categorias.ts` importa o mapa de ícones por caminho relativo (roda no `node --test` puro)
       if (name === '../design/category-icons.ts') return { categoryIcon: () => 'circle' };
       if (name === '@/hooks/use-debounced') return { useDebounced: (value: unknown) => value };
@@ -1790,9 +1790,12 @@ test('Fatura: tudo que se faz com ela se desfaz — pagamento, quitar à mão e 
   const rotulos = (ui: any) => menu(ui).map((a: any) => a.label);
 
   const paga = screen('src/app/finance/invoice/[id].tsx', { invoiceStatus: 'paid', pagamentos: [{ id: 'pg-1', amount_cents: 147000, occurred_at: '2026-08-18', account_id: 'cc' }] });
-  assert.ok(rotulos(paga).includes('Ver o pagamento') && !rotulos(paga).includes('Marcar como paga') && !rotulos(paga).includes('Desmarcar como paga'));
-  menu(paga).find((a: any) => a.label === 'Ver o pagamento').onPress();
-  assert.deepEqual(JSON.parse(JSON.stringify(paga.navigations.at(-1))), { pathname: '/finance/[txId]', params: { txId: 'pg-1', month: '2026-08' } });
+  assert.ok(rotulos(paga).includes('Desfazer um pagamento…') && !rotulos(paga).includes('Marcar como paga') && !rotulos(paga).includes('Desmarcar como paga'));
+  // com um só pagamento o menu vai direto à confirmação; o lançamento abre pela linha do bloco
+  menu(paga).find((a: any) => a.label === 'Desfazer um pagamento…').onPress();
+  assert.equal(paga.writes.length, 0, 'confirma antes');
+  paga.confirmations[0]();
+  assert.deepEqual(paga.writes.map((w: any) => [w.operation, w.value]), [['deleteTransaction', 'pg-1']]);
 
   const quitada = screen('src/app/finance/invoice/[id].tsx', { invoiceStatus: 'paid', settledManually: true });
   menu(quitada).find((a: any) => a.label === 'Desmarcar como paga').onPress();
@@ -1806,6 +1809,36 @@ test('Fatura: tudo que se faz com ela se desfaz — pagamento, quitar à mão e 
   menu(adiada).find((a: any) => a.label === 'Desfazer adiamento').onPress();
   adiada.confirmations[0]();
   assert.equal(adiada.writes[0].operation, 'unrollInvoice');
+});
+
+test('Fatura: bloco Pagamentos lista do mais recente ao mais antigo e desfaz exatamente o escolhido', () => {
+  const pagamentos = [
+    { id: 'pg-a', amount_cents: 50000, occurred_at: '2026-08-05', account_id: 'cc' },
+    { id: 'pg-c', amount_cents: 47000, occurred_at: '2026-08-18', account_id: 'cc' },
+    { id: 'pg-b', amount_cents: 50000, occurred_at: '2026-08-12', account_id: 'cc' },
+  ];
+  const ui = screen('src/app/finance/invoice/[id].tsx', { invoiceStatus: 'paid', datasReais: true, pagamentos, forecastAccounts: [{ id: 'cc', name: 'Conta', type: 'checking' }] });
+  const linhas = ui.nodes().filter((n: any) => n.type === 'Row' && /^Pagamento de/.test(String(n.props.accessibilityLabel)));
+  assert.deepEqual(linhas.map((n: any) => n.props.subtitle), ['18/08/2026 · Conta', '12/08/2026 · Conta', '05/08/2026 · Conta']);
+  linhas[1].props.onPress();
+  assert.deepEqual(ui.actions.map((a: any) => a.label), ['Ver o lançamento', 'Desfazer este pagamento']);
+  ui.actions.find((a: any) => a.label === 'Desfazer este pagamento').onPress();
+  assert.equal(ui.writes.length, 0, 'confirma antes');
+  ui.confirmations[0]();
+  assert.deepEqual(ui.writes.map((w: any) => [w.operation, w.value]), [['deleteTransaction', 'pg-b']]);
+});
+
+test('Fatura adiada: o pagamento não se desfaz por aqui', () => {
+  const ui = screen('src/app/finance/invoice/[id].tsx', { invoiceStatus: 'rolled', pagamentos: [{ id: 'pg-1', amount_cents: 1000, occurred_at: '2026-08-05', account_id: 'cc' }] });
+  const linha = ui.nodes().find((n: any) => n.type === 'Row' && /^Pagamento de/.test(String(n.props.accessibilityLabel)));
+  linha.props.onPress();
+  const desfazer = ui.actions.find((a: any) => /^Desfazer pagamento/.test(a.label));
+  assert.equal(desfazer.disabled, true);
+  desfazer.onPress();
+  assert.equal(ui.confirmations.length, 0);
+  assert.equal(ui.writes.length, 0);
+  const menu = ui.nodes().find((n: any) => n.type === 'HeaderActions').props.menu.actions.map((a: any) => a.label);
+  assert.ok(!menu.includes('Desfazer um pagamento…') && menu.includes('Desfazer adiamento'));
 });
 
 test('a paid invoice does not expose settlement or payment buttons', () => {

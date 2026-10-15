@@ -10,6 +10,8 @@
 --    saldo, os juros e o IOF da fatura seguinte.
 -- 3. "Marcar como paga" se desfaz; a fatura paga por pagamento não se desmarca por ali.
 -- 4. Cartão que adia sozinho: desfazer o adiamento de uma vencida é recusado, com o motivo.
+-- 6. Três pagamentos em parte somando o total: apagar o do MEIO reabre e devolve o dinheiro à conta;
+--    apagar outro baixa de novo; pagar o resto quita (o "Desfazer este pagamento" da tela da fatura).
 -- 5. Apagar o espaço inteiro (cascata) não é travado pelo pagamento da fatura adiada.
 -- Datas daqui a dois anos: o teste não depende do dia. Roda numa transação e dá rollback.
 
@@ -41,6 +43,11 @@ declare
   parte uuid;
   l record;
   n int;
+  inv6 uuid;
+  pa uuid; pb uuid; pc uuid;
+  linha6 uuid;
+  saldo0 bigint;
+  saldo bigint;
 begin
   insert into public.accounts (id, workspace_id, user_id, name, type, closing_day, due_day, credit_limit_cents)
     values (card, w, u, 'Cartão', 'credit_card', 3, 10, 500000);
@@ -170,6 +177,40 @@ begin
   exception when others then
     if sqlerrm not like 'Este cartão adia a fatura vencida sozinho%' then raise exception '4: recusa errada: %', sqlerrm; end if;
   end;
+
+  -- ── 6. três pagamentos em parte, desfazer um do meio ───────────────────────────────────
+  insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, account_id, occurred_at, source)
+    values (w, u, 'expense', 30000, 'Compra A', card, make_date(ano, 8, 10), 'app') returning invoice_id into inv6;
+  insert into public.transactions (workspace_id, user_id, kind, amount_cents, description, account_id, occurred_at, source, status)
+    values (w, u, 'expense', 10000, 'Compra B', card, make_date(ano, 8, 12), 'app', 'pending') returning id into linha6;
+  select cleared_cents into saldo0 from public.account_balances() where account_id = cc;
+  pa := public.pay_invoice(inv6, cc, make_date(ano, 9, 1), 15000);
+  pb := public.pay_invoice(inv6, cc, make_date(ano, 9, 2), 15000);
+  pc := public.pay_invoice(inv6, cc, make_date(ano, 9, 3), 10000);
+  select status, paid_cents into l from public.card_invoices where id = inv6;
+  if l.status <> 'paid' or l.paid_cents <> 40000 then raise exception '6: três pagamentos não quitaram (% %)', l.status, l.paid_cents; end if;
+  select cleared_cents into saldo from public.account_balances() where account_id = cc;
+  if saldo0 - saldo <> 40000 then raise exception '6: a conta devia ter caído 40000 (caiu %)', saldo0 - saldo; end if;
+  if (select status from public.transactions where id = linha6) <> 'cleared' then raise exception '6: a compra B não foi baixada'; end if;
+
+  delete from public.transactions where id = pb;
+  select status, paid_cents, paid_at into l from public.card_invoices where id = inv6;
+  if l.status = 'paid' or l.paid_cents <> 25000 or l.paid_at is not null then
+    raise exception '6: desfazer o do meio não reabriu (% % %)', l.status, l.paid_cents, l.paid_at;
+  end if;
+  if (select status from public.transactions where id = linha6) <> 'pending' then raise exception '6: a compra B devia voltar a prevista'; end if;
+  select cleared_cents into saldo from public.account_balances() where account_id = cc;
+  if saldo0 - saldo <> 25000 then raise exception '6: o dinheiro do pagamento não voltou à conta (caiu %)', saldo0 - saldo; end if;
+
+  delete from public.transactions where id = pa;
+  select paid_cents into l from public.card_invoices where id = inv6;
+  if l.paid_cents <> 10000 then raise exception '6: apagar outro não baixou paid_cents (%)', l.paid_cents; end if;
+
+  perform public.pay_invoice(inv6, cc, make_date(ano, 9, 4), null);
+  select status, paid_cents into l from public.card_invoices where id = inv6;
+  if l.status <> 'paid' or l.paid_cents <> 40000 then raise exception '6: pagar o resto não quitou (% %)', l.status, l.paid_cents; end if;
+  select cleared_cents into saldo from public.account_balances() where account_id = cc;
+  if saldo0 - saldo <> 40000 then raise exception '6: saldo final errado (caiu %)', saldo0 - saldo; end if;
 end $$;
 
 -- ── 5. a cascata não trava ──────────────────────────────────────────────────────────────

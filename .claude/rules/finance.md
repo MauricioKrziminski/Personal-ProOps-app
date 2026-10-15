@@ -1060,7 +1060,12 @@ fica tem motivo lógico escrito na frase. O que isso mudou no domínio:
   já soma) leva a diferença a `paid_cents`: editar o valor ou a data, ou apagar o pagamento, quita,
   reabre (as linhas que a quitação baixou voltam a `pending`) ou move a data de pagamento. Fatura
   ADIADA recusa mudar o pagamento ("desfaça o adiamento antes"), exceto em cascata (apagar a conta
-  ou o espaço). "Marcar como paga" se desfaz (`unsettle_invoice`); "Jogar para a próxima" também
+  ou o espaço). **Na tela da fatura os pagamentos ficam à vista** (15/10/2026, *"eu devo conseguir
+  escolher qual pagamento voltar"*): o bloco "Pagamentos" lista cada um (valor, data, conta, o mais
+  recente primeiro) e o toque oferece "Desfazer este pagamento" — apagar AQUELA transferência, com a
+  confirmação dizendo para que conta o dinheiro volta e quanto fica em aberto. Sem RPC nova: o gatilho
+  acima refaz a fatura (`pagamento_da_fatura_se_desfaz.sql`, seção 6: três parciais, desfazer o do
+  meio). Fatura adiada não oferece o desfazer. "Marcar como paga" se desfaz (`unsettle_invoice`); "Jogar para a próxima" também
   (`unroll_invoice`: tira o saldo, os juros e o IOF da fatura seguinte — pela data, categoria e
   nome que `roll_invoice` dá; a que a pessoa renomeou fica), recusado se a seguinte já foi paga
   ou adiada, e no cartão que adia sozinho com a fatura vencida (o cron a adiaria de novo).

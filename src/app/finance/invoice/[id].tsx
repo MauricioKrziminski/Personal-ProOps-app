@@ -62,6 +62,7 @@ import type { SelectOption } from '@/components/ui/select-field';
 import { AccountPicker } from '@/components/finance/account-picker';
 import { rotuloDaCompra } from '@/lib/data-da-compra';
 import { hrefDoLancamento, hrefDoLancar } from '@/lib/lancar';
+import { faltaDepoisDeDesfazer, mensagemDeDesfazer } from '@/lib/pagamentos-da-fatura';
 
 /**
  * Fatura — "o que tem nesta fatura, e como eu marco como paga?".
@@ -166,7 +167,11 @@ export default function InvoiceScreen() {
     () => (invoice.isError ? [] : (invoice.data?.transactions ?? [])),
     [invoice.data, invoice.isError]
   );
-  const pagamentos = invoice.isError ? [] : (invoice.data?.pagamentos ?? []);
+  // Do mais recente para o mais antigo (frontend.md); o desempate é a ordem que veio do banco.
+  const pagamentos = useMemo(
+    () => (invoice.isError ? [] : [...(invoice.data?.pagamentos ?? [])].sort((a, b) => b.occurred_at.localeCompare(a.occurred_at))),
+    [invoice.data, invoice.isError],
+  );
   const cartao = (accounts.data ?? []).find((a) => a.id === fatura?.account_id);
   // O nome pinta a face (a cor do emissor sai dele). Os cartões da Carteira já estão em cache;
   // as contas talvez não — sem este segundo caminho o cartão chegaria cinza e trocaria de cor.
@@ -414,13 +419,54 @@ export default function InvoiceScreen() {
    * pagamento se edita e se apaga no próprio lançamento — o banco refaz a fatura
    * (`20260926180000`) —; quitar à mão e adiar se desfazem aqui.
    */
-  const verPagamentos = () => {
-    const abrir = (p: (typeof pagamentos)[number]) =>
-      router.push({ pathname: '/finance/[txId]', params: { txId: p.id, month: p.occurred_at.slice(0, 7) } });
-    if (pagamentos.length === 1) return abrir(pagamentos[0]);
+  const abrirPagamentoNoLancamento = (p: (typeof pagamentos)[number]) =>
+    router.push({ pathname: '/finance/[txId]', params: { txId: p.id, month: p.occurred_at.slice(0, 7) } });
+
+  const nomeDaConta = (id: string | null) => (accounts.data ?? []).find((a) => a.id === id)?.name ?? null;
+
+  /**
+   * Desfazer um pagamento é APAGAR a transferência: o banco refaz a fatura (`sync_invoice_payment`)
+   * e o saldo da conta volta sozinho (é derivado). A fatura adiada recusa — o caminho é desfazer o
+   * adiamento antes.
+   */
+  const desfazerPagamento = (p: (typeof pagamentos)[number]) => {
+    if (!fatura || adiada || remove.isPending) return;
+    const conta = nomeDaConta(p.account_id);
+    confirmDestructive(
+      `Desfazer o pagamento de ${formatBRL(p.amount_cents)}?`,
+      'Desfazer',
+      () => {
+        if (remove.isPending) return;
+        remove.mutate(p.id, {
+          onSuccess: () =>
+            toast({ message: `Pagamento desfeito. ${formatBRL(p.amount_cents)} voltou para ${conta ?? 'a conta'}.`, tone: 'success' }),
+          onError: (erro) => toast({ message: financeErrorMessage(erro, 'Não deu para desfazer. Tenta de novo.'), tone: 'error' }),
+        });
+      },
+      mensagemDeDesfazer(p.amount_cents, conta, faltaDepoisDeDesfazer(total, jaPago, p.amount_cents), formatBRL),
+    );
+  };
+
+  const opcoesDoPagamento = (p: (typeof pagamentos)[number]) =>
+    showItemActions(`${brl(p.amount_cents)} em ${formatDateBR(p.occurred_at)}`, [
+      { label: 'Ver o lançamento', icon: 'arrow.left.arrow.right', onPress: () => abrirPagamentoNoLancamento(p) },
+      {
+        label: adiada ? 'Desfazer pagamento: desfaça o adiamento antes' : 'Desfazer este pagamento',
+        icon: 'arrow.uturn.backward',
+        destructive: true,
+        disabled: adiada,
+        onPress: () => desfazerPagamento(p),
+      },
+    ]);
+
+  const qualDesfazer = () => {
+    if (pagamentos.length === 1) return desfazerPagamento(pagamentos[0]);
     showItemActions(
-      'Pagamentos',
-      pagamentos.map((p) => ({ label: `${formatBRL(p.amount_cents)} em ${formatDateBR(p.occurred_at)}`, onPress: () => abrir(p) })),
+      'Qual pagamento desfazer?',
+      pagamentos.map((p) => ({
+        label: `${brl(p.amount_cents)} em ${formatDateBR(p.occurred_at)}${nomeDaConta(p.account_id) ? ` · ${nomeDaConta(p.account_id)}` : ''}`,
+        onPress: () => desfazerPagamento(p),
+      })),
     );
   };
 
@@ -553,6 +599,21 @@ export default function InvoiceScreen() {
           <Dica id="fatura-cartao" tela="fatura" />
         </Animated.View>
       ) : null}
+      {/* Quanto já foi pago e quanto falta já está sob o cartão: aqui só os pagamentos. */}
+      {fatura && pagamentos.length > 0 ? (
+        <Section title={`Pagamentos · ${pagamentos.length}`}>
+          {pagamentos.map((p) => (
+            <Row
+              key={p.id}
+              title={brl(p.amount_cents)}
+              subtitle={[formatDateBR(p.occurred_at), nomeDaConta(p.account_id)].filter(Boolean).join(' · ')}
+              icon="arrow.left.arrow.right"
+              accessibilityLabel={`Pagamento de ${brl(p.amount_cents)} em ${formatDateBR(p.occurred_at)}`}
+              onPress={() => opcoesDoPagamento(p)}
+            />
+          ))}
+        </Section>
+      ) : null}
       {lembreteDaFatura && fatura ? (
         <Section>
           <Row icon="bell" title={resumoDosAvisos(lembreteDaFatura.avisos)}
@@ -618,8 +679,8 @@ export default function InvoiceScreen() {
                   },
                   { label: lembreteDaFatura ? 'Editar lembrete' : 'Lembrar', icon: 'bell' as const,
                     onPress: () => router.push(hrefDoLembrete({ tipo: 'fatura', invoiceId: fatura.id }, `Fatura ${nomeDoCartao}`)) },
-                  ...(pagamentos.length > 0
-                    ? [{ label: pagamentos.length === 1 ? 'Ver o pagamento' : 'Ver os pagamentos', icon: 'arrow.left.arrow.right' as const, onPress: verPagamentos }]
+                  ...(pagamentos.length > 0 && !adiada
+                    ? [{ label: 'Desfazer um pagamento…', icon: 'arrow.uturn.backward' as const, onPress: qualDesfazer }]
                     : []),
                   ...(podePagar
                     ? [{ label: 'Pagar…', icon: 'checkmark.circle' as const, onPress: abrirPagamento }]
