@@ -607,6 +607,13 @@ Por isso o "E se…?" saiu do ÚLTIMO lugar da home do Financeiro para logo abai
 inteiro": o argumento antigo ("ninguém abre o app para simular") descrevia um simulador de
 compra, não a única tela que responde quanto resta.
 
+**E o mês sozinho também aparece, embaixo do acumulado** (15/10/2026, *"pode até deixar mas mostrar
+o só daquele mês também"*): `resultadoDoMes` = `entra − sai`, do MESMO payload (sem RPC). No mês
+parcial o rótulo não diz "no mês": o primeiro é "até o fim" (entra/sai são só o que ainda vai
+acontecer) e o cortado pelo horizonte é "até DD/MM". Na home de Finanças, o rodapé do painel mostra
+"Em conta hoje" pela régua do "Em conta" da Hoje (`caixaDasContas`, confirmado, sem investimento) —
+o mesmo número da partida de "Como chego nesse valor" no ciclo aberto.
+
 ## Agregações
 
 - Toda leitura agregada via RPC (padrão duplo interna/wrapper de `supabase.md`): `transactions_summary`, `monthly_cashflow`, `account_balances`, `budgets_status`. Não somar transações no cliente nem no agente.
