@@ -58,7 +58,7 @@ import { useToast } from '@/components/ui/toast';
 import { useTelaPronta } from '@/hooks/use-tela-pronta';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { currentMonth, monthTitle } from '@/components/finance/month-picker';
-import { mesDoCorte, veioDe, type MesProjetado } from '@/lib/forecast-months';
+import { mesDoCorte, resultadoDoMes, veioDe, type MesProjetado } from '@/lib/forecast-months';
 import { agruparPorPeriodo, periodoDe } from '@/lib/hipoteses-por-periodo';
 import { useDebounced } from '@/hooks/use-debounced';
 import {
@@ -111,6 +111,13 @@ import { hrefDoLancar } from '@/lib/lancar';
  * que faz o rascunho poder supor uma receita em 2028 — o seletor de mês dele oferece os meses
  * DESTA janela, então horizonte curto = suposição curta.
  */
+/** Rótulo do resultado só do mês: parcial (começa hoje ou o horizonte corta) não diz "no mês". */
+function rotuloDoResultado(m: MesProjetado, primeiro: boolean, ultimo: boolean): string {
+  if (!m.parcial) return 'no mês';
+  if (primeiro) return 'até o fim';
+  return ultimo ? `até ${isoToBR(m.ate).slice(0, 5)}` : 'no mês';
+}
+
 /**
  * A legenda de um ciclo, e por que a PRIMEIRA linha fala diferente das outras.
  *
@@ -1171,15 +1178,21 @@ export default function ForecastScreen() {
               <Row
                 title={monthTitle(m.mes)}
                 subtitle={legendaDoMes(m, iMes === 0, iMes === meses.length - 1, brl)}
-                accessibilityLabel={`${monthTitle(m.mes)}, veio de ${brl(veioDe(m))}, entra ${brl(m.entra)}, sai ${brl(m.sai)}, sobra ${brl(m.saldo)}`}
+                accessibilityLabel={`${monthTitle(m.mes)}, veio de ${brl(veioDe(m))}, entra ${brl(m.entra)}, sai ${brl(m.sai)}, sobra ${brl(m.saldo)}, ${rotuloDoResultado(m, iMes === 0, iMes === meses.length - 1)} ${brl(resultadoDoMes(m))}`}
                 accessibilityState={{ expanded: mesAberto === m.mes }}
                 onPress={() => setMesAberto(mesAberto === m.mes ? null : m.mes)}
                 trailing={
-                  <Money
-                    cents={m.saldo}
-                    variant="subhead"
-                    tone={m.saldo < 0 ? 'danger' : 'text'}
-                  />
+                  <View style={styles.saldoDoMes}>
+                    <Money
+                      cents={m.saldo}
+                      variant="subhead"
+                      tone={m.saldo < 0 ? 'danger' : 'text'}
+                    />
+                    <ThemedText type="caption" themeColor="textSecondary">
+                      <Money cents={resultadoDoMes(m)} variant="caption" signed tone="auto" />
+                      {` ${rotuloDoResultado(m, iMes === 0, iMes === meses.length - 1)}`}
+                    </ThemedText>
+                  </View>
                 }
               />
 
@@ -1469,6 +1482,7 @@ export default function ForecastScreen() {
 
 const styles = StyleSheet.create({
   previa: { gap: Space.xs },
+  saldoDoMes: { alignItems: 'flex-end' },
   // A lista e o seu "Ver mais" a `Space.md` um do outro, como título e conteúdo.
   lista: { gap: Space.md },
   horizonteCorpo: {

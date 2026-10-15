@@ -21,6 +21,7 @@ import { ExtendedFab } from '@/components/ui/extended-fab';
 import { useLancarPorVoz } from '@/components/finance/lancar-por-voz';
 import { DetalheDoCicloSheet } from '@/components/finance/detalhe-do-ciclo-sheet';
 import { diferencaDoPrevisto, previstoDoLancamento } from '@/lib/previsto';
+import { caixaDasContas } from '@/lib/account-cash';
 import { apoioDoAdiantamento } from '@/lib/anticipation';
 import { ATALHOS_DE_LANCAMENTO } from '@/lib/atalhos-de-lancamento';
 import { HeroPanel } from '@/components/ui/hero-panel';
@@ -48,6 +49,7 @@ import {
   useAccounts,
   useBudgetsStatus,
   useCardSummary,
+  useAccountBalances,
   useCashFlowForecast,
   useCycleMonth,
   useCycleSeries,
@@ -142,6 +144,7 @@ export default function FinanceScreen() {
   const budgets = useBudgetsStatus(month, regua.view);
   const accounts = useAccounts();
   const debts = useDebts();
+  const saldos = useAccountBalances();
   const cards = useCardSummary();
   const [janelaCashflow, setJanelaCashflow] = usePreferencia<'6' | '12'>('financeiro:tendencia', '6', umDe(['6', '12']));
   const cashflow = useMonthlyCashflow(Number(janelaCashflow));
@@ -347,10 +350,26 @@ export default function FinanceScreen() {
             value={heroLoading
               ? <Skeleton width="70%" height={46} tone="hero" />
               : <CountUpMoney cents={descricao?.cents ?? 0} variant="heroMoney" tone={cicloRuim ? 'onHeroDanger' : 'onHero'} />}
-            footer={!heroLoading && descricao?.rodape ? (
-              <View style={styles.heroRodape}>
-                <ThemedText type="footnote" themeColor="onHeroMuted">{descricao.rodape.label}</ThemedText>
-                <Money cents={descricao.rodape.cents} variant="footnote" tone="onHero" concealable />
+            footer={!heroLoading && (descricao?.rodape || !saldos.isPending) ? (
+              <View style={styles.heroRodapes}>
+                {descricao?.rodape ? (
+                  <View style={styles.heroRodape}>
+                    <ThemedText type="footnote" themeColor="onHeroMuted">{descricao.rodape.label}</ThemedText>
+                    <Money cents={descricao.rodape.cents} variant="footnote" tone="onHero" concealable />
+                  </View>
+                ) : null}
+                {/* Mesma fonte e régua do "Em conta" da Hoje; erro diz "indisponível", nunca R$ 0,00. */}
+                {saldos.isSuccess ? (
+                  <View style={styles.heroRodape}>
+                    <ThemedText type="footnote" themeColor="onHeroMuted">Em conta hoje</ThemedText>
+                    <Money cents={caixaDasContas(saldos.data).total} variant="footnote" tone="onHero" concealable />
+                  </View>
+                ) : saldos.isError ? (
+                  <View style={styles.heroRodape}>
+                    <ThemedText type="footnote" themeColor="onHeroMuted">Em conta hoje</ThemedText>
+                    <ThemedText type="footnote" themeColor="onHeroMuted">indisponível</ThemedText>
+                  </View>
+                ) : null}
               </View>
             ) : undefined}
             secondary={!heroLoading && variacaoSaida !== null ? {
@@ -691,6 +710,7 @@ const styles = StyleSheet.create({
   bloco: { gap: Space.md },
   /** A dica encosta no que ela explica — mais perto que o `gap` entre blocos. */
   comDica: { gap: Space.sm },
+  heroRodapes: { flex: 1, gap: Space.xs },
   heroRodape: {
     flex: 1,
     flexDirection: 'row',

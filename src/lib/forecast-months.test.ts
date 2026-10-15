@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { mesDoCorte, veioDe, type MesProjetado } from './forecast-months.ts';
+import { mesDoCorte, resultadoDoMes, veioDe, type MesProjetado } from './forecast-months.ts';
 
 /**
  * ⚠️ **As 9 asserções do AGRUPAMENTO saíram daqui em 10/09/2026.**
@@ -58,4 +58,10 @@ test('veioDe encadeia: o começo de um mês é a sobra do anterior', () => {
       `${meses[i].mes} não começa onde ${meses[i - 1].mes} terminou`
     );
   }
+});
+
+test('resultadoDoMes: entra − sai, com sinal', () => {
+  assert.equal(resultadoDoMes({ entra: 500_00, sai: 300_00 }), 200_00);
+  assert.equal(resultadoDoMes({ entra: 100_00, sai: 300_00 }), -200_00);
+  assert.equal(resultadoDoMes({ entra: '10' as any, sai: 4 }), 6);
 });

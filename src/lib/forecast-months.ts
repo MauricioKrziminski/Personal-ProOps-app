@@ -66,3 +66,8 @@ export function mesDoCorte(meses: MesProjetado[], cobertoAte: string | null): st
 export function veioDe(m: Pick<MesProjetado, 'saldo' | 'entra' | 'sai'>): number {
   return Number(m.saldo) - Number(m.entra) + Number(m.sai);
 }
+
+/** O que o mês deixou sozinho, sem o que veio do anterior: `entra − sai`. */
+export function resultadoDoMes(m: Pick<MesProjetado, 'entra' | 'sai'>): number {
+  return Number(m.entra) - Number(m.sai);
+}

@@ -780,6 +780,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
       };
       // A normalização do nome de pasta é a real: a "Nova pasta" a usa para achar nome repetido.
       if (name === '@/lib/search') return { noteTitle: (texto: string) => texto.split('\n')[0], notePreview: () => '', normalizeFolderName: load('src/lib/search.ts').normalizeFolderName };
+      if (name === '@/lib/pastas') return load('src/lib/pastas.ts');
       if (name === '@/lib/note-blocks') return { todoProgress: () => ({ done: 0, total: 0 }) };
       if (name === '@/design/category-icons') return { categoryIcon: () => 'circle' };
       if (name === '@/design/adaptive-window') return load('src/design/adaptive-window.ts');
