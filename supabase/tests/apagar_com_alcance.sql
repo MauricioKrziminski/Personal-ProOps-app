@@ -192,6 +192,10 @@ begin
     assert sqlstate = 'P0001', format('paga em parte: %s %s', sqlstate, sqlerrm);
   end;
   assert n <> -2, 'fatura paga em parte devia recusar';
+  -- a fatura de t_pai (hoje - 5) depende do dia do fechamento e pode ser a mesma das compras de
+  -- hoje + 20 abaixo: devolve o pagamento parcial para o teste não depender da data de hoje
+  reset role;
+  update public.card_invoices set paid_cents = 0 where id = (select invoice_id from public.transactions where id = t_pai);
 
   -- ── Task 2: compra parcelada (conta corrente, 4x de 25,00; a 1ª paga) ──
   reset role;
