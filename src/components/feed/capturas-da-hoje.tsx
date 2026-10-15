@@ -5,8 +5,7 @@ import { BlockHeader } from '@/components/ui/block-header';
 import { Deslizavel } from '@/components/ui/deslizavel';
 import { Row, Section } from '@/components/ui/row';
 import { useToast } from '@/components/ui/toast';
-import { useResolverCaptura, type Captura } from '@/hooks/use-capturas';
-import { hrefDaCaptura } from '@/lib/captura';
+import { useAbrirCaptura, useResolverCaptura, type Captura } from '@/hooks/use-capturas';
 import { Space } from '@/design/tokens';
 import { formatDateBR } from '@/lib/dates';
 import { showItemActions, type ItemAction } from '@/lib/item-actions';
@@ -23,6 +22,7 @@ const tituloDa = (c: Captura) => c.entendido ?? c.draft.entendido;
 export function useAcoesDaCaptura() {
   const toast = useToast();
   const resolver = useResolverCaptura();
+  const abrir = useAbrirCaptura();
   // Desfazer devolve ao status de ANTES: o duplicado volta para "Parecem já lançados", não para a Hoje.
   const descartar = ({ id, status }: Captura) =>
     resolver.mutate({ id, status: 'discarded' }, {
@@ -38,7 +38,7 @@ export function useAcoesDaCaptura() {
       curto: 'Lançar',
       icon: 'checkmark',
       arrasto: 'direita',
-      onPress: () => router.push(hrefDaCaptura(c)),
+      onPress: () => void abrir(c),
     },
     { label: 'Descartar', icon: 'trash', destructive: true, arrasto: 'esquerda', desfaz: true, onPress: () => descartar(c) },
   ];
@@ -46,6 +46,7 @@ export function useAcoesDaCaptura() {
 
 /** A linha de uma captura, a mesma na Hoje e em "A confirmar". */
 export function LinhaDaCaptura({ captura: c, acoes }: { captura: Captura; acoes: ItemAction[] }) {
+  const abrir = useAbrirCaptura();
   const titulo = tituloDa(c);
   const quando = `${c.bank} · ${formatDateBR(new Date(c.posted_at))}`;
   return (
@@ -54,7 +55,7 @@ export function LinhaDaCaptura({ captura: c, acoes }: { captura: Captura; acoes:
         title={titulo}
         subtitle={c.status === 'duplicate' ? `Parece já estar no app · ${quando}` : quando}
         icon={c.status === 'duplicate' ? 'doc.on.doc' : 'bell.badge'}
-        onPress={c.status === 'duplicate' ? () => showItemActions(titulo, acoes) : () => router.push(hrefDaCaptura(c))}
+        onPress={c.status === 'duplicate' ? () => showItemActions(titulo, acoes) : () => void abrir(c)}
         onLongPress={() => showItemActions(titulo, acoes)}
       />
     </Deslizavel>

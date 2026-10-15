@@ -20,6 +20,7 @@ import { useToast } from '@/components/ui/toast';
 import { Space } from '@/design/tokens';
 import { useCapturas } from '@/hooks/use-capturas';
 import { useConsentimento } from '@/hooks/use-consentimento';
+import { useSession } from '@/hooks/use-session';
 import { bancosDisponiveis } from '@/lib/captura';
 
 /**
@@ -59,11 +60,13 @@ export default function CapturaNotificacoes() {
     IntentLauncher.ActivityAction.IGNORE_BATTERY_OPTIMIZATION_SETTINGS,
   ));
 
-  const gravar = (ativa: boolean, pacotes: string[]) => { configurarCaptura(ativa, pacotes); reler(); };
+  // A fila é de quem está logado: o nativo guarda o dono e o envio descarta a de outra conta.
+  const dono = useSession().session?.user.id ?? null;
+  const gravar = (ativa: boolean, pacotes: string[]) => { configurarCaptura(ativa, pacotes, dono); reler(); };
   const concordar = () => {
     // Primeira vez: liga com todos os bancos marcados; a pessoa desmarca o que não usa.
     const pacotes = estado.pacotes.length ? estado.pacotes : bancosDisponiveis(__DEV__).map((b) => b.pacote);
-    configurarCaptura(true, pacotes);
+    configurarCaptura(true, pacotes, dono);
     reler();
     setAviso(false);
     // O ÚNICO caminho até o acesso do sistema: o aviso vem imediatamente antes, nesta instalação.

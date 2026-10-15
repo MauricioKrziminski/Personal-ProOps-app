@@ -28,7 +28,7 @@ export function bancosDisponiveis(dev: boolean): { pacote: string; nome: string 
   return dev ? [...BANCOS, { pacote: PACOTE_TESTE, nome: 'Teste (adb)' }] : [...BANCOS];
 }
 
-export type Capturada = { id: string; package: string; title: string; text: string; posted_at: number };
+export type Capturada = { id: string; package: string; title: string; text: string; posted_at: number; dono?: string | null };
 export type NotificacaoIn = { external_id: string; package: string; title: string; text: string; posted_at: string };
 
 export function paraEnvio(fila: Capturada[]): NotificacaoIn[] {
@@ -40,13 +40,23 @@ export function paraEnvio(fila: Capturada[]): NotificacaoIn[] {
 
 const LOTE = 20;
 
-/** Envia a fila em lotes; apaga do aparelho só o que o agente ACEITOU. Erro para tudo (fica para depois). */
+/**
+ * Envia a fila em lotes; apaga do aparelho só o que o agente ACEITOU. Erro para tudo (fica para depois).
+ *
+ * `dono` é o usuário logado. A fila é do aparelho, e a conta pode ter mudado com notificações ainda nela:
+ * o que tem OUTRO dono gravado é apagado SEM ser enviado (nunca vira captura de quem não a recebeu). Item
+ * sem dono (gravado por uma versão anterior) é do usuário atual, para não perder o que já estava na fila.
+ */
 export async function enviarFila(deps: {
+  dono: string;
   pendentes: () => Capturada[];
   remover: (ids: string[]) => void;
   enviar: (itens: NotificacaoIn[]) => Promise<{ aceitos: string[] }>;
 }): Promise<number> {
-  const itens = paraEnvio(deps.pendentes());
+  const todas = deps.pendentes();
+  const alheias = todas.filter((c) => c.dono && c.dono !== deps.dono).map((c) => c.id);
+  if (alheias.length) deps.remover(alheias);
+  const itens = paraEnvio(todas.filter((c) => !c.dono || c.dono === deps.dono));
   let removidos = 0;
   for (let i = 0; i < itens.length; i += LOTE) {
     const { aceitos } = await deps.enviar(itens.slice(i, i + LOTE));
@@ -55,6 +65,25 @@ export async function enviarFila(deps: {
   }
   return removidos;
 }
+
+/**
+ * "Confirmar" só abre o formulário se a captura ainda espera decisão. A leitura nova do servidor diz: `data`
+ * ausente (resolvida, apagada ou de outra pessoa) ou com lançamento já ligado = não abre. Erro de rede = abre
+ * (offline não prende a pessoa): `lancar_da_captura` segura a repetição no servidor.
+ */
+export function capturaAindaAberta(r: {
+  data: { status: string; transaction_id: string | null } | null; error: unknown;
+}): boolean {
+  if (r.error) return true;
+  return Boolean(r.data) && (r.data!.status === 'pending' || r.data!.status === 'duplicate') && !r.data!.transaction_id;
+}
+
+/** O servidor recusou (`PT409`) porque a captura já foi resolvida (lançada ou descartada, aqui ou em outro aparelho). */
+export const CAPTURA_RESOLVIDA = 'CAPTURA_RESOLVIDA';
+export function ehCapturaResolvida(e: unknown): boolean {
+  return (e as { code?: string } | null)?.code === CAPTURA_RESOLVIDA;
+}
+export const FRASE_CAPTURA_RESOLVIDA = 'Esta captura já foi lançada ou descartada.';
 
 export function hrefDaCaptura(c: { id: string; draft: FinanceDraft }) {
   const href = hrefDoRascunho(c.draft);

@@ -54,6 +54,7 @@ import { brToISO, formatNumberBR, isValidBRDate, isoToBR } from '@/lib/dates';
 import { askEditScope } from '@/lib/edit-scope';
 import { detalheDaEscrita, mudancaDoDetalhe, linhaDoFinanciamento } from '@/lib/escrita';
 import { normalizePaymentMethod, paymentMethodAccounts, paymentMethodError, type PaymentMethod } from '@/lib/payment-method';
+import { ehCapturaResolvida } from '@/lib/captura';
 import {
   camposNoOutroModo,
   debtTerm,
@@ -563,15 +564,17 @@ function CorpoDaDivida(props: Props & { alvo?: Debt }) {
     }
     // Pela PROMESSA: aberta pelo "Aplicar" de uma hipótese, ela sai do rascunho mesmo com o corpo já
     // fechado; o que é do corpo (toast, avisar o hospedeiro), só com ele montado.
-    save.mutateAsync({ ...target, ...(jaSairam ? { ja_sairam: jaSairam } : {}) }).then(
+    save.mutateAsync({ ...target, ...(jaSairam ? { ja_sairam: jaSairam } : {}), capturaId: props.captura }).then(
       () => {
         if (deHipotese) tirar(deHipotese);
         if (!montado.current) return;
         toast({ message: 'Dívida cadastrada.', tone: 'success' });
-        onSalvo(criarOutro);
+        onSalvo(criarOutro, Boolean(props.captura));
       },
       (error: Error) => {
-        if (montado.current) aoFalhar(error);
+        if (!montado.current) return;
+        if (ehCapturaResolvida(error)) return props.aoCapturaResolvida?.();
+        aoFalhar(error);
       },
     );
   };

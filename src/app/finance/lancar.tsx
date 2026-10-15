@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useAbrirPaywallSemAssinatura } from '@/hooks/use-acesso';
 import { StyleSheet, View } from 'react-native';
@@ -41,6 +42,7 @@ import {
 } from '@/lib/lancar';
 import { perguntasDoParam } from '@/lib/voice-draft';
 import { useResolverCaptura } from '@/hooks/use-capturas';
+import { FRASE_CAPTURA_RESOLVIDA } from '@/lib/captura';
 
 /** De que tabela vem o registro aberto, quando a entrada não diz. */
 const ORIGEM_DO_TIPO: Record<TipoDeLancamento, OrigemDaConversao['tipo']> = {
@@ -105,6 +107,7 @@ export default function LancarScreen() {
   const lerComum = useRef<() => Comum>(() => comum);
   const lerEstado = useRef<() => unknown>(() => undefined);
   const toast = useToast();
+  const queryClient = useQueryClient();
   const avaliar = useAvaliacaoDepoisDeSalvar();
   const converter = useConverterRegistro();
   const originCreation = useRef<OriginCreationController | null>(null);
@@ -168,10 +171,11 @@ export default function LancarScreen() {
     setTipo(novo);
   };
 
-  const onSalvo = (criarOutro: boolean) => {
+  const onSalvo = (criarOutro: boolean, capturaResolvida = false) => {
     void avaliar();
-    // Veio de "A confirmar" (captura de notificação): o lançamento salvo confirma a captura.
-    if (p.captura) resolverCaptura.mutate({ id: p.captura, status: 'confirmed' });
+    // Veio de "A confirmar" (captura de notificação): os quatro corpos criam o registro e confirmam a captura
+    // numa transação só (`lancar_da_captura`). Este caminho é a rede: confirma depois se algum não o fez.
+    if (p.captura && doAplicar && !capturaResolvida) resolverCaptura.mutate({ id: p.captura, status: 'confirmed' });
     if (!criarOutro) return router.back();
     setComum(comumDepoisDeSalvar(lerComum.current()));
     setEstados({});
@@ -258,6 +262,12 @@ export default function LancarScreen() {
     onSalvo,
     onFechar: () => { if (!originCreation.current?.close()) router.back(); },
     deHipotese: doAplicar ? p.deHipotese : undefined,
+    captura: doAplicar ? p.captura : undefined,
+    aoCapturaResolvida: () => {
+      toast({ message: FRASE_CAPTURA_RESOLVIDA, tone: 'info' });
+      void queryClient.invalidateQueries({ queryKey: ['captured_notifications'] });
+      router.back();
+    },
     editandoId: editandoAqui,
     converter: editandoId && tipo !== tipoOriginal ? converterPara : undefined,
     salvarBloqueado: creatingOrigin,

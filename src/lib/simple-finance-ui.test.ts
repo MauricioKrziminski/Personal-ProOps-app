@@ -627,7 +627,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
         },
       } };
       if (name === '@/hooks/use-aos-poucos') return load('src/hooks/use-aos-poucos.ts');
-      if (name === '@/hooks/use-capturas') return { useCapturas: () => ({ ...query, isSuccess: true, data: options.capturas ?? [] }), useResolverCaptura: () => mutation('resolverCaptura'), useEnviarCapturas: () => {} };
+      if (name === '@/hooks/use-capturas') return { useCapturas: () => ({ ...query, isSuccess: true, data: options.capturas ?? [] }), useResolverCaptura: () => mutation('resolverCaptura'), useAbrirCaptura: () => () => {}, useEnviarCapturas: () => {} };
       if (name === '@/components/feed/capturas-da-hoje') return load('src/components/feed/capturas-da-hoje.tsx');
       if (name === '@/hooks/use-lock') return { useLock: () => ({ semTrancar: (fn: () => unknown) => fn() }) };
       // O voo da Carteira é camada da raiz; aqui só a forma dos hooks, inerte.

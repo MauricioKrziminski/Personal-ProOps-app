@@ -45,3 +45,29 @@ test('configurar é sincronizado e limpa da fila o que saiu da seleção', () =>
   assert.match(fonte, /@Synchronized\s+fun configurar/);
   assert.match(fonte, /filter \{ it\.optString\("package"\) in novos \}/);
 });
+
+test('a fila não perde dado: corrompido é preservado, E/S não sobrescreve, fsync antes do rename', () => {
+  const fonte = kt('Captura.kt');
+  assert.match(fonte, /catch \(e: JSONException\)[\s\S]{0,80}preservarCorrompido/);
+  assert.match(fonte, /\$ARQUIVO\.corrompido/);
+  // erro de E/S na leitura devolve null (quem chama não escreve por cima) e a gravação nunca derruba o serviço
+  assert.match(fonte, /catch \(e: IOException\)[\s\S]{0,120}return null/);
+  assert.match(fonte, /val atuais = ler\(ctx\) \?: return/);
+  assert.match(fonte, /FileOutputStream\(tmp\)\.use/);
+  assert.ok(fonte.indexOf('fd.sync()') > 0 && fonte.indexOf('fd.sync()') < fonte.indexOf('renameTo(arquivo(ctx))'));
+  assert.match(fonte, /if \(!tmp\.renameTo\(arquivo\(ctx\)\)\) throw IOException/);
+  assert.doesNotMatch(fonte, /catch \(e: Exception\) \{\s*emptyList\(\)/);
+});
+
+test('a fila tem DONO: gravado em cada item e na configuração, e o configurar descarta o de outro dono', () => {
+  const fonte = kt('Captura.kt');
+  assert.match(fonte, /fun configurar\(ctx: Context, ativa: Boolean, pacotes: List<String>, dono: String\?\)/);
+  assert.match(fonte, /dono\(ctx\)\?\.let \{ nova\.put\("dono", it\) \}/);
+  assert.match(fonte, /it\.optString\("dono"\)\.isBlank\(\) \|\| it\.optString\("dono"\) == novoDono/);
+  // item sem dono (versão anterior) fica e vira do dono atual
+  assert.match(fonte, /onEach \{ if \(novoDono != null && it\.optString\("dono"\)\.isBlank\(\)\) it\.put\("dono", novoDono\) \}/);
+  const modulo = kt('ProOpsCapturaModule.kt');
+  assert.match(modulo, /Function\("configurar"\) \{ ativa: Boolean, pacotes: List<String>, dono: String\? ->/);
+  assert.match(modulo, /"dono" to it\.optString\("dono"\)/);
+  assert.match(modulo, /"dono" to Captura\.dono\(ctx\)/); // estado() expõe o dono: o JS desliga a captura de outra conta
+});

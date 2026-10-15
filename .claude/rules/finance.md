@@ -1648,3 +1648,36 @@ com a pergunta ("Confira o valor", "Compra de US$ 12,99: quanto foi em reais?").
 data inválida é descartada com pergunta. Falha de banco/rede depois do modelo solta a reserva (volta no próximo envio),
 nunca `ignored`; item inválido do lote é aceito sem gravar (o aparelho o apaga). Captura do mesmo banco, tipo e valor a
 até 30 min de outra (pendente, duplicada ou confirmada) entra como `duplicate` sem lançamento, e "Lançar mesmo assim" decide.
+
+**Fechamento da captura (15/10/2026, à tarde)** — idempotência e robustez:
+
+- **Quantias rotuladas** (`limite`, `saldo`, `disponível`, `fatura`, `cashback`, `pontos`, `rendimento`) saem da disputa só
+  quando há OUTRO valor. Restando duas ou mais quantias sem rótulo, o valor do modelo (se for uma delas) vai no rascunho,
+  mas SEMPRE com "Confira o valor: a notificação cita X e Y" — nunca silencioso. A probe distingue `(tipo, centavos)` de
+  `(tipo, centavos, "confira")`.
+- **Corrida pendente × pendente**: gravar o resultado (procurar a captura igual + `_concluir`) é uma unidade de trabalho que
+  toma `pg_advisory_xact_lock` por (espaço, banco, tipo, valor); a segunda captura espera o commit da primeira e então a vê.
+  `_duplicata` (leitura de lançamentos) fica fora da unidade. Prova com duas conexões no Postgres local:
+  `tests/test_captures_corrida_integracao.py` (opt-in `SQL_TEST_LOCAL_DATABASE_URL`, só local).
+- **Um registro por captura**: confirmar é `public.lancar_da_captura(captura, tipo, dados, fee, request_id)` (invoker; trava a
+  captura, despacha para a MESMA função de criação do formulário e a marca `confirmed` com o vínculo, numa transação):
+  `lancamento` -> `save_transaction_payment` (`transaction_id`), `parcelada` e `financiamento` -> `create_purchase`
+  (`installment_plan_id` / `debt_id`), `recorrente` -> `create_recurring_payment` (`recurring_id`). Uma FK por tipo,
+  `on delete set null`, `check` de no máximo uma. Repetir (resposta perdida, segundo toque, outro aparelho) devolve o registro
+  que existe, mesmo com dados editados. `confirmed` é terminal (gatilho `b_resolucao`) e o vínculo só aceita registro que a
+  pessoa enxerga (RLS; o registro nasce no espaço padrão de hoje, que pode não ser o da captura). "Confirmar" confere o servidor
+  antes de abrir o formulário (`useAbrirCaptura`). Os quatro corpos do formulário passam `capturaId`; o `registrarPagasContadas`
+  do financiamento segue depois (idempotente). `lancar.tsx` ainda confirma depois só como rede, se algum caminho não o fez.
+- **Conta pelo tipo**: o nome do banco só pré-seleciona o registro do tipo que a notificação diz (forma de pagamento que o
+  modelo propôs E a frase sustenta): crédito/parcelada só cartão; Pix, débito, boleto, transferência e dinheiro só conta
+  que não é cartão; sem forma dita, não escolhe e pergunta "Em qual conta ou cartão?".
+- **Conciliação**: compra parcelada (valor total guardado) casa com a parcela 1 de um plano já lançado (`total // N`, camada
+  "parcela"); com `conta` desconhecida, uma transferência própria já lançada, mesmo valor em até 5 dias, vira `duplicate`
+  (a pessoa decide em "Parecem já lançados"). Com conta conhecida a cascata de sempre vale.
+- **Fila do aparelho**: JSON corrompido é movido para `captura-pendentes.json.corrompido` (nunca sobrescrito), erro de E/S
+  não escreve por cima, a gravação dá `fsync` antes do `rename`. A fila tem DONO (usuário logado): `configurar` o grava, cada
+  item o leva, o nativo descarta o de outro dono e o envio (`enviarFila`) apaga sem enviar o de outro dono; item sem dono
+  (versão anterior) é tratado como do usuário atual. É mudança NATIVA (build novo, não OTA).
+- **Natureza (prompt constante `origem_da_notificacao`)**: cashback e pontos, prometidos OU recebidos, não são lançamento, e a
+  notificação se classifica pelo CORPO (o título pode ser propaganda ou citar valor de oferta/empréstimo). Corpus real de
+  projetos de terceiros (Nubank, Itaú, Inter, Mercado Pago, PicPay) em `agent/scripts/notificacoes_de_banco.py`, 65/65 na probe.

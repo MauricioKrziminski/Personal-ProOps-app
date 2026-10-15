@@ -13,6 +13,7 @@ import type { CategoryConfigurationInput, CategoryConfigurationResult } from '@/
 import { invalidateFinance, invalidateKeys } from '@/lib/query-invalidation';
 import type { Natureza } from '@/lib/import-preview';
 import { keepPreviousData, useMutation, useQueryClient } from '@tanstack/react-query';
+import { CAPTURA_RESOLVIDA, FRASE_CAPTURA_RESOLVIDA } from '@/lib/captura';
 import { useInfiniteQuery, useQuery } from '@/lib/consulta-em-foco';
 
 import type { ProjecaoMensal } from '@/lib/forecast-months';
@@ -1113,19 +1114,24 @@ export function useSettleInvoice() {
  */
 export function useCreateInstallmentPlan() {
   const invalidate = useInvalidateFinance();
+  const qc = useQueryClient();
   const attempt = useRef<{ key: string; id: string } | null>(null);
   return useMutation({
-    // A prévia e o salvar usam exatamente os mesmos argumentos da compra.
-    mutationFn: async (input: EntradaParcelada) => {
+    // A prévia e o salvar usam exatamente os mesmos argumentos da compra. `capturaId`: veio de "A confirmar".
+    mutationFn: async ({ capturaId, ...input }: EntradaParcelada & { capturaId?: string }) => {
       const { args } = escritaDaParcelada(input);
-      const key = JSON.stringify(args.p_dados);
+      const key = JSON.stringify(capturaId ? [capturaId, args.p_dados] : args.p_dados);
       if (attempt.current?.key !== key) attempt.current = { key, id: newClientMessageId() };
+      if (capturaId) {
+        await lancarDaCaptura(capturaId, 'parcelada', args.p_dados, attempt.current.id);
+        return;
+      }
       const { error } = await supabase.rpc('create_purchase', {
         ...args, p_request_id: attempt.current.id,
       });
       if (error) throw error;
     },
-    onSuccess: invalidate,
+    onSuccess: (_d, vars) => { invalidate(); aoConfirmarCaptura(qc, vars?.capturaId); },
   });
 }
 
@@ -2927,27 +2933,36 @@ export function usePayoffStrategy(estrategia: 'avalanche' | 'snowball') {
  */
 export function useCreateRecurring() {
   const invalidate = useInvalidateFinance();
+  const qc = useQueryClient();
   const attempt = useRef<{ key: string; id: string } | null>(null);
   return useMutation({
-    mutationFn: async (input: EntradaRecorrente) => {
+    // `capturaId`: veio de "A confirmar" (a série e a captura se confirmam numa transação só).
+    mutationFn: async ({ capturaId, ...input }: EntradaRecorrente & { capturaId?: string }) => {
       const { args } = escritaDaRecorrente(input);
-      const key = JSON.stringify(args.p_input);
+      const key = JSON.stringify(capturaId ? [capturaId, args.p_input] : args.p_input);
       if (attempt.current?.key !== key) attempt.current = { key, id: newClientMessageId() };
       const requestId = attempt.current.id;
-      const { data, error } = await supabase.rpc('create_recurring_payment', {
-        ...args,
-        p_request_id: requestId,
-      });
-      if (error) throw error;
+      let data: unknown;
+      if (capturaId) {
+        data = await lancarDaCaptura(capturaId, 'recorrente', args.p_input, requestId);
+      } else {
+        const r = await supabase.rpc('create_recurring_payment', {
+          ...args,
+          p_request_id: requestId,
+        });
+        if (r.error) throw r.error;
+        data = r.data;
+      }
       if (attempt.current?.id === requestId) attempt.current = null;
       return data as { id: string; revision: number };
     },
-    onSuccess: invalidate,
+    onSuccess: (_d, vars) => { invalidate(); aoConfirmarCaptura(qc, vars?.capturaId); },
   });
 }
 
 export function useSaveDebt() {
   const invalidate = useInvalidateFinance();
+  const qc = useQueryClient();
   const attempt = useRef<{ key: string; id: string } | null>(null);
   return useMutation({
     mutationFn: async (input: {
@@ -2976,8 +2991,10 @@ export function useSaveDebt() {
        * com o que a tela tinha lido antes. Mudou no meio: nada é gravado, e o erro diz por quê.
        */
       versao?: string | null;
+      /** Veio de "A confirmar": a dívida e a captura se confirmam numa transação só. */
+      capturaId?: string;
     } & Partial<ExpenseClassification> & SubcategoryMetadata) => {
-      const { id, versao, down_payment, ja_sairam, ...resto } = input;
+      const { id, versao, down_payment, ja_sairam, capturaId, ...resto } = input;
       if (id) {
         let consulta = supabase.from('debts').update(resto).eq('id', id);
         if (versao) consulta = consulta.eq('updated_at', versao);
@@ -2988,18 +3005,22 @@ export function useSaveDebt() {
         // O builder é o da prévia (que leva p_ja_sairam); a RPC real não o conhece e a gravação o lança depois.
         const { p_ja_sairam: _ja, ...args } = escritaDoFinanciamento(
           { ...resto, ...(down_payment ? { down_payment } : {}) }, ja_sairam).args;
-        const key = JSON.stringify(args.p_dados);
+        const key = JSON.stringify(capturaId ? [capturaId, args.p_dados] : args.p_dados);
         if (attempt.current?.key !== key) attempt.current = { key, id: newClientMessageId() };
-        const { data, error } = await supabase.rpc('create_purchase', {
-          ...args, p_request_id: attempt.current.id,
-        });
-        if (error) throw error;
+        let data: unknown;
+        if (capturaId) {
+          data = await lancarDaCaptura(capturaId, 'financiamento', args.p_dados, attempt.current.id);
+        } else {
+          const r = await supabase.rpc('create_purchase', { ...args, p_request_id: attempt.current.id });
+          if (r.error) throw r.error;
+          data = r.data;
+        }
         // Repetir é seguro: a mesma tentativa devolve o mesmo resultado e a RPC pula o já lançado.
         const novo = (data as { ids?: string[] } | null)?.ids?.[0];
         if (ja_sairam?.numbers.length && novo) await registrarPagasContadas(novo, ja_sairam.accountId, ja_sairam.numbers);
       }
     },
-    onSuccess: invalidate,
+    onSuccess: (_d, vars) => { invalidate(); aoConfirmarCaptura(qc, vars?.capturaId); },
   });
 }
 
@@ -3467,23 +3488,58 @@ export function useJurosDoPix(tx: Transaction | null | undefined) {
   });
 }
 
+/**
+ * Cria o registro de uma captura ("A confirmar") e a confirma NA MESMA transação do servidor. `tipo` e `dados`
+ * são os do formulário para a função de criação do tipo; repetir devolve o registro que já existe.
+ */
+export async function lancarDaCaptura(
+  capturaId: string, tipo: 'lancamento' | 'parcelada' | 'financiamento' | 'recorrente',
+  dados: Json, requestId: string, feeCents?: number | null,
+) {
+  const { data, error } = await supabase.rpc('lancar_da_captura', {
+    p_captura_id: capturaId, p_tipo: tipo, p_dados: dados, p_fee_cents: feeCents ?? 0, p_request_id: requestId,
+  });
+  // PT409 aqui = captura já resolvida (outro aparelho, segundo toque): o formulário fecha e a lista atualiza,
+  // nunca um erro genérico com o que foi digitado preso na tela.
+  if (error?.code === 'PT409') throw Object.assign(new Error(FRASE_CAPTURA_RESOLVIDA), { code: CAPTURA_RESOLVIDA });
+  if (error) throw error;
+  return data as unknown as { id?: string; ids?: string[]; ja_lancado?: boolean };
+}
+
+function aoConfirmarCaptura(qc: ReturnType<typeof useQueryClient>, capturaId?: string) {
+  if (capturaId) void qc.invalidateQueries({ queryKey: ['captured_notifications'] });
+}
+
+/**
+ * `capturaId`: o lançamento nasce de uma notificação capturada ("A confirmar"). Vai por
+ * `lancar_da_captura`, que grava o lançamento E confirma a captura numa transação só: repetir (resposta
+ * perdida, segundo toque, outro aparelho) devolve o mesmo lançamento, nunca cria outro.
+ */
 export function useSaveTransaction() {
   const invalidate = useInvalidateFinance();
+  const qc = useQueryClient();
   const attempt = useRef<{ key: string; id: string } | null>(null);
   return useMutation({
-    mutationFn: async (input: EntradaEscritaLancamento) => {
+    mutationFn: async ({ capturaId, ...input }: EntradaEscritaLancamento & { capturaId?: string }) => {
       const { args: payload } = escritaDoLancamento(input);
-      const key = JSON.stringify(payload);
+      const key = JSON.stringify(capturaId ? [capturaId, payload] : payload);
       if (attempt.current?.key !== key) attempt.current = { key, id: newClientMessageId() };
       const requestId = attempt.current.id;
-      const { data, error } = await supabase.rpc('save_transaction_payment', {
-        ...payload, p_request_id: requestId,
-      });
-      if (error) throw error;
+      let data: unknown;
+      if (capturaId) {
+        data = await lancarDaCaptura(capturaId, 'lancamento', payload.p_input, requestId, payload.p_fee_cents);
+      } else {
+        const r = await supabase.rpc('save_transaction_payment', { ...payload, p_request_id: requestId });
+        if (r.error) throw r.error;
+        data = r.data;
+      }
       if (attempt.current?.id === requestId) attempt.current = null;
-      return data as unknown as { id: string; revision: number; fee_id: string | null };
+      return data as { id: string; revision: number | null; fee_id: string | null };
     },
-    onSuccess: invalidate,
+    onSuccess: (_d, vars) => {
+      invalidate();
+      aoConfirmarCaptura(qc, vars?.capturaId);
+    },
   });
 }
 

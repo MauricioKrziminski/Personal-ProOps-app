@@ -37,11 +37,11 @@ class ProOpsCapturaModule : Module() {
     }
 
     Function("estado") {
-      mapOf("ativa" to Captura.ativa(ctx), "pacotes" to Captura.pacotes(ctx).toList())
+      mapOf("ativa" to Captura.ativa(ctx), "pacotes" to Captura.pacotes(ctx).toList(), "dono" to Captura.dono(ctx))
     }
 
-    Function("configurar") { ativa: Boolean, pacotes: List<String> ->
-      Captura.configurar(ctx, ativa, pacotes)
+    Function("configurar") { ativa: Boolean, pacotes: List<String>, dono: String? ->
+      Captura.configurar(ctx, ativa, pacotes, dono)
     }
 
     Function("pendentes") {
@@ -50,6 +50,7 @@ class ProOpsCapturaModule : Module() {
           "id" to it.optString("id"), "package" to it.optString("package"),
           "title" to it.optString("title"), "text" to it.optString("text"),
           "posted_at" to it.optLong("posted_at"),
+          "dono" to it.optString("dono").ifBlank { null },
         )
       }
     }

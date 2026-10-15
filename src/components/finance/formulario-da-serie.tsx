@@ -32,6 +32,7 @@ import { askEditScope } from '@/lib/edit-scope';
 import { confirmDestructive } from '@/lib/item-actions';
 import { fraseDoEncerramento } from '@/lib/encerrar-serie';
 import { linhaDaRecorrente, detalheDaEscrita, mudancaDoDetalhe, type EntradaRecorrente } from '@/lib/escrita';
+import { ehCapturaResolvida } from '@/lib/captura';
 import { financeErrorMessage } from '@/lib/finance-form';
 import { normalizePaymentMethod, paymentMethodError } from '@/lib/payment-method';
 import { comumParaSerie } from '@/lib/lancar';
@@ -340,15 +341,17 @@ function CorpoDaSerie(props: Props & { alvo?: RecurringTransaction }) {
     }
     // Pela PROMESSA: aberta pelo "Aplicar" de uma hipótese, ela sai do rascunho mesmo com o corpo já
     // fechado; o que é do corpo (toast, avisar o hospedeiro), só com ele montado.
-    create.mutateAsync(entrada).then(
+    create.mutateAsync({ ...entrada, capturaId: props.captura }).then(
       () => {
         if (deHipotese) tirar(deHipotese);
         if (!montado.current) return;
         toast({ message: 'Recorrência criada.', tone: 'success' });
-        onSalvo(criarOutro);
+        onSalvo(criarOutro, Boolean(props.captura));
       },
-      () => {
-        if (montado.current) toast({ message: 'Não deu para criar a recorrência.', tone: 'error' });
+      (error) => {
+        if (!montado.current) return;
+        if (ehCapturaResolvida(error)) return props.aoCapturaResolvida?.();
+        toast({ message: 'Não deu para criar a recorrência.', tone: 'error' });
       }
     );
   };

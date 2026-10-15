@@ -20,8 +20,15 @@ export type CorpoProps = {
   editandoId?: string;
   /** Convertendo: o registro de OUTRO tipo que está virando este. Salvar chama `converter`. */
   converter?: (destino: RegistroSimulado) => void;
-  /** Criando: `criarOutro` = "Salvar e criar outro". */
-  onSalvo: (criarOutro: boolean) => void;
+  /**
+   * Criando: `criarOutro` = "Salvar e criar outro". `capturaResolvida`: o servidor já confirmou a captura
+   * junto com o lançamento (`lancar_da_captura`); sem isso o hospedeiro a confirma depois.
+   */
+  onSalvo: (criarOutro: boolean, capturaResolvida?: boolean) => void;
+  /** O servidor disse que a captura já foi resolvida: o hospedeiro fecha o formulário e atualiza a lista. */
+  aoCapturaResolvida?: () => void;
+  /** Veio de "A confirmar": o lançamento comum se grava e confirma a captura numa transação só. */
+  captura?: string;
   onFechar: () => void;
   /** Aberta pelo "Aplicar" de uma hipótese: salvar a tira do rascunho. */
   deHipotese?: string;

@@ -74,6 +74,7 @@ import {
 import { brToISO, formatBRL, isValidBRDate, isoToBR, localISODate } from '@/lib/dates';
 import { mudaInicioDaSerie, mudancasDaOcorrencia, serieDaOcorrencia, validaSerie, type SerieForm } from '@/lib/serie';
 import { compraParaRevisaoDaParcela, edicaoEscopadaDaCompra, payloadDaCompra, validaCompra, type CompraForm } from '@/lib/compra';
+import { ehCapturaResolvida } from '@/lib/captura';
 import {
   faixaDeParcelas,
   financeErrorMessage,
@@ -705,6 +706,8 @@ export function FormularioDoLancamento(props: Props) {
       return;
     }
     const { destino, entradaParcelada, entradaLancamento } = preparado;
+    // Veio de "A confirmar": o registro (à vista ou parcelado) e a captura se confirmam na MESMA transação do servidor.
+    const capturaId = !editing ? props.captura : undefined;
 
     /*
       Convertendo OUTRO registro neste lançamento: nada é gravado aqui. O destino sai pelos MESMOS
@@ -727,12 +730,12 @@ export function FormularioDoLancamento(props: Props) {
     if (destino === 'criarPlano' && entradaParcelada) {
       // Pela PROMESSA: a rápida salva sai do rascunho mesmo com a tela já fechada; o que é da tela
       // (voltar, toast), só com ela montada — `props.onFechar()` depois de sair tiraria OUTRA tela.
-      createPlan.mutateAsync(entradaParcelada).then(
+      createPlan.mutateAsync({ ...entradaParcelada, capturaId }).then(
           () => {
             tirarRapida();
             if (!montado.current) return;
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            props.onSalvo(criarOutro);
+            props.onSalvo(criarOutro, Boolean(capturaId));
             // O `hint` do campo encurtou para caber no teto de 90 caracteres (design.md §7b), e
             // explicação passou a morar na confirmação da ação. Sem esta linha, quem CRIA uma
             // compra parcelada deixa de saber que as futuras já entram nas próximas faturas —
@@ -743,7 +746,9 @@ export function FormularioDoLancamento(props: Props) {
             });
           },
           (error) => {
-            if (montado.current) toast({ message: financeErrorMessage(error, 'Não deu para parcelar. Tenta de novo.'), tone: 'error' });
+            if (!montado.current) return;
+            if (ehCapturaResolvida(error)) return props.aoCapturaResolvida?.();
+            toast({ message: financeErrorMessage(error, 'Não deu para parcelar. Tenta de novo.'), tone: 'error' });
           },
       );
       return;
@@ -858,17 +863,19 @@ export function FormularioDoLancamento(props: Props) {
         id: editing?.id,
         expectedRevision: editing?.edit_revision,
         juros: editing && (mostraJuros || jurosDoPix) ? { id: jurosDoPix?.id ?? null, cents: mostraJuros ? values.fee_cents : 0 } : undefined,
+        capturaId,
       }).then(
         () => {
           tirarRapida();
           if (!montado.current) return;
           if (editing) return fechar();
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          props.onSalvo(criarOutro);
+          props.onSalvo(criarOutro, Boolean(capturaId));
         },
         // Erro NUNCA fecha o modal: o que foi digitado continua na tela.
         (error) => {
           if (!montado.current) return;
+          if (ehCapturaResolvida(error)) return props.aoCapturaResolvida?.();
           toast({
             message: financeErrorMessage(error, 'Nada foi salvo. Tenta de novo.'),
             tone: 'error',

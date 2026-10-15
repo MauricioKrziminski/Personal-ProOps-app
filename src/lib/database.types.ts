@@ -1024,16 +1024,20 @@ export type Database = {
           amount_cents: number | null
           bank: string
           created_at: string
+          debt_id: string | null
           draft: Json | null
           entendido: string | null
           external_id: string
           id: string
+          installment_plan_id: string | null
           kind: string | null
           match_transaction_id: string | null
           occurred_at: string | null
           posted_at: string
+          recurring_id: string | null
           status: string
           texto: string | null
+          transaction_id: string | null
           updated_at: string
           user_id: string
           workspace_id: string
@@ -1042,16 +1046,20 @@ export type Database = {
           amount_cents?: number | null
           bank: string
           created_at?: string
+          debt_id?: string | null
           draft?: Json | null
           entendido?: string | null
           external_id: string
           id?: string
+          installment_plan_id?: string | null
           kind?: string | null
           match_transaction_id?: string | null
           occurred_at?: string | null
           posted_at: string
+          recurring_id?: string | null
           status?: string
           texto?: string | null
+          transaction_id?: string | null
           updated_at?: string
           user_id: string
           workspace_id: string
@@ -1060,24 +1068,56 @@ export type Database = {
           amount_cents?: number | null
           bank?: string
           created_at?: string
+          debt_id?: string | null
           draft?: Json | null
           entendido?: string | null
           external_id?: string
           id?: string
+          installment_plan_id?: string | null
           kind?: string | null
           match_transaction_id?: string | null
           occurred_at?: string | null
           posted_at?: string
+          recurring_id?: string | null
           status?: string
           texto?: string | null
+          transaction_id?: string | null
           updated_at?: string
           user_id?: string
           workspace_id?: string
         }
         Relationships: [
           {
+            foreignKeyName: "captured_notifications_debt_id_fkey"
+            columns: ["debt_id"]
+            isOneToOne: false
+            referencedRelation: "debts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "captured_notifications_installment_plan_id_fkey"
+            columns: ["installment_plan_id"]
+            isOneToOne: false
+            referencedRelation: "installment_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "captured_notifications_recurring_id_fkey"
+            columns: ["recurring_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_transactions"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "captured_notifications_match_transaction_id_fkey"
             columns: ["match_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "captured_notifications_transaction_id_fkey"
+            columns: ["transaction_id"]
             isOneToOne: false
             referencedRelation: "transactions"
             referencedColumns: ["id"]
@@ -5228,6 +5268,16 @@ export type Database = {
       investment_positions: { Args: never; Returns: Json }
       investment_value_command: {
         Args: { p_input: Json; p_request_id: string }
+        Returns: Json
+      }
+      lancar_da_captura: {
+        Args: {
+          p_captura_id: string
+          p_dados: Json
+          p_fee_cents: number
+          p_request_id: string
+          p_tipo: string
+        }
         Returns: Json
       }
       ledger_expected_lines: {

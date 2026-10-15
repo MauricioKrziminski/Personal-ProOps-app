@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react';
+import { router } from 'expo-router';
+import { useCallback, useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 import { keepPreviousData, useMutation, useQueryClient } from '@tanstack/react-query';
 
@@ -7,7 +8,7 @@ import { useToast } from '@/components/ui/toast';
 import { useRealtimeInvalidate } from '@/hooks/use-items';
 import { useSession } from '@/hooks/use-session';
 import { enviarNotificacoes } from '@/lib/agent-api';
-import { enviarFila } from '@/lib/captura';
+import { capturaAindaAberta, enviarFila, hrefDaCaptura } from '@/lib/captura';
 import { useQuery } from '@/lib/consulta-em-foco';
 import { supabase } from '@/lib/supabase';
 import type { FinanceDraft } from '@/lib/voice-draft';
@@ -44,6 +45,25 @@ export function useCapturas(limite = 20, status?: Captura['status']) {
   return { ...q, data: q.data?.itens, total: q.data?.total };
 }
 
+/**
+ * Abre o formulário preenchido DEPOIS de conferir no servidor que a captura ainda espera decisão: a lista
+ * pode estar velha (outro aparelho, confirmação que terminou depois do toque), e um segundo "Confirmar"
+ * não abre de novo a captura que já virou lançamento.
+ */
+export function useAbrirCaptura() {
+  const toast = useToast();
+  const qc = useQueryClient();
+  return useCallback(async (c: Pick<Captura, 'id' | 'draft'>) => {
+    const r = await supabase.from('captured_notifications').select('status, transaction_id').eq('id', c.id).maybeSingle();
+    if (!capturaAindaAberta(r)) {
+      toast({ message: 'Esta captura já foi lançada ou descartada.', tone: 'info' });
+      void qc.invalidateQueries({ queryKey: CHAVE });
+      return;
+    }
+    router.push(hrefDaCaptura(c));
+  }, [toast, qc]);
+}
+
 /** Confirmar/descartar apaga o texto da notificação: ele só existe enquanto o item está em aberto. */
 export function useResolverCaptura() {
   const qc = useQueryClient();
@@ -73,17 +93,22 @@ export function useEnviarCapturas() {
   // Saiu (sair, conta apagada, sessão revogada): para a captura e esvazia a fila do aparelho.
   const tinha = useRef<string | undefined>(undefined);
   useEffect(() => {
-    if (tinha.current && !userId && capturaDisponivel()) configurarCaptura(false, []);
+    if (tinha.current && !userId && capturaDisponivel()) configurarCaptura(false, [], null);
     tinha.current = userId;
   }, [userId]);
   useEffect(() => {
     if (!userId || !capturaDisponivel()) return;
+    // A captura ligada é de OUTRA conta (a sessão dela caiu com o app fechado): desliga. Ligar de novo é
+    // consentimento desta pessoa, na tela de ajustes — nunca um efeito. Sem dono gravado (versão antiga) segue ligada.
+    const ligada = estadoDaCaptura();
+    if (ligada.ativa && ligada.dono && ligada.dono !== userId) configurarCaptura(false, [], null);
     let enviando = false;
     const enviar = async () => {
       if (enviando || !estadoDaCaptura().ativa) return;
       enviando = true;
       try {
         const n = await enviarFila({
+          dono: userId,
           pendentes: notificacoesPendentes,
           remover: removerPendentes,
           enviar: (itens) => enviarNotificacoes(itens, Intl.DateTimeFormat().resolvedOptions().timeZone),
