@@ -27,7 +27,7 @@ from app.auth import current_user
 from app.config import get_settings
 from app.domain import atributos as dom_atributos
 from app.domain import captura as dom_captura
-from app.domain.reconcile import Item, conciliar
+from app.domain.reconcile import JANELA_TRANSFERENCIA, Item, conciliar
 from app.graph import nodes
 from app.jobs import importer
 from app.routes import finance_draft
@@ -142,8 +142,10 @@ def origem_da_notificacao(banco: str) -> str:
         "valor é o da movimentação, nunca o limite, o saldo ou o total da fatura que a notificação cita junto. "
         "Fatura fechada ou a vencer, pagamento da fatura do cartão (o gasto já foi contado nas compras), "
         "limite, saldo, rendimento, aplicação, resgate, caixinha, investimento, compra em análise, Pix ou "
-        "pagamento agendado para data futura, código ou token, oferta, empréstimo, cashback prometido e "
-        "compra negada, recusada ou reprovada não são lançamento: nesses casos, nenhuma ação."
+        "pagamento agendado para data futura, código ou token, oferta, empréstimo, cashback ou pontos "
+        "(prometidos ou recebidos) e compra negada, recusada ou reprovada não são lançamento: nesses casos, "
+        "nenhuma ação. Classifique pelo CORPO da notificação: o título pode ser propaganda ou citar um valor "
+        "que não é do movimento (um título com valor sobre um corpo de oferta ou empréstimo não é compra)."
     )
 
 
@@ -222,16 +224,30 @@ async def _concluir(reserva: str, item: NotificacaoIn, status: str, rascunho=Non
         raise _ReservaPerdida("reserva de captura perdida")
 
 
-async def _duplicata(ws, kind: str, amount_cents: int, dia: date, descricao: str | None, conta: str | None):
+async def _duplicata(ws, kind: str, amount_cents: int, dia: date, descricao: str | None, conta: str | None,
+                     parcelas: int | None = None):
     existentes = await importer.carregar_existentes(
         ws, dia - timedelta(days=MARGEM_DIAS), dia + timedelta(days=MARGEM_DIAS), conta)
     if conta is None:  # sem conta, qualquer conta casa
         existentes = [replace(t, account_id=None) for t in existentes]
+    # Compra parcelada (valor total na captura): a notificação é a parcela 1 de N, que é o que o plano já
+    # lançado tem (`total // N`, o resto vai na última). O `k/N` no nome aciona a camada "parcela" da cascata.
+    if parcelas:
+        amount_cents, descricao = amount_cents // parcelas, f"{descricao or 'compra'} 1/{parcelas}"
     (v,) = conciliar([Item(0, kind, amount_cents, dia, descricao, None)], existentes,
                      conta_id=conta or "", cartao=False)
     # O nome da notificação ("MERCADO SAO JOSE") quase nunca é o que a pessoa escreveu ("mercado"):
     # mesmo valor em poucos dias e nome parecido também saem da Hoje, para ela decidir na lista.
-    return v.transaction_id if v.status in ("duplicate", "near_match", "uncertain") else None
+    if v.status in ("duplicate", "near_match", "uncertain"):
+        return v.transaction_id
+    if conta is None and not parcelas:
+        # Transferência entre contas próprias: a cascata só a casa pela conta do lote, e a captura não sabe a
+        # conta. Mesmo valor, em poucos dias, com uma transferência já lançada: a pessoa decide na lista.
+        for t in existentes:
+            if t.kind == "transfer" and t.amount_cents == amount_cents \
+                    and abs((t.occurred_at - dia).days) <= JANELA_TRANSFERENCIA:
+                return t.id
+    return None
 
 
 async def _captura_igual(ws, reserva: str, banco: str, kind: str, valor: int, posted_at: datetime) -> bool:
@@ -251,6 +267,10 @@ async def _captura_igual(ws, reserva: str, banco: str, kind: str, valor: int, po
         ws, reserva, banco, kind, valor, posted_at, IGUAL_EM_MIN, posted_at, IGUAL_EM_MIN,
     )
     return bool(achadas)
+
+
+def chave_da_captura(ws, banco: str, kind: str, valor: int) -> str:
+    return f"captura|{ws}|{banco}|{kind}|{valor}"
 
 
 async def _interpretar(user_id, ws, item: NotificacaoIn, banco: str, fuso: str):
@@ -282,13 +302,28 @@ async def _interpretar(user_id, ws, item: NotificacaoIn, banco: str, fuso: str):
     return await _rascunho(ws, texto, banco, acao, perguntas, local.date())
 
 
+def origem_da_conta(acao: dict, texto: str) -> str:
+    """O tipo de conta que o nome do banco pode pré-selecionar, pela forma de pagamento que a notificação DIZ.
+
+    Crédito (ou compra parcelada) só casa cartão; Pix, débito, transferência, boleto e dinheiro só casam
+    conta que não é cartão; sem forma dita, nenhuma é escolhida (o banco tem conta E cartão): pergunta.
+    """
+    forma = dom_atributos.forma_proposta(acao.get("payment_method"), texto)
+    parcelada = acao["type"] == "create_installment_purchase" and (acao.get("installments") or 0) > 1
+    # "Pix no crédito" é compra no CARTÃO (com os juros do Pix), não Pix de conta
+    if parcelada or forma == "credit" or (forma == "pix" and dom_atributos.pix_no_credito(texto)):
+        return "cartao"
+    return "conta" if forma in ("pix", "debit", "bank_transfer", "boleto", "cash") else "nenhuma"
+
+
 async def _rascunho(ws, texto: str, banco: str, acao: dict, perguntas: list[str], dia: date):
     forma = (dom_atributos.forma_proposta(acao.get("payment_method"), texto)
              if finance_draft._pede_forma(acao) else None)
     # O nome do banco entra no texto que `montar_rascunho` casa com as contas cadastradas ("Nubank" →
-    # a conta/cartão Nubank, só se casar com UM registro); ele não vai ao modelo por aqui.
-    # Entrada já conferida (`dom_captura.fechar`): o que escapar daqui é banco ou rede, e a reserva é solta.
-    rascunho = await finance_draft.montar_rascunho(ws, f"{banco}\n{texto}", [acao], dia, forma)
+    # a conta/cartão Nubank, só se casar com UM registro DO TIPO que a notificação diz); ele não vai ao
+    # modelo por aqui. Entrada já conferida (`dom_captura.fechar`): o que escapar daqui é banco ou rede.
+    rascunho = await finance_draft.montar_rascunho(
+        ws, f"{banco}\n{texto}", [acao], dia, forma, origem_da_conta(acao, texto))
     return _com_perguntas(rascunho, perguntas, acao), acao, dia
 
 
@@ -310,17 +345,26 @@ async def _guardar(ws, reserva: str, item: NotificacaoIn, banco: str, rascunho, 
     ocorreu = date.fromisoformat(acao["occurred_at"]) if acao.get("occurred_at") else dia
     conta = rascunho.params.get("conta")
     match = None
-    igual = False
     if valor:
         try:
-            match = await _duplicata(ws, kind, valor, ocorreu, acao.get("description"), conta)
+            parcelas = acao.get("installments") if acao["type"] == "create_installment_purchase" else None
+            match = await _duplicata(ws, kind, valor, ocorreu, acao.get("description"), conta,
+                                     parcelas if isinstance(parcelas, int) and parcelas > 1 else None)
         except Exception as e:  # noqa: BLE001
             if _transitorio(e):
                 raise
             log.warning("Conciliação da notificação %s falhou: %s", item.external_id, type(e).__name__)
-        igual = not match and await _captura_igual(ws, reserva, banco, kind, valor, item.posted_at)
-    await _concluir(reserva, item, "duplicate" if match or igual else "pending", rascunho,
-                    kind, valor, ocorreu, match)
+    if not valor or match:
+        await _concluir(reserva, item, "duplicate" if match else "pending", rascunho, kind, valor, ocorreu, match)
+        return
+    # Duas capturas da mesma compra ao mesmo tempo (dois aparelhos, push + SMS) não se enxergam: ambas leem
+    # "sem igual" antes de qualquer uma gravar. O lock por (espaço, banco, tipo, valor) serializa "procurar a
+    # igual + gravar": a segunda espera o commit da primeira e então a vê. `_duplicata` fica FORA da unidade
+    # (um erro de banco ali aborta a transação). Nada de rede dentro.
+    async with db.unidade_de_trabalho():
+        await db.fetch("select pg_advisory_xact_lock(hashtextextended(%s, 0))", chave_da_captura(ws, banco, kind, valor))
+        igual = await _captura_igual(ws, reserva, banco, kind, valor, item.posted_at)
+        await _concluir(reserva, item, "duplicate" if igual else "pending", rascunho, kind, valor, ocorreu, None)
 
 
 @router.post("/notifications", response_model=EnvioOut)

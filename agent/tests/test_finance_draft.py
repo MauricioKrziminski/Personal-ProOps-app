@@ -279,6 +279,29 @@ def test_nome_cadastrado_ambiguo_na_fala_pergunta(mundo):
     assert any("mais de uma" in q.lower() for q in j["perguntas"])
 
 
+ITAU_CONTA = {"id": uuid4(), "name": "Itaú", "type": "checking"}
+ITAU_CARTAO = {"id": uuid4(), "name": "Itaú Cartão", "type": "credit_card"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("contas,origem,esperada,pergunta", [
+    # o nome do banco só pré-seleciona o registro do TIPO que a notificação diz
+    ([ITAU_CARTAO], "conta", None, None),                 # Pix do Itaú com só o cartão cadastrado: não escolhe o cartão
+    ([ITAU_CONTA], "cartao", None, None),                 # compra no crédito com só a conta: não escolhe a conta
+    ([ITAU_CONTA, ITAU_CARTAO], "conta", ITAU_CONTA, None),
+    ([ITAU_CONTA, ITAU_CARTAO], "cartao", ITAU_CARTAO, None),
+    ([ITAU_CONTA, ITAU_CARTAO], "nenhuma", None, "Em qual conta ou cartão"),  # tipo não dito: pergunta
+    ([ITAU_CONTA, ITAU_CARTAO], None, None, "Mais de uma conta"),             # voz/chat: comportamento de sempre
+])
+async def test_origem_filtra_a_conta_que_o_nome_do_banco_pre_seleciona(mundo, contas, origem, esperada, pergunta):
+    mundo.contas[:] = contas
+    r = await finance_draft.montar_rascunho(
+        WS, "Itaú\nPix de R$ 12,00 enviado", [{"type": "create_expense", "amount_cents": 1200}],
+        __import__("datetime").date(2026, 10, 5), None, origem)
+    assert r.params.get("conta") == (str(esperada["id"]) if esperada else None)
+    assert (pergunta is None) or any(pergunta in q for q in r.perguntas)
+
+
 def _jpeg_real():
     import io
 

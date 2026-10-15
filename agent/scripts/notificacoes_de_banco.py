@@ -8,6 +8,8 @@ Os 16 primeiros são SINTÉTICOS no formato comum dos bancos; os demais trazem a
 (pacote, título, texto, esperado) — esperado:
   ("expense"|"income", centavos)  o rascunho final traz esse tipo e esse valor;
   ("expense"|"income", None)      o rascunho nasce SEM valor e com a pergunta "Confira o valor"/moeda;
+  ("expense"|"income", centavos, "confira")  o valor do modelo vale (é uma das quantias do texto) MAS com a
+                                  pergunta "Confira o valor: a notificação cita X e Y" (2+ quantias sem rótulo);
   None                            não lança.
 """
 
@@ -78,4 +80,54 @@ CASOS = [
     ("com.nu.production", "Rendimento", "Rendimento de R$ 12,34 na sua caixinha", None),
     # sintético: agendado para data futura não é lançamento
     ("com.nu.production", "Pix agendado", "Pix agendado de R$ 300,00 para 20/10", None),
+    # sintético: duas quantias sem rótulo -> o valor do modelo vai, mas com a pergunta (nunca silencioso)
+    ("com.nu.production", "Pix enviado", "Pix de R$ 20,00 enviado para Maria Silva. Tarifa de R$ 1,50", ("expense", 2000, "confira")),
+    # sintético: o rótulo "fatura" tira a quantia da disputa quando há outra (sem pergunta)
+    ("com.nu.production", "Compra aprovada", "Compra de R$ 80,00 aprovada em LOJA X. Total da fatura agora: R$ 1.500,00", ("expense", 8000)),
+    # sintético: "cashback" e "pontos" também são rótulo
+    ("com.itau", "Itaú", "Compra de R$ 40,00 aprovada em MERCADO. Cashback de R$ 2,00 e 40 pontos", ("expense", 4000)),
+
+    # === Corpus real (15/10/2026) — textos de projetos que capturam notificação de verdade; nomes trocados por fictícios ===
+    # fixture de terceiro: github.com/felipe-rodrogues/Sobra, notificationParser.test.ts
+    ("com.nu.production", "Compra no cartão de crédito aprovada", "Compra de R$ 6,99 APROVADA em PROLAR para o cartão com final 1234", ("expense", 699)),
+    # fixture de terceiro: github.com/felipe-rodrogues/Sobra, notificationParser.test.ts
+    ("com.nu.production", "Compra no crédito aprovada", "Compra de R$ 32,00 APROVADA em PAIVA HORTIFRUTI para o cartão adicional com final 5882.", ("expense", 3200)),
+    # fixture de terceiro: github.com/felipe-rodrogues/Sobra, notificationParser.test.ts
+    ("com.nu.production", "Compra no cartão de crédito aprovada", "R$ 24,00 em DROGARIA ULTRA POPULAR para o cartão final 5678", ("expense", 2400)),
+    # fixture de terceiro: github.com/felipe-rodrogues/Sobra, notificationParser.test.ts
+    ("com.nu.production", "Transferência recebida", "Você recebeu uma transferência Pix de R$ 300,00 de ANA P.", ("income", 30000)),
+    # fixture de terceiro: github.com/felipe-rodrogues/Sobra, notificationParser.test.ts
+    ("com.nu.production", "Pix enviado", "Você fez um Pix de R$ 35,00 para ANA P.", ("expense", 3500)),
+    # fixture de terceiro: github.com/felipe-rodrogues/Sobra, notificationParser.test.ts
+    ("com.nu.production", "", "Estorno de R$ 89,90 de FAST SHOP aprovado e creditado na sua fatura.", ("income", 8990)),
+    # fixture de terceiro: github.com/felipe-rodrogues/Sobra, notificationParser.test.ts
+    ("com.nu.production", "", "Compra de R$ 350,00 não autorizada em LOJA XYZ. Saldo insuficiente.", None),
+    # fixture de terceiro: github.com/felipe-rodrogues/Sobra, notificationParser.test.ts
+    ("com.nu.production", "", "Você recebeu R$ 12,50 de cashback da Nubank Rewards! Aproveite.", None),
+    # fixture de terceiro: github.com/felipe-rodrogues/Sobra, notificationParser.test.ts (sem R$: nem chega ao modelo)
+    ("com.nu.production", "", "Novo boleto emitido no seu CPF", None),
+    # fixture de terceiro: github.com/pedrotaem/financas, NotificacaoParserTest.kt (Pix capturado num S24 Ultra)
+    ("com.itau", "Feito. Pix enviado", "Você enviou R$ 0,01 para MARIA TESTE, CPF XXX.000.000-XX.", ("expense", 1)),
+    # fixture de terceiro: github.com/pedrotaem/financas, NotificacaoParserTest.kt
+    ("com.itau", "Pix recebido", "Você recebeu R$ 10,00 de MARIA TESTE, CPF XXX.000.000-XX.", ("income", 1000)),
+    # fixture de terceiro: github.com/pedrotaem/financas, NotificacaoParserTest.kt
+    ("com.itau", "Itaú", "Sua fatura de R$ 1.850,00 fecha amanhã", None),
+    # fixture de terceiro: Sobra, "notificação real do Inter"
+    ("br.com.intermedium", "Compra no crédito", "Olá, ANA. Você acaba de comprar R$ 4,49 em PAYPAL *STEAM GAMES. A compra foi no crédito nacional, com o cartão final 5023.", ("expense", 449)),
+    # fixture de terceiro: Sobra, "notificação real do Inter" — propaganda com cashback e valores
+    ("br.com.intermedium", "Seu cupom expira hoje 🎁", "Utilize o cupom SAUDADESONE e garanta R$30 de Cashback extra em compras acima de R$200 no Inter Shop. *Válido até as 23h59", None),
+    # fixture de terceiro: Sobra "[REAL]" e github.com/felipegcoutinho/openmonetis-companion
+    ("com.mercadopago.wallet", "", "Você pagou R$ 3,40 a PG *99 RIDE - O valor vai entrar na próxima fatura do seu Cartão Mercado Pago.", ("expense", 340)),
+    # fixture de terceiro: Sobra "[REAL]" e openmonetis-companion — texto achatado, sem quebra
+    ("com.mercadopago.wallet", "", "Você pagou R$ 164,45 a XsollaEpic O valor vai entrar na próxima fatura do seu Cartão Mercado Pago.", ("expense", 16445)),
+    # fixture de terceiro: Sobra "[REAL]" — boleto a pagar, não pago
+    ("com.mercadopago.wallet", "Chegou 1 boleto que vence em 15/out.", "Você já pode agendar ou fazer o pagamento de R$ 488,44 para Banco Bradescard S A.", None),
+    # fixture de terceiro: Sobra "[REAL]" — TÍTULO ENGANOSO: o valor do título é propaganda de empréstimo
+    ("com.mercadopago.wallet", "Compra no Mercado Pago: R$ 230,00", "Seu empréstimo foi aprovado! 🤑 Você tem um crédito de R$230 disponível. Toque aqui para simular.", None),
+    # fixture de terceiro: Sobra "[REAL]"
+    ("com.mercadopago.wallet", "", "Você ganhou R$ 0,02 de cashback - Continue usando seu Cartão de Crédito Mercado Pago para ganhar mais.", None),
+    # fixture de terceiro: Sobra, "notificação real do PicPay" — o título é cashback, o corpo é a compra
+    ("com.picpay", "Você garantiu 1,3% de cashback!", "Compra de R$ 39,48 em Servi Supermercados Lt APROVADA.", ("expense", 3948)),
+    # fixture de terceiro: Sobra, "notificação real do PicPay" — parcelada, o total
+    ("com.picpay", "Você garantiu 1,3% de cashback!", "Compra de R$ 94,13 em 3x em Pag*steam APROVADA.", ("expense", 9413)),
 ]

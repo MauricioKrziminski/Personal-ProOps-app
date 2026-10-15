@@ -118,8 +118,11 @@ def _contas_no_texto(texto: str, contas: list[dict]) -> list[dict]:
 
 
 async def montar_rascunho(
-    workspace_id, texto: str, acoes: list[dict], hoje: date, forma: str | None = None
+    workspace_id, texto: str, acoes: list[dict], hoje: date, forma: str | None = None,
+    origem: str | None = None,
 ) -> RascunhoOut:
+    """`origem` (captura de notificação): o TIPO da conta que o nome do banco pode pré-selecionar —
+    `cartao` | `conta` | `nenhuma` (tipo não dito). `None` (voz, chat) não filtra nada."""
     a = dict(acoes[0])
     perguntas: list[str] = []
     if a["type"] == "mark_paid":
@@ -185,6 +188,14 @@ async def montar_rascunho(
         # O modelo nem sempre devolve `account`: o nome CADASTRADO dito na fala vale (casamento com
         # as contas do próprio espaço, não inferência). Um registro preenche; vários perguntam.
         citadas = _contas_no_texto(texto, await db.accounts(workspace_id, only_cards=so_cartao))
+        if origem == "cartao":
+            citadas = [c for c in citadas if c["type"] == "credit_card"]
+        elif origem == "conta":
+            citadas = [c for c in citadas if c["type"] != "credit_card"]
+        elif origem == "nenhuma" and citadas:
+            # o nome do banco casa, mas a notificação não diz se é conta ou cartão: não escolhe, pergunta
+            perguntas.append("Em qual conta ou cartão? Escolha no formulário.")
+            citadas = []
         if len(citadas) == 1:
             params["account" if recorrencia else "conta"] = str(citadas[0]["id"])
         elif citadas:

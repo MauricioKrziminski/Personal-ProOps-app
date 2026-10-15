@@ -36,9 +36,32 @@ def test_valores_em_reais_so_com_moeda(texto, esperado):
     ("Compra em 3x de R$ 100,00", 10000, (30000, None)),                  # a parcela no lugar do total
     ("Compra de R$ 600,00 em 3x", 60000, (60000, None)),                  # total dito
     ("Compra de US$ 20,00 (R$ 110,40)", 2000, (11040, None)),             # (e) com reais
-    ("Compra de 0x de R$ 5,00 e 1x de R$ 7,00", 500, (500, None)),        # N inválido não vira parcelada
+    ("Compra de 0x de R$ 5,00 e 1x de R$ 7,00", 500, (500, "Confira o valor: a notificação cita R$ 5,00 e R$ 7,00.")),  # N inválido não vira parcelada; duas quantias perguntam
 ])
 def test_ancorar_valor(texto, modelo, esperado):
+    assert ancorar_valor(texto, modelo) == esperado
+
+
+@pytest.mark.parametrize("texto,modelo,esperado", [
+    # 2+ quantias sem rótulo: o valor do modelo (se for uma delas) vai, sempre com a pergunta
+    ("Pix de R$ 20,00 enviado. Tarifa de R$ 1,50", 2000, (2000, "Confira o valor: a notificação cita R$ 20,00 e R$ 1,50.")),
+    ("Pix de R$ 20,00 enviado. Tarifa de R$ 1,50", 150, (150, "Confira o valor: a notificação cita R$ 20,00 e R$ 1,50.")),
+    ("Pix de R$ 20,00 enviado. Tarifa de R$ 1,50", None, (None, "Confira o valor: a notificação cita R$ 20,00 e R$ 1,50.")),
+    ("Pix de R$ 20,00 enviado. Tarifa de R$ 1,50", 777, (None, "Confira o valor: a notificação cita R$ 20,00 e R$ 1,50.")),
+    # rótulo ampliado: só tira da disputa quando há outro valor
+    ("Compra de R$ 80,00 aprovada. Total da fatura: R$ 1.500,00", 150000, (8000, None)),
+    ("Compra de R$ 40,00. Cashback de R$ 2,00 e 40 pontos", 200, (4000, None)),
+    ("Compra de R$ 40,00. Disponível: R$ 900,00", None, (4000, None)),
+    ("Rendimento de R$ 0,50 e compra de R$ 30,00", None, (3000, None)),
+    # sozinho, o rótulo não some: nenhum valor a mais, nenhuma pergunta
+    ("Pagamento da fatura de R$ 500,00 realizado", 50000, (50000, None)),
+    ("Pagamento da fatura de R$ 500,00 realizado", None, (50000, None)),
+    # a parcela dita e o total repetido são um valor só
+    ("Compra em 3x de R$ 100,00 (total R$ 300,00)", 30000, (30000, None)),
+    # rótulo ampliado não esconde dois valores sem rótulo
+    ("Compra de R$ 10,00 e outra de R$ 15,00. Saldo R$ 90,00", 1000, (1000, "Confira o valor: a notificação cita R$ 10,00 e R$ 15,00.")),
+])
+def test_ancorar_valor_rotulo_e_pergunta(texto, modelo, esperado):
     assert ancorar_valor(texto, modelo) == esperado
 
 
@@ -93,6 +116,7 @@ def test_corpus_so_usa_bancos_da_lista_e_esperados_validos():
     for pacote, titulo, texto, esperado in CASOS:
         assert pacote in BANCOS and isinstance(texto, str)
         assert esperado is None or (esperado[0] in ("expense", "income") and (esperado[1] is None or esperado[1] > 0))
+        assert esperado is None or len(esperado) == 2 or (len(esperado) == 3 and esperado[1] and esperado[2] == "confira")
 
 
 def test_a_quantia_do_corpus_esta_no_texto():
@@ -101,7 +125,9 @@ def test_a_quantia_do_corpus_esta_no_texto():
         if not esperado or esperado[1] is None:
             continue
         valor, pergunta = ancorar_valor(f"{titulo}\n{texto}", esperado[1])
-        assert (valor, pergunta) == (esperado[1], None), texto
+        assert valor == esperado[1], texto
+        # "confira": 2+ quantias sem rótulo -> o valor do modelo vai, com a pergunta; senão nunca pergunta
+        assert (pergunta is not None) == (len(esperado) == 3), texto
 
 
 def test_corpus_sem_valor_nao_chama_o_modelo():

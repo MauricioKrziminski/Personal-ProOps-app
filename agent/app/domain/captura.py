@@ -32,13 +32,25 @@ def _parcelas_ditas(texto: str) -> list[tuple[int, int]]:
     return achados
 
 
-# Quantia que a notificação ROTULA como limite ou saldo ("Limite disponível: R$ 1.980,00"): não é o
-# gasto. Não escolhe nada sozinha, só tira o rótulo da disputa quando há outro valor (aí, pergunta).
-_ROTULADA = re.compile(r"(?:limite|saldo)[^.\n]{0,25}?((?:R\$|BRL)\s*[\d.,]+)", re.IGNORECASE)
+# Quantia que a notificação ROTULA como outra coisa que não o movimento ("Limite disponível: R$ 1.980,00",
+# "fatura de R$ 3.832,80", "cashback de R$ 2,00"): não é o gasto. Estrutura, não sentido: não escolhe nada,
+# só tira o rótulo da disputa quando há OUTRO valor (sozinho, segue o caminho de sempre).
+_ROTULADA = re.compile(
+    r"(?:limite|saldo|dispon[ií]vel|fatura|cashback|pontos|rendimentos?)[^.\n]{0,25}?((?:R\$|BRL)\s*[\d.,]*\d)",
+    re.IGNORECASE,
+)
+
+
+def _confira(candidatos: list[int]) -> str:
+    return "Confira o valor: a notificação cita " + " e ".join(cents_to_brl(c) for c in candidatos) + "."
 
 
 def ancorar_valor(texto: str, valor_modelo: int | None) -> tuple[int | None, str | None]:
-    """(valor em centavos, pergunta). O valor do modelo só passa se o texto o sustenta."""
+    """(valor em centavos, pergunta). O valor do modelo só passa se o texto o sustenta.
+
+    Com mais de uma quantia em reais depois de tirar as rotuladas, o valor do modelo (se for uma delas) vai
+    no rascunho, mas SEMPRE com a pergunta: nunca silencioso.
+    """
     reais, estrangeiras = valores_em_reais(texto)
     rotuladas = {v for m in _ROTULADA.finditer(texto) for v in valores_em_reais(m[1])[0]}
     if rotuladas and any(r not in rotuladas for r in reais):
@@ -48,15 +60,16 @@ def ancorar_valor(texto: str, valor_modelo: int | None) -> tuple[int | None, str
     if len(dadas) == 1:  # "3x de R$ 100,00": a compra é N×V, e o V sozinho é a parcela, não o gasto
         n, v = dadas[0]
         candidatos = [c for c in candidatos if c != v] + [n * v]
+    candidatos = list(dict.fromkeys(candidatos))  # "3x de R$ 100,00 (total R$ 300,00)" é um valor só
     modelo = valor_modelo if isinstance(valor_modelo, int) and 0 < valor_modelo <= MAX_CENTS else None
-    if modelo in candidatos:
-        return modelo, None
     if len(candidatos) == 1:
         return candidatos[0], None
+    if modelo in candidatos:
+        return modelo, _confira(candidatos)
     if not candidatos and estrangeiras:
         return None, f"Compra de {estrangeiras[0]}: quanto foi em reais?"
     if candidatos:
-        return None, "Confira o valor: a notificação cita " + " e ".join(cents_to_brl(c) for c in candidatos) + "."
+        return None, _confira(candidatos)
     return None, "Confira o valor: não achei a quantia em reais na notificação."
 
 
