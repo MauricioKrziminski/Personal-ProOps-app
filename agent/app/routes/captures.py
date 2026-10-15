@@ -8,22 +8,25 @@ Spec: docs/superpowers/specs/2026-10-12-captura-de-lancamentos-design.md
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
 from dataclasses import replace
 from datetime import date, datetime, timedelta
-from typing import Annotated
+from typing import Annotated, Any
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
+import psycopg
 from fastapi import APIRouter, Depends
-from pydantic import Field
+from pydantic import Field, ValidationError
 
 from app import conversation, db
 from app.auth import current_user
 from app.config import get_settings
 from app.domain import atributos as dom_atributos
+from app.domain import captura as dom_captura
 from app.domain.reconcile import Item, conciliar
 from app.graph import nodes
 from app.jobs import importer
@@ -48,6 +51,8 @@ MARGEM_DIAS = 5
 # Uma notificação em interpretação (`processing`) é de quem a reservou; depois disto, a reserva de um
 # processo que morreu no meio volta a valer para o próximo envio.
 RESERVA_VENCE_EM_MIN = 10
+# A mesma compra reposta pelo banco (notificação atualizada, push + SMS, depois do bucket de 5 min do aparelho).
+IGUAL_EM_MIN = 30
 # Estrutura, não sentido: movimento de dinheiro sempre traz valor em reais.
 _VALOR = re.compile(r"R\$\s*\d|\b\d+(?:\.\d{3})*,\d{2}\b")
 
@@ -62,7 +67,9 @@ class NotificacaoIn(Corpo):
 
 class EnvioIn(Corpo):
     timezone: str = Field(min_length=1, max_length=64)
-    items: list[NotificacaoIn] = Field(min_length=1, max_length=MAX_POR_ENVIO)
+    # Cada item é validado SEPARADO (`_ler_itens`): um texto vazio não pode dar 422 no lote inteiro e
+    # prender a fila do aparelho para sempre.
+    items: list[Any] = Field(min_length=1, max_length=MAX_POR_ENVIO)
 
 
 class EnvioOut(Corpo):
@@ -70,12 +77,43 @@ class EnvioOut(Corpo):
     novos: int
 
 
-class _Falhou(Exception):
-    """Depois da chamada ao modelo: repetir custaria outra chamada e falharia igual."""
+class _ReservaPerdida(RuntimeError):
+    """A reserva venceu e outro envio a retomou: este não escreve nada."""
 
 
 class _Parar(Exception):
     """Rajada, cota ou modelo fora: o resto fica no aparelho para a próxima abertura."""
+
+
+def _ler_itens(brutos: list[Any]) -> tuple[list[NotificacaoIn], list[str]]:
+    """(itens válidos, ids dos inválidos). O inválido é ACEITO sem gravar, para o aparelho apagá-lo.
+
+    Título e texto longos demais são cortados (a notificação do banco pode passar do limite) e campo
+    desconhecido de um app mais novo é ignorado: nenhum dos dois é motivo para perder a notificação.
+    """
+    validos: list[NotificacaoIn] = []
+    invalidos: list[str] = []
+    for bruto in brutos:
+        if not isinstance(bruto, dict):
+            continue
+        d = {k: bruto.get(k) for k in NotificacaoIn.model_fields}
+        for campo, teto in (("title", 200), ("text", 1000)):
+            if isinstance(d[campo], str):
+                d[campo] = d[campo].strip()[:teto].strip()
+        if d["title"] is None:
+            d["title"] = ""
+        try:
+            validos.append(NotificacaoIn.model_validate(d))
+        except ValidationError:
+            if isinstance(d["external_id"], str) and 0 < len(d["external_id"]) <= 128:
+                log.warning("Notificação %s inválida: aceita sem gravar", d["external_id"])
+                invalidos.append(d["external_id"])
+    return validos, invalidos
+
+
+def _transitorio(e: Exception) -> bool:
+    """Banco ou rede fora: repetir pode dar certo. O resto é erro nosso e não se repete às cegas."""
+    return isinstance(e, (psycopg.Error, OSError, asyncio.TimeoutError))
 
 
 def banco_do_pacote(pacote: str) -> str | None:
@@ -94,10 +132,18 @@ def origem_da_notificacao(banco: str) -> str:
     """A instrução, CONFIÁVEL: vai fora do envelope (`user_turn(origem=...)`). `banco` vem da allowlist."""
     return (
         f"O texto do usuário abaixo é uma notificação do app do banco {banco}, copiada do celular — não uma "
-        "mensagem escrita pela pessoa. Crie um lançamento só se ela registrar um gasto, uma compra, um Pix "
-        "ou uma transferência feita ou recebida. Transferência ou Pix enviado a outra pessoa ou conta é "
-        "gasto (create_expense) e recebido é receita (create_income), nunca create_transfer. Fatura fechada, limite, saldo, cashback, código, compra "
-        "negada e propaganda não são lançamento: nesses casos, nenhuma ação."
+        "mensagem escrita pela pessoa. Crie um lançamento só se ela registra dinheiro que JÁ saiu ou entrou: "
+        "compra aprovada, débito, Pix ou transferência feita ou recebida, boleto pago, estorno. Transferência "
+        "ou Pix enviado a outra pessoa ou conta é gasto (create_expense) e recebido é receita (create_income), "
+        "nunca create_transfer. Estorno, reembolso, Pix devolvido ou crédito na fatura é entrada "
+        "(create_income) e a descrição começa com a palavra estorno. Pagamento de boleto é gasto "
+        "(create_expense), nunca mark_paid. Compra parcelada em Nx de V é um gasto parcelado (installments=N). "
+        "Compra internacional é gasto: use o valor em reais do texto e, sem ele, não invente conversão. O "
+        "valor é o da movimentação, nunca o limite, o saldo ou o total da fatura que a notificação cita junto. "
+        "Fatura fechada ou a vencer, pagamento da fatura do cartão (o gasto já foi contado nas compras), "
+        "limite, saldo, rendimento, aplicação, resgate, caixinha, investimento, compra em análise, Pix ou "
+        "pagamento agendado para data futura, código ou token, oferta, empréstimo, cashback prometido e "
+        "compra negada, recusada ou reprovada não são lançamento: nesses casos, nenhuma ação."
     )
 
 
@@ -173,7 +219,7 @@ async def _concluir(reserva: str, item: NotificacaoIn, status: str, rascunho=Non
         *_colunas(item, status, rascunho, kind, amount_cents, occurred_at, match), reserva,
     )
     if n == 0:
-        raise RuntimeError("reserva de captura perdida")
+        raise _ReservaPerdida("reserva de captura perdida")
 
 
 async def _duplicata(ws, kind: str, amount_cents: int, dia: date, descricao: str | None, conta: str | None):
@@ -186,6 +232,25 @@ async def _duplicata(ws, kind: str, amount_cents: int, dia: date, descricao: str
     # O nome da notificação ("MERCADO SAO JOSE") quase nunca é o que a pessoa escreveu ("mercado"):
     # mesmo valor em poucos dias e nome parecido também saem da Hoje, para ela decidir na lista.
     return v.transaction_id if v.status in ("duplicate", "near_match", "uncertain") else None
+
+
+async def _captura_igual(ws, reserva: str, banco: str, kind: str, valor: int, posted_at: datetime) -> bool:
+    """Já há captura do MESMO banco, tipo e valor a até 30 min? (notificação reposta, push + SMS)
+
+    Duas compras iguais de verdade em minutos também caem aqui: ficam em "Parecem já lançados", onde
+    "Lançar mesmo assim" decide. Olha pendente, duplicada e confirmada, nunca a descartada.
+    """
+    achadas = await db.fetch(
+        """
+        select id from public.captured_notifications
+        where workspace_id = %s and id <> %s and bank = %s and kind = %s and amount_cents = %s
+          and status in ('pending', 'duplicate', 'confirmed')
+          and posted_at between %s - make_interval(mins => %s) and %s + make_interval(mins => %s)
+        limit 1
+        """,
+        ws, reserva, banco, kind, valor, posted_at, IGUAL_EM_MIN, posted_at, IGUAL_EM_MIN,
+    )
+    return bool(achadas)
 
 
 async def _interpretar(user_id, ws, item: NotificacaoIn, banco: str, fuso: str):
@@ -205,28 +270,57 @@ async def _interpretar(user_id, ws, item: NotificacaoIn, banco: str, fuso: str):
         log.warning("Falha ao interpretar notificação capturada")
         await conversation.soltar_reserva()
         raise _Parar("modelo") from None
-    acoes = [x for x in saida.get("finance_actions", []) if x.get("type") in finance_draft._CRIA]
     await db.record_ai_event(
         user_id=user_id, workspace_id=ws, channel="app", model=ia.modelo(ia.PAPEL_PARSE),
         confidence=saida.get("confidence"), kind="capture",
         result={"finance_actions": saida.get("finance_actions", []), "llm_calls": 1, "capture": True},
     )
-    if not acoes:
+    # O modelo diz o que é; o código confere o QUANTO contra o texto (valor, data, mark_paid).
+    acao, perguntas = dom_captura.fechar(saida.get("finance_actions", []), item.title, item.text)
+    if acao is None:
         return None, None, local.date()
-    try:
-        return await _rascunho(ws, texto, banco, acoes, local.date())
-    except Exception as e:  # noqa: BLE001
-        raise _Falhou(type(e).__name__) from None
+    return await _rascunho(ws, texto, banco, acao, perguntas, local.date())
 
 
-async def _rascunho(ws, texto: str, banco: str, acoes: list[dict], dia: date):
-    local_date = dia
-    forma = (dom_atributos.forma_proposta(acoes[0].get("payment_method"), texto)
-             if finance_draft._pede_forma(acoes[0]) else None)
+async def _rascunho(ws, texto: str, banco: str, acao: dict, perguntas: list[str], dia: date):
+    forma = (dom_atributos.forma_proposta(acao.get("payment_method"), texto)
+             if finance_draft._pede_forma(acao) else None)
     # O nome do banco entra no texto que `montar_rascunho` casa com as contas cadastradas ("Nubank" →
     # a conta/cartão Nubank, só se casar com UM registro); ele não vai ao modelo por aqui.
-    rascunho = await finance_draft.montar_rascunho(ws, f"{banco}\n{texto}", acoes, local_date, forma)
-    return rascunho, acoes[0], local_date
+    # Entrada já conferida (`dom_captura.fechar`): o que escapar daqui é banco ou rede, e a reserva é solta.
+    rascunho = await finance_draft.montar_rascunho(ws, f"{banco}\n{texto}", [acao], dia, forma)
+    return _com_perguntas(rascunho, perguntas, acao), acao, dia
+
+
+def _com_perguntas(rascunho, perguntas: list[str], acao: dict):
+    """As perguntas da conferência primeiro; a genérica "Não ouvi o valor" some quando há a específica."""
+    if not perguntas:
+        return rascunho
+    resto = [q for q in rascunho.perguntas if not q.startswith("Não ouvi o valor")]
+    entendido = rascunho.entendido
+    if not acao.get("amount_cents"):  # "Gasto de R$ 0,00" seria um número que ninguém disse
+        entendido = re.sub(r"^(Receita|Gasto) de R\$ 0,00", r"\1 (valor a conferir)", entendido)
+    return rascunho.model_copy(update={"perguntas": [*perguntas, *resto], "entendido": entendido})
+
+
+async def _guardar(ws, reserva: str, item: NotificacaoIn, banco: str, rascunho, acao: dict, dia: date) -> None:
+    """Concilia (lançamentos e capturas já feitas) e fecha a reserva. Banco fora levanta: quem chama solta."""
+    kind = "income" if acao["type"] == "create_income" else "expense"
+    valor = acao.get("amount_cents") or None
+    ocorreu = date.fromisoformat(acao["occurred_at"]) if acao.get("occurred_at") else dia
+    conta = rascunho.params.get("conta")
+    match = None
+    igual = False
+    if valor:
+        try:
+            match = await _duplicata(ws, kind, valor, ocorreu, acao.get("description"), conta)
+        except Exception as e:  # noqa: BLE001
+            if _transitorio(e):
+                raise
+            log.warning("Conciliação da notificação %s falhou: %s", item.external_id, type(e).__name__)
+        igual = not match and await _captura_igual(ws, reserva, banco, kind, valor, item.posted_at)
+    await _concluir(reserva, item, "duplicate" if match or igual else "pending", rascunho,
+                    kind, valor, ocorreu, match)
 
 
 @router.post("/notifications", response_model=EnvioOut)
@@ -240,18 +334,19 @@ async def receber(body: EnvioIn, user_id: Annotated[UUID, Depends(current_user)]
     if not plano or plano.get("access") != "subscriber":
         raise _erro(402, "subscription_required", "A captura faz parte da assinatura.")
     fuso = finance_draft._fuso_valido(body.timezone)
-    ids = [i.external_id for i in body.items]
+    itens, invalidos = _ler_itens(body.items)
+    ids = [i.external_id for i in itens]
     # Conhecida = já resolvida. A em interpretação (`processing`) não conta: se o outro envio falhar,
     # ela volta para a fila; se der certo, o próximo envio deste aparelho a acha aqui.
     conhecidos = {r["external_id"] for r in await db.fetch(
         """select external_id from public.captured_notifications
            where workspace_id = %s and external_id = any(%s) and status <> 'processing'""",
         ws, ids,
-    )}
-    aceitos = [e for e in ids if e in conhecidos]
+    )} if ids else set()
+    aceitos = [*invalidos, *(e for e in ids if e in conhecidos)]
     novos = 0
     parado = False
-    for item in body.items:
+    for item in itens:
         if item.external_id in conhecidos:
             continue
         banco = banco_do_pacote(item.package)
@@ -275,38 +370,23 @@ async def receber(body: EnvioIn, user_id: Annotated[UUID, Depends(current_user)]
             continue  # outro aparelho está interpretando esta mesma notificação agora
         try:
             rascunho, acao, dia = await _interpretar(user_id, ws, item, banco, fuso)
-        except _Falhou as e:
-            rascunho, acao, dia = None, None, None
-            log.warning("Notificação %s (%s) descartada: %s", item.external_id, banco, e)
-        except conversation.ConsentimentoNecessario:
-            await _soltar(reserva)
-            raise
-        except Exception as e:  # noqa: BLE001 — teto, modelo fora ou cota indisponível: volta à fila
-            if not isinstance(e, _Parar):
-                log.warning("Notificação %s não foi interpretada: %s", item.external_id, type(e).__name__)
-            await _soltar(reserva)
-            parado = True
-            continue
-        try:
             if rascunho is None:
                 await _concluir(reserva, item, "ignored")
             else:
-                kind = "income" if acao["type"] == "create_income" else "expense"
-                valor = int(acao.get("amount_cents") or 0) or None
-                ocorreu = date.fromisoformat(acao["occurred_at"]) if acao.get("occurred_at") else dia
-                conta = rascunho.params.get("conta")
-                match = await _duplicata(ws, kind, valor, ocorreu, acao.get("description"), conta) if valor else None
-                await _concluir(reserva, item, "duplicate" if match else "pending", rascunho,
-                                kind, valor, ocorreu, match)
+                await _guardar(ws, reserva, item, banco, rascunho, acao, dia)
                 novos += 1
+        except conversation.ConsentimentoNecessario:
+            await _soltar(reserva)
+            raise
+        except _ReservaPerdida:
+            continue  # a reserva venceu e outro envio a retomou: o resultado é dele
         except Exception as e:  # noqa: BLE001
-            # Já custou um modelo: repetir custaria de novo e falharia igual. Fecha como ignorada; se
-            # nem isso grava (banco fora), para sem aceitar — o aparelho guarda e tenta depois.
-            log.warning("Notificação %s (%s) com falha após o modelo: %s", item.external_id, banco, type(e).__name__)
-            try:
-                await _concluir(reserva, item, "ignored")
-            except Exception:  # noqa: BLE001
-                parado = True
-                continue
+            # Teto, modelo fora, cota, banco ou rede: NADA vira `ignored` para sempre. A reserva volta e a
+            # notificação segue no aparelho para o próximo envio (o lote para: o resto também falharia).
+            if not isinstance(e, _Parar):
+                log.warning("Notificação %s (%s) não concluiu: %s", item.external_id, banco, type(e).__name__)
+            await _soltar(reserva)
+            parado = True
+            continue
         aceitos.append(item.external_id)
     return EnvioOut(aceitos=aceitos, novos=novos)

@@ -189,7 +189,7 @@ async def montar_rascunho(
             params["account" if recorrencia else "conta"] = str(citadas[0]["id"])
         elif citadas:
             nomes = ", ".join(f"*{c['name']}*" for c in citadas[:6])
-            perguntas.append(f"A fala casa com mais de uma conta ({nomes}): escolha.")
+            perguntas.append(f"Mais de uma conta combina ({nomes}): escolha.")
         elif so_cartao:
             perguntas.append("Qual cartão? Escolha no formulário.")
 

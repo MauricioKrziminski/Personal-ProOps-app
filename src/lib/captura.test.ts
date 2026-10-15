@@ -48,6 +48,34 @@ test('enviarFila para no primeiro erro sem apagar nada daquele lote', async () =
   assert.deepEqual(removidos, []);
 });
 
+test('item que o agente julgou inválido volta em aceitos e sai da fila: um item ruim não prende o resto', async () => {
+  const fila = [n('id-000001'), { ...n('id-000002'), text: '' }, n('id-000003')];
+  const restante = new Set(fila.map((c) => c.id));
+  const total = await enviarFila({
+    pendentes: () => fila.filter((c) => restante.has(c.id)),
+    remover: (ids) => { ids.forEach((id) => restante.delete(id)); },
+    // o servidor valida item a item: o vazio é aceito sem gravar e os outros seguem
+    enviar: async (itens) => ({ aceitos: itens.map((i) => i.external_id) }),
+  });
+  assert.equal(total, 3);
+  assert.equal(restante.size, 0);
+});
+
+test('lote que falha depois de outro que passou: o aceito sai e o resto fica para a próxima abertura', async () => {
+  const fila = Array.from({ length: 25 }, (_, i) => n(`id-${String(i).padStart(6, '0')}`));
+  const restante = new Set(fila.map((c) => c.id));
+  let chamada = 0;
+  await assert.rejects(enviarFila({
+    pendentes: () => fila.filter((c) => restante.has(c.id)),
+    remover: (ids) => { ids.forEach((id) => restante.delete(id)); },
+    enviar: async (itens) => {
+      if (++chamada === 2) throw new Error('503');
+      return { aceitos: itens.map((i) => i.external_id) };
+    },
+  }));
+  assert.equal(restante.size, 5);
+});
+
 test('hrefDaCaptura leva o id da captura ao formulário', () => {
   const href = hrefDaCaptura({ id: 'c1', draft: { tipo: 'uma', params: { kind: 'expense', amount: '4590' }, perguntas: [], entendido: 'x' } });
   assert.equal(href.pathname, '/finance/lancar');

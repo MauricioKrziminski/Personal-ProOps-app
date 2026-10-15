@@ -34,7 +34,7 @@ def _config(monkeypatch):
 def mundo(monkeypatch):
     v = {"acesso": "subscriber", "limite": None, "gravados": [], "eventos": [], "conhecidos": set(),
          "acoes": [{"type": "create_expense", "amount_cents": 4590, "description": "mercado"}],
-         "chamadas": 0, "existentes": [], "reservadas": [], "soltas": [], "ocupadas": set()}
+         "chamadas": 0, "existentes": [], "reservadas": [], "soltas": [], "ocupadas": set(), "iguais": False}
 
     async def perfil(_u):
         return {"id": USER, "timezone": "America/Sao_Paulo", "workspace_id": WS}
@@ -57,13 +57,22 @@ def mundo(monkeypatch):
 
     async def montar(ws, texto, acoes, hoje, forma=None):
         from app.routes.finance_draft import RascunhoOut
-        return RascunhoOut(tipo="uma", params={"kind": "expense", "amount": str(acoes[0]["amount_cents"])},
-                           perguntas=[], entendido="Gasto de R$ 45,90 · mercado")
+        params = {"kind": "expense"}
+        if acoes[0].get("amount_cents"):
+            params["amount"] = str(acoes[0]["amount_cents"])
+        v["montadas"] = acoes
+        return RascunhoOut(tipo="uma", params=params,
+                           perguntas=[] if acoes[0].get("amount_cents") else ["Não ouvi o valor: informe."],
+                           entendido="Gasto de R$ 45,90 · mercado" if acoes[0].get("amount_cents")
+                           else "Gasto de R$ 0,00 · mercado")
 
     async def fetch(sql, *args):
         if "external_id = any" in sql:
             assert "status <> 'processing'" in sql  # a em interpretação não é "conhecida"
             return [{"external_id": e} for e in v["conhecidos"] if e in args[1]]
+        if "status in ('pending', 'duplicate', 'confirmed')" in sql:
+            v["consulta_igual"] = args
+            return [{"id": "outra"}] if v["iguais"] else []
         return []
 
     async def fetch_one(sql, *args):
@@ -260,18 +269,116 @@ def test_tem_valor_so_estrutura():
     assert not captures.tem_valor("Bom dia!")
 
 
-def test_item_que_quebra_depois_do_modelo_vira_ignored_e_o_lote_segue(mundo, monkeypatch):
-    async def quebra_na_primeira(ws, texto, acoes, hoje, forma=None):
-        if "AZEDA" in texto:
-            raise ValueError("2026-09-31")
-        from app.routes.finance_draft import RascunhoOut
-        return RascunhoOut(tipo="uma", params={"kind": "expense"}, perguntas=[], entendido="Gasto")
+def test_data_alucinada_vira_pendente_sem_a_data_e_com_pergunta(mundo):
+    # erro DETERMINÍSTICO do modelo: a notificação não pode virar `ignored` para sempre
+    mundo["acoes"] = [{"type": "create_expense", "amount_cents": 4590, "description": "mercado", "occurred_at": "2026-09-31"}]
+    r = _envia(_item())
+    assert r.json() == {"aceitos": ["ext-00000001"], "novos": 1}
+    linha = mundo["gravados"][0]
+    assert linha[1] == "pending" and linha[5] == 4590
+    assert "Confira a data" in linha[2]
+    assert mundo["montadas"][0]["occurred_at"] is None
 
-    monkeypatch.setattr(captures.finance_draft, "montar_rascunho", quebra_na_primeira)
-    r = _envia(_item(texto="Compra de R$ 10,00 em AZEDA"), _item(ext="ext-00000002"))
+
+def test_banco_ou_rede_fora_depois_do_modelo_solta_a_reserva_e_nao_ignora(mundo, monkeypatch):
+    async def quebra(ws, texto, acoes, hoje, forma=None):
+        raise ConnectionError("db")
+
+    monkeypatch.setattr(captures.finance_draft, "montar_rascunho", quebra)
+    r = _envia(_item(), _item(ext="ext-00000002"))
+    assert r.json() == {"aceitos": [], "novos": 0}
+    assert mundo["soltas"] == ["res-ext-00000001"] and mundo["chamadas"] == 1
+    assert not any("ignored" in x for x in mundo["gravados"])
+
+
+def test_falha_ao_fechar_a_reserva_solta_e_para_o_lote(mundo, monkeypatch):
+    original = db.execute
+
+    async def quebra_no_update(sql, *args):
+        if sql.lstrip().startswith("update"):
+            raise RuntimeError("db fora")
+        return await original(sql, *args)
+
+    monkeypatch.setattr(db, "execute", quebra_no_update)
+    r = _envia(_item(), _item(ext="ext-00000002"))
+    assert r.json() == {"aceitos": [], "novos": 0}
+    assert mundo["soltas"] == ["res-ext-00000001"] and mundo["chamadas"] == 1
+
+
+@pytest.mark.parametrize("texto,modelo,esperado", [
+    ("Compra de R$ 45,90 aprovada", 99999, 4590),                         # (b) um valor só: vale o do texto
+    ("Compra de R$ 20,00 aprovada. Limite disponível: R$ 1.980,00", 2000, 2000),  # (a) um dos valores lidos
+    ("Compra parcelada em 3x de R$ 100,00 aprovada", 10000, 30000),       # a parcela dita não é o total
+    ("Compra parcelada em 3x de R$ 100,00 aprovada", 30000, 30000),       # N×V vale
+    ("Compra de US$ 20,00 (R$ 110,40) aprovada", 2000, 11040),            # (e) com reais junto vale o de reais
+    ("Compra de R$45 aprovada no cartão final 1234", None, 4500),         # (c) modelo sem valor
+])
+def test_valor_do_modelo_so_vale_ancorado_no_texto(mundo, texto, modelo, esperado):
+    mundo["acoes"] = [{"type": "create_expense", "amount_cents": modelo, "description": "x"}]
+    _envia(_item(texto=texto))
+    linha = mundo["gravados"][0]
+    assert linha[1] == "pending" and linha[5] == esperado
+
+
+@pytest.mark.parametrize("texto,modelo,pergunta", [
+    ("Pix de R$ 20,00 enviado. Tarifa de R$ 1,50", 777, "Confira o valor"),     # (d)
+    ("Pix de R$ 20,00 enviado. Tarifa de R$ 1,50", None, "Confira o valor"),
+    ("Compra de US$ 12,99 APROVADA em NETFLIX.COM", 1299, "Compra de US$ 12,99: quanto foi em reais?"),  # (e)
+])
+def test_sem_valor_seguro_nasce_sem_valor_e_com_pergunta(mundo, texto, modelo, pergunta):
+    mundo["acoes"] = [{"type": "create_expense", "amount_cents": modelo, "description": "x"}]
+    _envia(_item(texto=texto))
+    linha = mundo["gravados"][0]
+    assert linha[1] == "pending" and linha[5] is None
+    assert pergunta in linha[2] and "Não ouvi o valor" not in linha[2]
+    assert "valor a conferir" in linha[3]
+    assert not mundo.get("consulta_igual")  # sem valor não há o que conciliar
+
+
+def test_mark_paid_vira_gasto_com_o_valor_e_entra_na_conciliacao(mundo):
+    achado = str(uuid4())
+    mundo["acoes"] = [{"type": "mark_paid", "new_amount_cents": 15075, "description": "boleto"}]
+    mundo["existentes"] = [Existente(
+        id=achado, kind="expense", amount_cents=15075, occurred_at=date(2026, 10, 12),
+        description="boleto", merchant=None, account_id=None, counterparty_account_id=None,
+        installment_plan_id=None, installment_no=None, plan_installments=None, rollover=False, previsto=False,
+    )]
+    _envia(_item(texto="Pagamento de boleto de R$ 150,75 realizado com sucesso."))
+    assert mundo["montadas"][0]["type"] == "create_expense"
+    linha = mundo["gravados"][0]
+    assert linha[1] == "duplicate" and linha[5] == 15075 and achado in [str(x) for x in linha]
+
+
+def test_captura_igual_a_ate_30_min_vira_duplicate_sem_lancamento(mundo):
+    mundo["iguais"] = True
+    _envia(_item())
+    linha = mundo["gravados"][0]
+    assert linha[1] == "duplicate" and linha[7] is None and linha[5] == 4590
+    # mesmo espaço, banco, tipo e valor, pela janela de 30 min, sem contar a própria reserva
+    ws, reserva, banco, kind, valor, *_ = mundo["consulta_igual"]
+    assert (ws, reserva, banco, kind, valor) == (WS, "res-ext-00000001", "Nubank", "expense", 4590)
+    assert mundo["consulta_igual"][-1] == 30
+
+
+def test_sem_captura_igual_segue_pendente(mundo):
+    _envia(_item())
+    assert mundo["gravados"][0][1] == "pending"
+
+
+def test_item_invalido_e_aceito_sem_gravar_e_o_lote_segue(mundo):
+    vazio = {**_item(ext="ext-00000009"), "text": "   "}
+    sem_data = {**_item(ext="ext-0000000a"), "posted_at": "ontem"}
+    r = _envia(vazio, sem_data, _item())
     assert r.status_code == 200
-    assert r.json() == {"aceitos": ["ext-00000001", "ext-00000002"], "novos": 1}
-    assert "ignored" in mundo["gravados"][0] and "pending" in mundo["gravados"][1]
+    assert r.json() == {"aceitos": ["ext-00000009", "ext-0000000a", "ext-00000001"], "novos": 1}
+    assert len(mundo["gravados"]) == 1 and mundo["chamadas"] == 1
+
+
+def test_texto_longo_e_cortado_e_campo_novo_do_app_e_ignorado(mundo):
+    longo = {**_item(texto="Compra de R$ 45,90 " + "x" * 3000), "title": "t" * 500, "campo_novo": 1}
+    r = _envia(longo)
+    assert r.json() == {"aceitos": ["ext-00000001"], "novos": 1}
+    assert len(mundo["ultimo_texto"]) <= 200 + 1 + 1000
 
 
 def test_banco_fora_nao_aceita_e_para_o_lote(mundo, monkeypatch):

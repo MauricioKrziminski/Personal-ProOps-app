@@ -276,7 +276,7 @@ def test_nome_cadastrado_ambiguo_na_fala_pergunta(mundo):
     mundo.modelo([{"type": "create_expense", "amount_cents": 4500, "description": "mercado"}])
     j = _pede("gastei 45 no mercado no nubank").json()
     assert "conta" not in j["params"]
-    assert any("mais de uma" in q for q in j["perguntas"])
+    assert any("mais de uma" in q.lower() for q in j["perguntas"])
 
 
 def _jpeg_real():

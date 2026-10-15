@@ -1640,3 +1640,11 @@ na rajada por hora do chat (`ai_events.kind = 'capture'`); teto de 60 por espaç
 sob o lock de `db.reservar_cota`. A notificação é RESERVADA (`processing`) antes do modelo: dois
 aparelhos com a mesma não pagam duas vezes. Sair da conta desliga a captura e esvazia a fila do aparelho. Lista de bancos em DOIS lugares
 (`src/lib/captura.ts` e `agent/app/routes/captures.py`, presas por `captura.test.ts`).
+
+**O modelo diz o que é, o código diz QUANTO** (15/10/2026, `domain/captura.py`): o valor do modelo só vale se
+o texto o cita em reais (`money.valores_em_reais`: só quantia com moeda, nunca "final 1234") ou é N×V de um "Nx de R$ V".
+Um valor só no texto vence o do modelo; dois ou mais sem o do modelo, ou moeda estrangeira sem reais, nascem SEM valor e
+com a pergunta ("Confira o valor", "Compra de US$ 12,99: quanto foi em reais?"). `mark_paid` vira gasto antes de tudo;
+data inválida é descartada com pergunta. Falha de banco/rede depois do modelo solta a reserva (volta no próximo envio),
+nunca `ignored`; item inválido do lote é aceito sem gravar (o aparelho o apaga). Captura do mesmo banco, tipo e valor a
+até 30 min de outra (pendente, duplicada ou confirmada) entra como `duplicate` sem lançamento, e "Lançar mesmo assim" decide.

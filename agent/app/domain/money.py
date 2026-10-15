@@ -168,6 +168,42 @@ def leitura_de_valores(texto: str | None) -> tuple[list[int], bool]:
     return valores, False
 
 
+# Só quantia COM MOEDA: o texto de uma notificação traz "final 1234", "CONTA 12345-6" e códigos que a
+# leitura de números soltos (`leitura_de_valores`) tomaria por dinheiro.
+_REAIS = re.compile(r"(?<![A-Za-z])(?:R\$|BRL)\s*(\d{1,3}(?:\.\d{3})+|\d+)(?:,(\d{1,2}))?(?!\d)", re.IGNORECASE)
+_ESTRANGEIRA = re.compile(
+    r"(?<![A-Za-z])(?:US\$|U\$|USD|EUR|GBP|€|£)\s*(\d{1,3}(?:\.\d{3})+|\d+)(?:,(\d{1,2}))?(?!\d)"
+    r"|(\d{1,3}(?:\.\d{3})+|\d+)(?:,(\d{1,2}))?\s*(?:d[óo]lares|euros|libras)\b",
+    re.IGNORECASE,
+)
+_SOLTO = re.compile(r"(?<![\d.,])(\d{1,3}(?:\.\d{3})+|\d+),(\d{2})(?![\d%])")
+
+
+def _centavos(inteiro: str, fracao: str | None) -> int:
+    return int(inteiro.replace(".", "")) * 100 + int((fracao or "0").ljust(2, "0"))
+
+
+def valores_em_reais(texto: str | None) -> tuple[list[int], list[str]]:
+    """(valores em reais citados, em centavos e sem repetir; quantias em moeda estrangeira, como escritas).
+
+    Entende "R$ 1.460,53", "R$45", "BRL 45,90". "US$ 12,99", "USD", "EUR", "€" e "dólares" NUNCA viram reais:
+    voltam na segunda lista. Sem nenhuma marca de moeda, o decimal solto ("Pix recebido 1.200,00") vale como
+    reais, mas só fora das quantias estrangeiras. Número sem moeda e sem centavos ("final 1234") não é dinheiro.
+    """
+    texto = texto or ""
+    estrangeiras = [m for m in _ESTRANGEIRA.finditer(texto)]
+    nomes = [m.group(0).strip() for m in estrangeiras]
+    sem_estrangeira = _ESTRANGEIRA.sub(" ", texto)
+    reais = [_centavos(m[1], m[2]) for m in _REAIS.finditer(sem_estrangeira)]
+    if not reais:
+        reais = [_centavos(m[1], m[2]) for m in _SOLTO.finditer(sem_estrangeira)]
+    vistos: list[int] = []
+    for v in reais:
+        if v > 0 and v <= MAX_CENTS and v not in vistos:
+            vistos.append(v)
+    return vistos, nomes
+
+
 def parse_valor_em_centavos(texto: str | None) -> int | None:
     """"1.234,56" | "45" | "2 mil" | "trezentos reais" -> centavos. None se não houver UM candidato claro.
 
