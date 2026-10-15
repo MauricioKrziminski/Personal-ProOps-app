@@ -270,8 +270,10 @@ CATALOGO: tuple[Entrada, ...] = (
     Entrada(
         "notas", "Notas",
         ("onde vejo minhas notas?", "como anoto algo?", "como crio uma pasta de notas?",
-         "como recupero uma nota apagada?"),
-        "Aba *Notas*: anote, organize em pastas e arquive. Ou diga: \"anota: ligar pro dentista\". "
+         "como recupero uma nota apagada?", "dá para criar pasta dentro de pasta?"),
+        "Aba *Notas*: anote, organize em pastas e arquive. Pasta pode ficar dentro de pasta (até 5 "
+        "níveis): diga \"anota em trabalho / 2026: ...\" ou \"crie a pasta 2026 dentro de trabalho\" "
+        "e eu crio o que faltar. Ou diga: \"anota: ligar pro dentista\". "
         "Apagadas vão para a lixeira e podem voltar.",
         "/notes", "Notas",
     ),

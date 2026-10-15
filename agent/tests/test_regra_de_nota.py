@@ -20,21 +20,18 @@ class Banco:
         self.notas, self.hits = [], []
 
     async def fetch(self, sql, *a):
+        if "from public.note_folders" in sql:
+            return [{"id": i, "parent_id": None, "name": n} for n, i in self.pastas.items()]
         return []
 
     async def fetch_one(self, sql, *a):
-        if "select 1 as ok from public.note_folders" in sql:
-            return {"ok": 1} if a[1] in self.pastas else None
         if "_match_note_rule" in sql:
             if self.regra and self.regra[0] in a[1].lower():
                 return {"rule_id": "r1", "folder_id": self.pastas[self.regra[1]]}
             return None
-        if "select id, name from public.note_folders where id" in sql:
-            nome = next(n for n, i in self.pastas.items() if i == a[0])
-            return {"id": a[0], "name": nome}
         if "insert into public.note_folders" in sql:
-            self.pastas[a[2]] = f"id-{a[2]}"
-            return {"id": self.pastas[a[2]], "name": a[2]}
+            self.pastas[a[3]] = f"id-{a[3]}"
+            return {"id": self.pastas[a[3]], "name": a[3]}
         if "insert into public.notes" in sql:
             self.notas.append(a)
             return {"id": "n1"}

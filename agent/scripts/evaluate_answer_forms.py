@@ -49,7 +49,8 @@ from app.graph import nodes  # noqa: E402
 from app.tools import movimentos, resources  # noqa: E402
 from app.tools.guards import Level1Error  # noqa: E402
 
-PASTAS = ["mercado", "trabalho", "ideias", "proops"]
+PASTAS = ["mercado", "trabalho", "ideias", "proops", "pessoal"]
+SUBPASTAS = [("2025", "trabalho"), ("2026", "trabalho"), ("2026", "pessoal")]  # caminho "trabalho / 2026"
 PALAVRAS = {"trabalho": "reunião, cliente", "proops": "proops"}  # regras de nota (palavra -> pasta) da pasta
 WS = "20000000-0000-0000-0000-000000000001"
 BASE = {"timezone": "America/Sao_Paulo", "workspace_id": WS, "user_id": WS,
@@ -64,7 +65,9 @@ async def _sem_banco(sql, *a, **kw):
     comportamento que a lista existe para substituir.
     """
     if "note_folders" in sql and "name" in sql:
-        return [{"name": nome, "palavras": PALAVRAS.get(nome)} for nome in PASTAS]
+        return ([{"id": nome, "parent_id": None, "name": nome, "palavras": PALAVRAS.get(nome)} for nome in PASTAS]
+                + [{"id": f"{mae}/{nome}", "parent_id": mae, "name": nome, "palavras": None}
+                   for nome, mae in SUBPASTAS])
     return []
 
 
@@ -148,6 +151,12 @@ async def _nota(texto):
     saida = await nodes.notes_node({**BASE, "text": texto, "messages": []})
     acoes = saida.get("notes_actions") or []
     return acoes[0] if acoes else None
+
+
+async def _nota_ou_pergunta(texto):
+    """A decisão do nó: a nota pronta, ou a pergunta de qual pasta (rascunho com `_pergunta`)."""
+    saida = await nodes.notes_node({**BASE, "text": texto, "messages": []})
+    return (saida.get("notes_actions") or saida.get("notes_draft") or [None])[0]
 
 
 async def _lembrete(texto):
@@ -550,6 +559,19 @@ def secoes():
              lambda t=t: _nota(t))
             for t, e in [("anota na pasta do mercado: comprar pão", "mercado"),
                          ("põe na pasta de ideias: app de receitas", "ideias")]
+        ],
+        # Pasta dentro de pasta (15/10/2026): a identidade é o CAMINHO "trabalho / 2026".
+        "notas/subpasta": [
+            (t, lambda a, e=e: bool(a) and (a.get("folder") or "").lower().replace(" ", "") == e,
+             f"pasta={e}", lambda t=t: _nota(t))
+            for t, e in [("salva na pasta 2026 de trabalho: relatório anual de metas", "trabalho/2026"),
+                         ("anota em trabalho/2026: ata do planejamento", "trabalho/2026"),
+                         ("anota na pasta 2025: fechamento do balanço", "trabalho/2025")]
+        ] + [
+            # duas "2026" (trabalho e pessoal): a frase não disse a mãe, o modelo NÃO pode escolher
+            ("anota na pasta 2026: ligar para o contador",
+             lambda a: bool(a) and "Tenho mais de uma pasta chamada" in (a.get("_pergunta") or ""),
+             "pergunta qual 2026", lambda: _nota_ou_pergunta("anota na pasta 2026: ligar para o contador")),
         ],
         # A linha da pasta traz as regras ("trabalho · notas que citam: reunião, cliente"): o nome é só o
         # que vem antes do " · " e a regra manda a nota, mesmo sem o usuário citar a pasta.

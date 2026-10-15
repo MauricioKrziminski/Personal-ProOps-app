@@ -33,29 +33,27 @@ class Banco:
         self.notas: list[dict] = []
         self.ordem: list[str] = []
 
+    def _linhas(self):
+        return [{"id": i, "parent_id": None, "name": n, "palavras": None} for n, i in self.pastas.items()]
+
     async def fetch(self, sql, *args):
-        if "from public.note_folders" in sql and "where workspace_id = %s and name = %s" in sql:
-            nome = args[1]
-            return [{"id": self.pastas[nome], "name": nome, "row_version": "1"}] if nome in self.pastas else []
-        if "from public.note_folders" in sql and "(id::text = %s or name = %s)" in sql:
+        if "parent_id is not distinct from" in sql:  # a checagem de duplicata por mãe
             nome = args[2]
-            return [{"id": self.pastas[nome], "name": nome}] if nome in self.pastas else []
-        if "from public.note_folders f" in sql:
-            return [{"name": n, "palavras": None} for n in self.pastas]
+            return [{"id": self.pastas[nome]}] if nome in self.pastas else []
+        if "from public.note_folders" in sql:
+            return self._linhas()
         return []
 
     async def fetch_one(self, sql, *args):
+        if "from public.note_folders" in sql and "insert" not in sql:  # o select depois do conflito
+            nome = args[2]
+            return {"id": self.pastas[nome], "name": nome} if nome in self.pastas else None
         if "insert into public.note_folders" in sql:
             colunas = re.search(r"note_folders \(([^)]*)\)", sql).group(1).split(", ")
             nome = args[colunas.index("name")]
+            assert "on conflict do nothing" in sql  # sem alvo: vale no unique antigo e no novo
             if nome in self.pastas:
-                if "on conflict" in sql and "do update" in sql:
-                    return {"id": self.pastas[nome], "name": nome}
-                if "on conflict" in sql:
-                    return None
-                raise RuntimeError(
-                    'duplicate key value violates unique constraint "note_folders_workspace_id_name_key"'
-                )
+                return None
             self.pastas[nome] = f"pasta-{nome}"
             self.ordem.append(f"pasta:{nome}")
             return {"id": self.pastas[nome], "name": nome}

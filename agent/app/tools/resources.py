@@ -20,6 +20,7 @@ from app.domain.dates import format_date_br, now_utc, to_instant, local_iso_date
 from app.domain.money import cents_to_brl, leitura_de_valores, MAX_CENTS
 from app.domain.recurrence import descreve_rrule, next_occurrence
 from app.domain.categories import normalize
+from app.tools import notes as notes_tools
 from app.domain.matching import ultimo_dia_do_mes
 from app.graph.schemas import ResourceAction, ResourceActionType as Op, ResourceField
 from app.tools.base import ExecContext, ToolResult, ensure_owned, request_id
@@ -644,6 +645,11 @@ def validate_fields(action: ResourceAction) -> dict:
                    "(regra de nota). Ainda não salvei nada.")
     if action.resource == "folders":
         if "name" in values:
+            if "/" in values["name"] and not values.get("parent_id"):
+                # "trabalho/2026" é o caminho: a mãe é o que vem antes da última barra
+                *mae, values["name"] = [x for x in values["name"].split("/") if x.strip()] or [""]
+                if mae:
+                    values["parent_id"] = notes_tools.SEP.join(m.strip() for m in mae)
             values["name"] = normalize(values["name"])
             if not values["name"] or len(values["name"]) > 40:
                 _error("Nome de pasta deve ter entre 1 e 40 caracteres.")
@@ -1500,6 +1506,13 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
             f"{identity} = %s" if action.resource == "folders"
             else f"extensions.unaccent(lower({identity})) = extensions.unaccent(lower(%s))"
         )
+        if action.resource == "folders":
+            # pasta se acha pelo CAMINHO ("trabalho / 2026"); nome solto só se for único (notes.resolver)
+            r = await notes_tools.resolver_pasta(ctx.workspace_id, action.name)
+            if r["estado"] == "ambigua":
+                _error(notes_tools.pergunta_da_ambiguidade(r, "você quer mexer", "") + " Nada foi alterado.")
+            if r["estado"] == "achada":
+                comparacao, params = "id = %s", [ctx.workspace_id, r["id"]]
         rows = await db.fetch(
             f"select *, xmin::text as row_version from public.{table} where workspace_id = %s and {comparacao}"
             + _where(action.resource, lixeira)
@@ -1516,6 +1529,8 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
                 + _where(action.resource, lixeira) + f" order by {identity} limit 8",
                 ctx.workspace_id,
             ) if r.get("label")]
+            if action.resource == "folders":
+                nomes = sorted(notes_tools.caminhos(await notes_tools.carregar_pastas(ctx.workspace_id)).values())[:8]
             if nomes:
                 _error(
                     f"Não achei {LABELS[action.resource]} com o nome *{action.name}*. "
@@ -1682,14 +1697,6 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
         merged = {**old, **values}
     else:
         merged = values
-        if action.resource == "folders":
-            # O unique `(workspace_id, name)` recusaria na EXECUÇÃO, depois do SIM, com a
-            # frase genérica "deu erro ao processar". Aqui a pessoa lê o motivo antes.
-            if await db.fetch(
-                "select id from public.note_folders where workspace_id = %s and name = %s",
-                ctx.workspace_id, values["name"],
-            ):
-                raise JaExiste(f"📁 A pasta *{values['name']}* já existe.")
     # Never let a new non-nullable value become null during an edit.
     if action.type != Op.DELETE:
         protegidos = REQUIRED[action.resource]
@@ -1749,7 +1756,18 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
             display["subcategory_id"] = "Sem detalhe"
     for key, linked_table in LINKS.items():
         if values.get(key):
-            rows = await db.fetch(
+            pasta_dita = None
+            if linked_table == "note_folders" and not _parece_id(values[key]):
+                # pasta pelo CAMINHO; nome solto em dois lugares é pergunta, nunca escolha
+                pasta_dita = await notes_tools.resolver_pasta(ctx.workspace_id, values[key])
+                if pasta_dita["estado"] == "ambigua":
+                    _error(notes_tools.pergunta_da_ambiguidade(pasta_dita, "você quer usar", "")
+                           + " Nada foi alterado.")
+            if pasta_dita is not None and pasta_dita["estado"] in {"achada", "falta"}:
+                rows = ([{"id": pasta_dita["id"], "name": pasta_dita["caminho"]}]
+                        if pasta_dita["estado"] == "achada" else [])
+            else:
+              rows = await db.fetch(
                 "select id, name"
                 + (", type" if linked_table == "accounts" else "")
                 # Sem maiúscula e sem acento, como o nome do cadastro (25/09/2026): "nubank"
@@ -1763,13 +1781,15 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
             )
             if (not rows and key == "folder_id" and action.resource in {"notes", "rules"}
                     and action.type == Op.CREATE and not _parece_id(values[key])):
-                if not 1 <= len(normalize(values[key])) <= 40:
+                if pasta_dita is None or pasta_dita["estado"] != "falta":
                     _error("Nome de pasta deve ter entre 1 e 40 caracteres.")
+                if pasta_dita["nivel"] + len(pasta_dita["faltam"]) > notes_tools.PROFUNDIDADE_MAX:
+                    _error(f"Pastas vão até {notes_tools.PROFUNDIDADE_MAX} níveis. Nada foi alterado.")
                 # Nota nova numa pasta que ainda não existe: a pasta nasce junto, na
                 # execução — é o que `notes.create_note` sempre fez. Recusar aqui era o
                 # "Não encontrei pasta" de "crie a pasta X e ponha a nota Y": a pasta do
                 # MESMO lote só existe depois do SIM.
-                prepared["pasta_nova"] = normalize(values[key])
+                prepared["pasta_nova"] = pasta_dita["caminho"]
                 display[key] = f"{prepared['pasta_nova']} (nova)"
                 continue
             if len(rows) != 1:
@@ -1799,6 +1819,15 @@ async def prepare(ctx: ExecContext, action: ResourceAction) -> dict:
                 _error("Uma pasta não pode ser sua própria pasta superior.")
             values[key] = str(row["id"])
             display[key] = row["name"]
+    if action.resource == "folders" and action.type == Op.CREATE:
+        # Recusa antes do SIM (o banco recusaria depois, com a frase genérica). Duplicata é por MÃE.
+        if await db.fetch(
+            "select id from public.note_folders where workspace_id = %s "
+            "and parent_id is not distinct from %s and name = %s",
+            ctx.workspace_id, values.get("parent_id"), values["name"],
+        ):
+            onde = f" dentro de *{display['parent_id']}*" if values.get("parent_id") else ""
+            raise JaExiste(f"📁 A pasta *{values['name']}* já existe{onde}.")
     if action.resource == "recurring" and action.type != Op.DELETE:
         # Origem e destino da transferência valem JUNTOS (o banco recusa depois do SIM; aqui a recusa
         # vem antes). O gatilho `recurring_transfer_scope` continua sendo a palavra final.
@@ -2181,11 +2210,15 @@ async def execute(ctx: ExecContext, action: ResourceAction) -> ToolResult:
         return ToolResult(proposal["simulacao"], read_only=True)
     if action.type == Op.LIST and action.resource == "rules":
         rows = await db.fetch(
-            "select r.pattern, r.category, f.name as pasta from public.categorization_rules r "
-            "left join public.note_folders f on f.id = r.folder_id "
+            "select r.pattern, r.category, r.folder_id from public.categorization_rules r "
             "where r.workspace_id = %s order by (r.folder_id is not null), r.pattern limit 50",
             ctx.workspace_id,
         )
+        if any(r["folder_id"] for r in rows):
+            todos = notes_tools.caminhos(await notes_tools.carregar_pastas(ctx.workspace_id))
+            rows = [{**r, "pasta": todos.get(r["folder_id"])} for r in rows]
+        else:
+            rows = [{**r, "pasta": None} for r in rows]
         if not rows:
             return ToolResult("Nenhuma regra cadastrada.", read_only=True)
         lanc = [f"• {r['pattern']} → {r['category'] or 'sem categoria'}" for r in rows if not r["pasta"]]
@@ -2296,7 +2329,7 @@ async def execute(ctx: ExecContext, action: ResourceAction) -> ToolResult:
             + reference_guard
             # Pasta criada por outra ação do mesmo lote (ou no app, entre a pergunta e o
             # SIM): o unique não vira "deu erro ao processar", vira a frase de baixo.
-            + (" on conflict (workspace_id, name) do nothing" if action.resource == "folders" else "")
+            + (" on conflict do nothing" if action.resource == "folders" else "")
             + " returning id",
             *values.values(),
             *link_args,

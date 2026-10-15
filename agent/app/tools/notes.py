@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import re
+import unicodedata
 from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 
@@ -42,31 +43,160 @@ def first_line(content: str | None, limite: int = 60) -> str:
     return linha if len(linha) <= limite else linha[: limite - 1] + "…"
 
 
+SEP = " / "
+PROFUNDIDADE_MAX = 5  # espelha o gatilho de note_folders (raiz = 1); o banco continua sendo a palavra final
+
+
+def _colapsa(texto: str) -> str:
+    return re.sub(r"\s*/\s*", "/", texto.strip().lower())
+
+
+def caminhos(pastas: list[dict]) -> dict:
+    """id -> "mãe / filha" para a árvore inteira (raiz = só o nome). Ciclo legado não trava."""
+    por_id = {p["id"]: p for p in pastas}
+
+    def sobe(p):
+        nomes, visto = [], set()
+        while p and p["id"] not in visto:
+            visto.add(p["id"])
+            nomes.append(p["name"])
+            p = por_id.get(p.get("parent_id"))
+        return SEP.join(reversed(nomes))
+
+    return {p["id"]: sobe(p) for p in pastas}
+
+
+def resolver(pastas: list[dict], texto: str | None) -> dict:
+    """Pura: o que o texto do modelo quer dizer na árvore. `estado`:
+    vazia | achada (id, name, caminho) | ambigua (opcoes) | falta (parent_id, faltam, caminho).
+    Texto inteiro como nome exato vem primeiro (nome antigo com "/"), depois o caminho nível a nível;
+    nome solto sem "/" vale em qualquer nível se for UM só, e é ambíguo se forem vários."""
+    bruto = (texto or "").strip()
+    if not bruto:
+        return {"estado": "vazia"}
+    nomes = caminhos(pastas)
+    exatas = [p for p in pastas if _colapsa(p["name"]) == _colapsa(bruto)]
+    if "/" not in bruto or exatas:
+        nome = normalize_folder(bruto) if not exatas else None
+        achadas = exatas or [p for p in pastas if p["name"] == nome]
+        if len(achadas) == 1:
+            p = achadas[0]
+            return {"estado": "achada", "id": p["id"], "name": p["name"], "caminho": nomes[p["id"]]}
+        if achadas:
+            return {"estado": "ambigua", "nome": achadas[0]["name"],
+                    "opcoes": sorted(nomes[p["id"]] for p in achadas)}
+        return {"estado": "falta", "parent_id": None, "faltam": [nome], "caminho": nome, "nivel": 0}
+    segs = [x for x in (normalize_folder(x) for x in bruto.split("/")) if x]
+    if not segs:
+        return {"estado": "vazia"}
+    pai, andou = None, 0
+    for seg in segs:
+        filha = next((p for p in pastas if p.get("parent_id") == pai and p["name"] == seg), None)
+        if not filha:
+            break
+        pai, andou = filha["id"], andou + 1
+    if andou == len(segs):
+        p = next(p for p in pastas if p["id"] == pai)
+        return {"estado": "achada", "id": pai, "name": p["name"], "caminho": nomes[pai]}
+    return {"estado": "falta", "parent_id": pai, "faltam": segs[andou:], "nivel": andou,
+            "caminho": SEP.join(segs)}
+
+
+async def carregar_pastas(workspace_id) -> list[dict]:
+    return await db.fetch(
+        "select id, parent_id, name from public.note_folders where workspace_id = %s", workspace_id
+    )
+
+
+async def resolver_pasta(workspace_id, texto: str | None) -> dict:
+    return resolver(await carregar_pastas(workspace_id), texto)
+
+
+def descendentes(pastas: list[dict], raiz) -> list:
+    """O id da pasta e o de todas as que estão dentro dela."""
+    ids = [raiz]
+    for i in ids:  # a lista cresce enquanto se anda nela
+        ids += [p["id"] for p in pastas if p.get("parent_id") == i and p["id"] not in ids]
+    return ids
+
+
+def pergunta_da_ambiguidade(r: dict, acao: str = "vai a nota", saida: str = " ou diz *sem pasta*") -> str:
+    opcoes = ", ".join(f"*{o}*" for o in r["opcoes"])
+    return (f"Tenho mais de uma pasta chamada *{r['nome']}*: {opcoes}. Em qual delas {acao}? "
+            f"Responde com o caminho (ex.: *{r['opcoes'][0]}*){saida}.")
+
+
+def _sem_acento(texto: str) -> str:
+    return "".join(c for c in unicodedata.normalize("NFD", texto.lower()) if not unicodedata.combining(c))
+
+
+async def pergunta_da_pasta(workspace_id, action, texto: str | None = None) -> str | None:
+    """Antes do SIM: nome de pasta que existe em mais de um lugar vira pergunta, nunca escolha.
+
+    Ancoragem: se o modelo devolveu um caminho ("pessoal / 2026") cuja folha é ambígua, cada mãe tem
+    que aparecer na FRASE da pessoa; mãe que só o modelo disse é dedução, e a folha vira nome solto."""
+    if action.sem_pasta or not action.folder:
+        return None
+    pastas = await carregar_pastas(workspace_id)
+    r = resolver(pastas, action.folder)
+    segs = [x for x in (normalize_folder(x) for x in action.folder.split("/")) if x]
+    if r["estado"] == "achada" and len(segs) > 1 and texto is not None:
+        folha = resolver(pastas, segs[-1])
+        frase = _sem_acento(texto)
+        if folha["estado"] == "ambigua" and not all(_sem_acento(m) in frase for m in segs[:-1]):
+            r = folha
+    return pergunta_da_ambiguidade(r) if r["estado"] == "ambigua" else None
+
+
 async def ensure_folder(
-    workspace_id: UUID, user_id: UUID, nome: str | None
+    workspace_id: UUID, user_id: UUID, nome: str | None, avisos: list | None = None
 ) -> dict | None:
-    """Cria/acha a pasta. Falhar aqui devolve None e a nota nasce sem pasta —
-    nota perdida seria pior.
+    """Acha a pasta pelo caminho e cria o que faltar (mãe e filha). Falhar aqui devolve None e a
+    nota nasce sem pasta — nota perdida seria pior —, mas o motivo vai em `avisos` para a pessoa.
 
     `user_id` explícito e obrigatório: note_folders NÃO tem `default auth.uid()`
-    (sob um papel sem JWT isso viraria null e estouraria o not null).
+    (sob um papel sem JWT isso viraria null e estouraria o not null). Insert SEM alvo no
+    `on conflict`: vale no unique antigo (workspace, name) e no novo (workspace, mãe, name).
     """
-    name = normalize_folder(nome)
-    if not name:
+    def falhou(frase):
+        if avisos is not None:
+            avisos.append(frase)
         return None
+
     try:
-        return await db.fetch_one(
-            """
-            insert into public.note_folders (workspace_id, user_id, name)
-            values (%s, %s, %s)
-            on conflict (workspace_id, name) do update set name = excluded.name
-            returning id, name
-            """,
-            workspace_id, user_id, name,
-        )
+        r = await resolver_pasta(workspace_id, nome)
+        if r["estado"] == "vazia":
+            return None
+        if r["estado"] == "achada":
+            return {"id": r["id"], "name": r["name"], "caminho": r["caminho"]}
+        if r["estado"] == "ambigua":
+            return falhou(f"⚠️ Há mais de uma pasta chamada *{r['nome']}* "
+                          f"({', '.join(r['opcoes'])}); a nota ficou sem pasta.")
+        if r["nivel"] + len(r["faltam"]) > PROFUNDIDADE_MAX:
+            return falhou(f"⚠️ Pastas vão até {PROFUNDIDADE_MAX} níveis; a nota ficou sem pasta.")
+        pai, pasta = r["parent_id"], None
+        for seg in r["faltam"]:
+            pasta = await db.fetch_one(
+                """
+                insert into public.note_folders (workspace_id, user_id, parent_id, name)
+                values (%s, %s, %s, %s)
+                on conflict do nothing
+                returning id, name
+                """,
+                workspace_id, user_id, pai, seg,
+            ) or await db.fetch_one(
+                "select id, name from public.note_folders "
+                "where workspace_id = %s and parent_id is not distinct from %s and name = %s",
+                workspace_id, pai, seg,
+            )
+            if not pasta:
+                raise RuntimeError(f"pasta {seg!r} não criada nem achada")
+            pai = pasta["id"]
+        return {"id": pasta["id"], "name": pasta["name"], "caminho": r["caminho"]}
     except Exception as err:  # noqa: BLE001
         log.warning("ensure_folder falhou (nota fica sem pasta): %s", err)
-        return None
+        recusa = guards.recusa_do_banco(err, fim="A nota ficou sem pasta.")
+        return falhou(recusa or "⚠️ Não consegui criar a pasta; a nota ficou sem pasta.")
 
 
 async def _regra_que_cita(workspace_id, conteudo: str) -> dict | None:
@@ -80,28 +210,25 @@ async def _regra_que_cita(workspace_id, conteudo: str) -> dict | None:
         )
         if not regra:
             return None
-        pasta = await db.fetch_one(
-            "select id, name from public.note_folders where id = %s and workspace_id = %s",
-            regra["folder_id"], workspace_id,
-        )
-        return {"rule_id": regra["rule_id"], "pasta": pasta} if pasta else None
+        pastas = await carregar_pastas(workspace_id)
+        pasta = next((p for p in pastas if str(p["id"]) == str(regra["folder_id"])), None)
+        if not pasta:
+            return None
+        return {"rule_id": regra["rule_id"], "pasta": {
+            "id": pasta["id"], "name": pasta["name"], "caminho": caminhos(pastas)[pasta["id"]]}}
     except Exception as err:  # noqa: BLE001
         log.warning("regra de nota ignorada: %s", err)
         return None
 
 
-async def _pasta_existe(workspace_id, nome: str) -> bool:
-    return bool(await db.fetch_one(
-        "select 1 as ok from public.note_folders where workspace_id = %s and name = %s",
-        workspace_id, nome,
-    ))
+async def _pasta_existe(workspace_id, texto: str) -> bool:
+    return (await resolver_pasta(workspace_id, texto))["estado"] in {"achada", "ambigua"}
 
 
 async def regra_da_nota(workspace_id, conteudo: str, folder: str | None) -> dict | None:
     """A regra que manda a nota, sem efeito (não conta `hits`). Vale com pasta vazia OU com um nome
     que ainda não existe (o modelo inventou); pasta que já existe e foi escolhida fica."""
-    nome = normalize_folder(folder)
-    if nome and await _pasta_existe(workspace_id, nome):
+    if folder and await _pasta_existe(workspace_id, folder):
         return None
     return await _regra_que_cita(workspace_id, conteudo)
 
@@ -112,9 +239,10 @@ async def _pasta_da_regra(ctx: ExecContext, conteudo: str, folder: str | None) -
     regra = await _regra_que_cita(ctx.workspace_id, conteudo)
     if not regra:
         return None
-    nome = normalize_folder(folder)
-    if nome and nome != normalize_folder(regra["pasta"]["name"]) and await _pasta_existe(ctx.workspace_id, nome):
-        return None
+    if folder:
+        r = await resolver_pasta(ctx.workspace_id, folder)
+        if r["estado"] == "ambigua" or (r["estado"] == "achada" and str(r["id"]) != str(regra["pasta"]["id"])):
+            return None
     try:
         # direto na tabela (a RPC de contador não é do `authenticated`); a RLS já escopa
         await db.execute(
@@ -126,14 +254,20 @@ async def _pasta_da_regra(ctx: ExecContext, conteudo: str, folder: str | None) -
     return regra["pasta"]
 
 
+def _folha(texto: str | None) -> str | None:
+    """Só o último nível: é o que cabe na coluna legada `category` (40 chars)."""
+    return normalize_folder((texto or "").split("/")[-1])
+
+
 async def create_note(ctx: ExecContext, action: NotesAction) -> ToolResult:
     conteudo = guards.require_text(action.content, o_que="o que anotar", maximo=20_000)
+    avisos: list[str] = []
     if action.sem_pasta:  # a pessoa pediu fora das pastas: nem regra, nem pasta
         pasta = None
     else:
         pasta = await _pasta_da_regra(ctx, conteudo, action.folder)
         if not pasta:
-            pasta = await ensure_folder(ctx.workspace_id, ctx.user_id, action.folder)
+            pasta = await ensure_folder(ctx.workspace_id, ctx.user_id, action.folder, avisos)
 
     row = await db.fetch_one(
         """
@@ -144,12 +278,13 @@ async def create_note(ctx: ExecContext, action: NotesAction) -> ToolResult:
         """,
         ctx.user_id, ctx.workspace_id, conteudo,
         # grava os DOIS durante a transição da 0038: binário antigo ainda lê `category`
-        pasta["name"] if pasta else (None if action.sem_pasta else normalize_folder(action.folder)),
+        pasta["name"] if pasta else (None if action.sem_pasta else _folha(action.folder)),
         pasta["id"] if pasta else None,
     )
-    onde = f" em *{pasta['name']}*" if pasta else ""
+    onde = f" em *{pasta['caminho']}*" if pasta else ""
     return ToolResult(
-        f"📝 Nota salva{onde}: {first_line(conteudo)}", result_id=row["id"] if row else None
+        f"📝 Nota salva{onde}: {first_line(conteudo)}" + "".join(f"\n{a}" for a in avisos),
+        result_id=row["id"] if row else None,
     )
 
 
@@ -204,13 +339,24 @@ async def append_note(ctx: ExecContext, action: NotesAction) -> ToolResult:
 
 async def query_notes(ctx: ExecContext, action: NotesAction) -> ToolResult:
     termo = (action.search_term or action.content or "").strip()
-    pasta = normalize_folder(action.folder)
+    pasta = (action.folder or "").strip()
+    ids_da_pasta = None
+    if pasta:
+        pastas = await carregar_pastas(ctx.workspace_id)
+        r = resolver(pastas, pasta)
+        if r["estado"] == "ambigua":
+            return ToolResult("🤷 " + pergunta_da_ambiguidade(r, "procuro"),
+                              read_only=True)
+        if r["estado"] == "achada":
+            ids_da_pasta = descendentes(pastas, r["id"])
+            pasta = r["caminho"]
+        else:
+            ids_da_pasta = []  # pasta que não existe: nenhuma nota
 
     sql = [
         """
-        select n.id, n.content, n.updated_at, f.name as folder
+        select n.id, n.content, n.updated_at, n.folder_id
         from public.notes n
-        left join public.note_folders f on f.id = n.folder_id
         where n.workspace_id = %s and n.deleted_at is null
           and n.archived_at is null
         """
@@ -222,8 +368,8 @@ async def query_notes(ctx: ExecContext, action: NotesAction) -> ToolResult:
         sql.append("and n.search_tsv @@ plainto_tsquery('public.pt_unaccent', %s)")
         args.append(termo)
     if pasta:
-        sql.append("and f.name = %s")
-        args.append(pasta)
+        sql.append("and n.folder_id = any(%s)")
+        args.append(ids_da_pasta)
     if action.query_from:
         sql.append("and n.created_at >= %s")
         args.append(to_instant(action.query_from, ctx.timezone))
@@ -237,6 +383,13 @@ async def query_notes(ctx: ExecContext, action: NotesAction) -> ToolResult:
     sql.append("order by n.pinned desc, n.updated_at desc limit 5")
 
     notas = await db.fetch(" ".join(sql), *args)
+    if any(n["folder_id"] for n in notas):  # o caminho de cada nota, não só o nome da folha
+        todos = caminhos(await carregar_pastas(ctx.workspace_id))
+        for n in notas:
+            n["folder"] = todos.get(n["folder_id"])
+    else:
+        for n in notas:
+            n["folder"] = None
     if not notas:
         alvo = termo or pasta
         return ToolResult(
