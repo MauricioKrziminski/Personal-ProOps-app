@@ -130,27 +130,31 @@ function rotuloDoResultado(m: MesProjetado, primeiro: boolean, ultimo: boolean):
  * A última linha tem o problema espelhado — ela é parcial porque o HORIZONTE corta ali, não
  * porque falta acontecer.
  */
-function legendaDoMes(
+function apoioDoMes(
   m: MesProjetado,
   primeiro: boolean,
   ultimo: boolean,
   // Helper de módulo: o formatador entra por parâmetro para a legenda obedecer ao "esconder saldo".
   brl: (cents: number) => string
 ): string {
-  const janela = `${isoToBR(m.de)} a ${isoToBR(m.ate)}`;
-  const vermelho = m.primeiroNegativo ? ` · no vermelho em ${isoToBR(m.primeiroNegativo)}` : '';
+  // A linha diz só o que o mês deixou (15/10/2026, *"não tá muito poluído isso?"*): período, de
+  // onde veio, entra e sai moram no expandido, numa conta que se lê de cima para baixo.
+  const v = resultadoDoMes(m);
+  const sinal = v < 0 ? '−' : v > 0 ? '+' : '';
+  const resultado = `${sinal}${brl(Math.abs(v))} ${rotuloDoResultado(m, primeiro, ultimo)}`;
+  return m.primeiroNegativo
+    ? `${resultado} · no vermelho em ${isoToBR(m.primeiroNegativo).slice(0, 5)}`
+    : resultado;
+}
 
-  if (primeiro && m.parcial) {
-    return (
-      `${janela} · em conta hoje ${brl(veioDe(m))}` +
-      ` · ainda entra ${brl(m.entra)} · ainda sai ${brl(m.sai)}${vermelho}`
-    );
-  }
-  const corte = ultimo && m.parcial ? ' · a projeção termina aqui' : '';
-  return (
-    `${janela} · veio de ${brl(veioDe(m))}` +
-    ` · entra ${brl(m.entra)} · sai ${brl(m.sai)}${vermelho}${corte}`
-  );
+/** A conta do mês, no expandido: o primeiro mês fala "em conta hoje / ainda". */
+function contaDoMes(m: MesProjetado, primeiro: boolean): [string, number][] {
+  const agora = primeiro && m.parcial;
+  return [
+    [agora ? 'Em conta hoje' : 'Veio de', veioDe(m)],
+    [agora ? 'Ainda entra' : 'Entra', Number(m.entra)],
+    [agora ? 'Ainda sai' : 'Sai', Number(m.sai)],
+  ];
 }
 
 const HORIZONTES = [
@@ -1177,22 +1181,16 @@ export default function ForecastScreen() {
               ) : null}
               <Row
                 title={monthTitle(m.mes)}
-                subtitle={legendaDoMes(m, iMes === 0, iMes === meses.length - 1, brl)}
+                subtitle={apoioDoMes(m, iMes === 0, iMes === meses.length - 1, brl)}
                 accessibilityLabel={`${monthTitle(m.mes)}, veio de ${brl(veioDe(m))}, entra ${brl(m.entra)}, sai ${brl(m.sai)}, sobra ${brl(m.saldo)}, ${rotuloDoResultado(m, iMes === 0, iMes === meses.length - 1)} ${brl(resultadoDoMes(m))}`}
                 accessibilityState={{ expanded: mesAberto === m.mes }}
                 onPress={() => setMesAberto(mesAberto === m.mes ? null : m.mes)}
                 trailing={
-                  <View style={styles.saldoDoMes}>
-                    <Money
-                      cents={m.saldo}
-                      variant="subhead"
-                      tone={m.saldo < 0 ? 'danger' : 'text'}
-                    />
-                    <ThemedText type="caption" themeColor="textSecondary">
-                      <Money cents={resultadoDoMes(m)} variant="caption" signed tone="auto" />
-                      {` ${rotuloDoResultado(m, iMes === 0, iMes === meses.length - 1)}`}
-                    </ThemedText>
-                  </View>
+                  <Money
+                    cents={m.saldo}
+                    variant="subhead"
+                    tone={m.saldo < 0 ? 'danger' : 'text'}
+                  />
                 }
               />
 
@@ -1206,6 +1204,15 @@ export default function ForecastScreen() {
                     debaixo do número e dizia outra coisa, na mesma tela. Quem detalha o que está
                     dentro do ciclo é a tela do ciclo, que soma exatamente este número.
                   */}
+                  <ThemedText type="caption" themeColor="textSecondary">
+                    {`${isoToBR(m.de)} a ${isoToBR(m.ate)}${iMes === meses.length - 1 && m.parcial ? ' · a projeção termina aqui' : ''}`}
+                  </ThemedText>
+                  {contaDoMes(m, iMes === 0).map(([rotulo, cents]) => (
+                    <View key={rotulo} style={styles.contaLinha}>
+                      <ThemedText type="footnote" themeColor="textSecondary">{rotulo}</ThemedText>
+                      <Money cents={cents} variant="footnote" />
+                    </View>
+                  ))}
                   <ButtonRow>
                     <Button
                       label="Como chego nesse valor"
@@ -1482,7 +1489,7 @@ export default function ForecastScreen() {
 
 const styles = StyleSheet.create({
   previa: { gap: Space.xs },
-  saldoDoMes: { alignItems: 'flex-end' },
+  contaLinha: { flexDirection: 'row', justifyContent: 'space-between', gap: Space.md },
   // A lista e o seu "Ver mais" a `Space.md` um do outro, como título e conteúdo.
   lista: { gap: Space.md },
   horizonteCorpo: {
@@ -1576,7 +1583,8 @@ const styles = StyleSheet.create({
   },
   expandido: {
     gap: Space.sm,
-    paddingHorizontal: Space.md,
+    // O mesmo recuo do `Row`: a conta do mês alinha com o título e o valor acima dela.
+    paddingHorizontal: Space.lg,
     paddingBottom: Space.md,
   },
   parcela: {

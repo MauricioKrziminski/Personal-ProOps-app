@@ -4417,8 +4417,18 @@ test('Projeção mês a mês: os dois "hoje" dizem o que são, e o rodapé nomei
   const textos = JSON.stringify(ui.nodes().map((n: any) => [n.props?.children, n.props?.subtitle]));
   assert.match(textos, /no fim de hoje/);
   assert.doesNotMatch(textos, /tenho hoje|hoje você tem/);
-  assert.match(textos, /em conta hoje R\$/);
+  // 15/10/2026, *"não tá muito poluído isso?"*: a linha diz só o que o mês deixou; o "em conta
+  // hoje" (e veio de, entra, sai) mora no expandido.
+  assert.match(textos, /até o fim/);
+  assert.match(textos, /no mês/);
+  const apoios = ui.nodes().filter((n: any) => n.type === 'Row' && /de 2026,/.test(String(n.props.accessibilityLabel))).map((n: any) => String(n.props.subtitle));
+  assert.equal(apoios.length, 3);
+  for (const a of apoios) assert.doesNotMatch(a, /veio de|entra|sai/);
   assert.match(textos, /A projeção vai até \d{2}\/\d{2}\/\d{4}; Dezembro de 2026 está incompleto/);
+  ui.interact((nodes: any[]) => nodes.find((n) => n.type === 'Row' && /^Setembro de 2026/.test(String(n.props.accessibilityLabel))).props.onPress());
+  const abertos = JSON.stringify(ui.nodes().map((n: any) => n.props?.children));
+  assert.match(abertos, /Em conta hoje/);
+  assert.match(abertos, /Ainda sai/);
 });
 
 test('Dinheiro de DESTAQUE (money, heroMoney) encolhe sozinho: ocupa a linha e não tem para onde descer', () => {
