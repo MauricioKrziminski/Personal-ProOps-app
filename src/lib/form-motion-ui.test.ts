@@ -171,7 +171,7 @@ function montar(file: string, name: string, initial: any, config: { reduzir: boo
       if (id === '@/hooks/use-theme') return { useTheme: () => ({ curtain: '#0B0B0C' }), useScheme: () => 'light' };
       if (id === '@/hooks/use-lock') return { useLock: () => config.lock };
       if (id === '@/lib/trava-na-tela') return travaNaTelaMod;
-      if (id === '@/components/motion/marca-se-construindo') return { CONSTRUCAO_MS: 1500, MarcaSeConstruindo: () => null };
+      if (id === '@/components/motion/marca-se-construindo') return { CONSTRUCAO_MS: 1500, MarcaSeConstruindo: 'MarcaSeConstruindo' };
       if (id === '@/components/motion/session-curtain') return { useCortinaSaindo: () => config.ativo, useCortinaAberta: () => config.aberta ?? false };
       if (id === '@/components/motion/wave-curtain') return { WaveCurtain: 'WaveCurtain' };
       if (id === '@/components/ui/mark') return { Mark: 'Mark' };
@@ -1473,6 +1473,38 @@ test('Sheet: Voltar com a trava do app na tela não fecha a folha por baixo (And
   travaMarcada = false;
   modal().props.onRequestClose();
   assert.equal(closes, 1, 'sem a trava, Voltar fecha a folha como sempre');
+});
+
+test('LockOverlay: durante o prompt a tela é só a marca; "App bloqueado" só depois de uma falha (15/10/2026)', () => {
+  // "não tá demorando muito isso?": eram "App bloqueado", "Confirmando…", a logo se construindo de
+  // novo e só então a onda. Agora a marca fica parada enquanto o sistema confere.
+  const lock = { locked: true, velado: false, estado: 'autenticando', comoAutentica: 'o Face ID', autenticar: async () => 'aberto' };
+  const ui = montar('src/components/ui/lock-overlay.tsx', 'LockOverlay', {}, { reduzir: false, ativo: true, lock });
+  const titulo = () => ui.find((n) => n.type === 'ThemedText' && n.props.children === 'App bloqueado');
+  const marca = () => ui.find((n) => n.type === 'MarcaSeConstruindo');
+  assert.ok(marca(), 'a marca cobre a tela durante o prompt');
+  assert.equal(titulo(), undefined, 'sem "App bloqueado" enquanto o sistema confere');
+  lock.estado = 'falhou'; ui.render();
+  assert.ok(titulo(), 'na falha aparece o painel com o caminho de tentar de novo');
+  assert.equal(marca(), undefined);
+  lock.estado = 'autenticando'; ui.render();
+  assert.ok(titulo(), 'tentando de novo, o painel fica (é ele que conta a tentativa)');
+});
+
+test('LockOverlay: senha aceita sobe a tinta na hora, levando a marca, sem reconstruí-la', () => {
+  const lock = { locked: true, velado: false, estado: 'autenticando', comoAutentica: 'o Face ID', autenticar: async () => 'aberto' };
+  const ui = montar('src/components/ui/lock-overlay.tsx', 'LockOverlay', {}, { reduzir: false, ativo: true, lock });
+  const antes = ui.animations.length;
+  lock.locked = false; lock.estado = 'trancado'; ui.render();
+  const novas = ui.animations.slice(antes).filter((a) => a.target === 1);
+  assert.equal(novas.length, 1, 'uma animação só: a onda (nada de painel saindo nem marca se construindo)');
+  assert.equal(novas[0].settings.duration, 1150);
+  const marca = ui.find((n) => n.type === 'MarcaSeConstruindo');
+  assert.ok(marca, 'a marca continua na tela e sai com a tinta');
+  assert.equal(marca.props.t.get(), 1, 'já desenhada');
+  assert.equal(ui.find((n) => n.type === 'ThemedText' && n.props.children === 'App bloqueado'), undefined, 'o painel não pisca na saída');
+  ui.finish(novas[0]);
+  assert.equal(ui.nodes().length, 0);
 });
 
 test('LockOverlay fallback completes only its current reveal when a native completion is missing', () => {

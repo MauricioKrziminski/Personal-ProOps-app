@@ -10,10 +10,13 @@
  *
  * ## O desenho
  *
- * Tinta nos dois temas — a mesma da abertura — e UM objeto: a marca num círculo suave, que é o
- * alvo do toque. Ele conta o estado sozinho: um halo respira enquanto o sistema confere; na falha
- * o círculo dá um tranco e ganha um anel vermelho. Destravar sobe a tinta como uma cortina, a
- * mesma onda da abertura.
+ * Tinta nos dois temas — a mesma da abertura — e a MARCA parada no centro, no mesmo lugar em
+ * que a abertura termina (15/10/2026, *"não tá demorando muito isso?"*: eram "App bloqueado",
+ * "Confirmando…", a logo se construindo de novo e só então a onda — ~3 s depois da senha). Enquanto
+ * o prompt do sistema está aberto a tela é só a marca; aceita a senha, a tinta sobe NA HORA levando
+ * a marca, sem reconstruí-la. O painel com "App bloqueado" (a marca num círculo, alvo do toque)
+ * só aparece quando há o que fazer: a tentativa falhou ou foi cancelada. Na falha o círculo dá um
+ * tranco e ganha um anel vermelho.
  */
 
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
@@ -35,7 +38,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FullWindowOverlay } from 'react-native-screens';
 
-import { CONSTRUCAO_MS, MarcaSeConstruindo } from '@/components/motion/marca-se-construindo';
+import { MarcaSeConstruindo } from '@/components/motion/marca-se-construindo';
 import { useCortinaAberta, useCortinaSaindo } from '@/components/motion/session-curtain';
 import { WaveCurtain } from '@/components/motion/wave-curtain';
 import { ThemedText } from '@/components/themed-text';
@@ -143,11 +146,31 @@ function Cortina({ saindo, onSaiu }: { saindo: boolean; onSaiu: () => void }) {
   const insets = useSafeAreaInsets();
   const reduzido = useReducedMotion();
   const progresso = useSharedValue(0);
-  /** A marca se construindo depois da senha aceita (0 → 1), antes de a tinta subir. */
-  const construcao = useSharedValue(0);
-  /** O disco e a frase saem (0 → 1) quando a senha é aceita: no lugar deles, a marca. */
+  /** A marca já desenhada (o fim da construção da abertura): ela não se constrói de novo aqui. */
+  const inteira = useSharedValue(1);
+  /** O disco e a frase saem (0 → 1) quando a senha é aceita depois de uma falha. */
   const painelSai = useSharedValue(0);
   const cortinaSaindo = useCortinaSaindo();
+
+  /*
+    Painel só depois de uma tentativa que não abriu: antes dela (e durante o prompt) a tela é a
+    marca. Ajuste de estado no render, como a casca acima. Saindo, o painel fica como estava — é
+    ele (ou a marca) que sai com a tinta —, e uma nova trava começa sem painel.
+  */
+  const [jaTentou, setJaTentou] = useState(false);
+  const [painel, setPainel] = useState(false);
+  const [saindoAntes, setSaindoAntes] = useState(saindo);
+  if (saindoAntes !== saindo) {
+    setSaindoAntes(saindo);
+    if (!saindo) {
+      setJaTentou(false);
+      setPainel(false);
+    }
+  }
+  if (!saindo && estado === 'autenticando' && !jaTentou) setJaTentou(true);
+  // Uma vez na tela, o painel fica até destravar: tentar de novo pelo disco é ele que conta.
+  const pedePainel = !saindo && (estado === 'falhou' || (jaTentou && estado === 'trancado'));
+  if (pedePainel && !painel) setPainel(true);
 
   /*
     O prompt é pedido assim que a cortina aparece. A guarda de reentrância mora no HOOK
@@ -160,10 +183,8 @@ function Cortina({ saindo, onSaiu }: { saindo: boolean; onSaiu: () => void }) {
   useEffect(() => {
     if (!saindo) {
       cancelAnimation(progresso);
-      cancelAnimation(construcao);
       cancelAnimation(painelSai);
       progresso.set(0);
-      construcao.set(0);
       painelSai.set(0);
       return;
     }
@@ -176,19 +197,15 @@ function Cortina({ saindo, onSaiu }: { saindo: boolean; onSaiu: () => void }) {
       return;
     }
     /*
-      Senha aceita: o disco e a frase saem, a marca se constrói no centro (a mesma da abertura,
-      `MarcaSeConstruindo`) e só então a tinta sobe — pedido do dono do produto, 06/10/2026: a
-      animação da logo é da entrada e de depois da senha. Uma cadeia só na UI thread.
+      Senha aceita: a tinta sobe na hora, levando a marca (15/10/2026 — a marca se reconstruindo
+      depois da senha, pedida em 06/10/2026, somava ~1,8 s a toda volta ao app). Se o painel
+      estava na tela (uma falha antes), ele sai primeiro, para disco e onda não se sobreporem.
     */
     const duracao = reduzido ? Motion.duration.base : Motion.curtain.duration;
-    const marca = reduzido ? Motion.duration.base : CONSTRUCAO_MS;
-    // O disco e a frase saem primeiro; a marca só começa quando eles já sumiram (não se sobrepõem).
-    const some = Motion.duration.exit;
-    const espera = some + marca + Motion.duration.base;
+    const espera = painel ? Motion.duration.exit : 0;
     let vigente = true;
     const concluir = () => { if (vigente) onSaiu(); };
-    painelSai.set(withTiming(1, { duration: some }));
-    construcao.set(withDelay(some, withTiming(1, { duration: marca, easing: Easing.linear })));
+    if (painel) painelSai.set(withTiming(1, { duration: espera }));
     progresso.set(
       withDelay(
         espera,
@@ -204,10 +221,11 @@ function Cortina({ saindo, onSaiu }: { saindo: boolean; onSaiu: () => void }) {
       vigente = false;
       clearTimeout(teto);
       cancelAnimation(progresso);
-      cancelAnimation(construcao);
       cancelAnimation(painelSai);
     };
-  }, [saindo, cortinaSaindo, reduzido, progresso, construcao, painelSai, onSaiu]);
+    // `painel` de propósito fora: saindo ele não muda, e a cadeia é decidida no começo da saída.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saindo, cortinaSaindo, reduzido, progresso, painelSai, onSaiu]);
 
   const conteudo = useAnimatedStyle(() => ({ opacity: 1 - painelSai.get() }));
   // Senha aceita: disco e frase ficam em "Confirmando…" enquanto saem — o estado já voltou a
@@ -243,33 +261,48 @@ function Cortina({ saindo, onSaiu }: { saindo: boolean; onSaiu: () => void }) {
         />
       )}
 
-      <View style={styles.folga} />
+      {painel ? (
+        <>
+          <View style={styles.folga} />
 
-      {/* Terço ótico: 2 em cima, 3 embaixo — o centro geométrico lê baixo demais. */}
-      <Animated.View style={[styles.centro, conteudo]}>
-        <DiscoDaTrava estado={visivel} onPress={() => void autenticar()} />
-        <Animated.View
-          entering={FadeIn.delay(140).duration(Motion.duration.slow)}
-          style={styles.dizeres}>
-          <ThemedText type="title" themeColor="onCurtain" style={styles.titulo}>
-            App bloqueado
-          </ThemedText>
-          {/* `key={estado}`: a troca de frase é um corte com fade, não texto mudando sob o olho. */}
-          <Animated.View key={visivel} entering={FadeIn.duration(Motion.duration.base)}>
-            <ThemedText type="small" themeColor="onCurtainMuted" style={styles.centrado}>
-              {FRASES[visivel](comoAutentica)}
-            </ThemedText>
+          {/* Terço ótico: 2 em cima, 3 embaixo — o centro geométrico lê baixo demais. */}
+          {/* Entrada por fora, opacidade da saída por dentro: as duas na mesma view brigam. */}
+          <Animated.View entering={FadeIn.duration(Motion.duration.base)}>
+            <Animated.View style={[styles.centro, conteudo]}>
+              <DiscoDaTrava estado={visivel} onPress={() => void autenticar()} />
+              <View style={styles.dizeres}>
+                <ThemedText type="title" themeColor="onCurtain" style={styles.titulo}>
+                  App bloqueado
+                </ThemedText>
+                {/* `key={estado}`: a troca de frase é um corte com fade, não texto mudando sob o olho. */}
+                <Animated.View key={visivel} entering={FadeIn.duration(Motion.duration.base)}>
+                  <ThemedText type="small" themeColor="onCurtainMuted" style={styles.centrado}>
+                    {FRASES[visivel](comoAutentica)}
+                  </ThemedText>
+                </Animated.View>
+              </View>
+            </Animated.View>
           </Animated.View>
-        </Animated.View>
-      </Animated.View>
 
-      <View style={styles.folgaBaixa} />
-
-      {saindo && cortinaSaindo ? (
-        <View style={styles.marcaCentral} pointerEvents="none">
-          <MarcaSeConstruindo saida={progresso} t={construcao} reduzido={reduzido} />
-        </View>
-      ) : null}
+          <View style={styles.folgaBaixa} />
+        </>
+      ) : (
+        /*
+          Só a marca, parada — a mesma da abertura, no mesmo lugar. A tela inteira é o alvo: se o
+          prompt não abriu (o app ainda não estava ativo), um toque pede de novo.
+        */
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={ROTULO[visivel]}
+          accessibilityState={{ busy: visivel === 'autenticando' }}
+          disabled={saindo || visivel === 'autenticando'}
+          onPress={() => void autenticar()}
+          style={styles.marcaCentral}>
+          <Animated.View exiting={FadeOut.duration(Motion.duration.exit)}>
+            <MarcaSeConstruindo saida={progresso} t={inteira} reduzido={reduzido} />
+          </Animated.View>
+        </Pressable>
+      )}
     </View>
   );
 }

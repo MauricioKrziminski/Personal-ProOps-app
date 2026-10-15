@@ -25,8 +25,8 @@ const suave = (x: number) => {
 };
 
 /**
- * A marca SE CONSTRUINDO, no centro da tinta — na abertura (`session-curtain.tsx`) e depois da
- * senha (`lock-overlay.tsx`): o contorno da marca se desenha (trim do path, o
+ * A marca SE CONSTRUINDO, no centro da tinta — na abertura (`session-curtain.tsx`); a trava
+ * (`lock-overlay.tsx`) a mostra já desenhada (`t` = 1): o contorno da marca se desenha (trim do path, o
  * mesmo `markPath` do app), o preenchimento entra por baixo dele e o nome "ProOps" aparece
  * abaixo. É o que o splash nativo deixa de fazer — ele é só a tinta, então o primeiro quadro desta
  * camada (nada além da tinta) é idêntico ao dele e não há flash. Na saída a marca sobe e some com
