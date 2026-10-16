@@ -70,6 +70,7 @@ const GROUPS: { title: string; items: ManageItem[] }[] = [
     title: 'Panorama',
     items: [
       { title: 'Patrimônio', icon: 'building.columns', href: '/finance/net-worth' },
+      { title: 'Quanto vou acumular', icon: 'chart.line.uptrend.xyaxis', href: '/finance/acumulacao' },
       { title: 'Relatórios', subtitle: 'Exporta para o IR', icon: 'chart.bar', href: '/finance/reports' },
     ],
   },
@@ -82,6 +83,7 @@ const GROUPS: { title: string; items: ManageItem[] }[] = [
     title: 'Entrada de dados',
     items: [
       { title: 'Importar extrato', icon: 'square.and.arrow.down', href: '/import' },
+      { title: 'Importações', icon: 'clock.arrow.circlepath', href: '/import-history' },
       { title: 'Regras', subtitle: 'Categoria ou pasta por palavra', icon: 'line.3.horizontal.decrease', href: '/finance/rules' },
       { title: 'Categorias', subtitle: 'Ícone, cor, renomear e juntar', icon: 'tag', href: '/finance/categories' },
       { title: 'Favoritos', subtitle: 'Modelos de lançamento', icon: 'star', href: '/finance/favorites' },

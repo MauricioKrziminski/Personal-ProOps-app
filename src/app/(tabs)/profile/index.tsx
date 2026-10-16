@@ -489,6 +489,10 @@ export default function ProfileScreen() {
 
   const settings = (
     <>
+      <Section heading="block" title="Organização">
+        <Row title="Lembretes" subtitle="Todos os lembretes, criar e editar" icon="bell.fill" onPress={() => router.push('/reminders')} />
+      </Section>
+
       <Section heading="block" title="Finanças">
         {cicloConfig}
         <Row title="Categorias" subtitle="Ícone, cor, renomear e juntar" icon="tag" onPress={() => router.push('/finance/categories')} />
@@ -496,7 +500,10 @@ export default function ProfileScreen() {
         <Row title="Importar extrato" icon="square.and.arrow.down" onPress={() => router.push('/import')} />
         <Row title="Importações" icon="clock.arrow.circlepath" onPress={() => router.push('/import-history')} />
         {capturaDisponivel() ? (
-          <Row title="Lançar pelas notificações" icon="bell.badge" onPress={() => router.push('/captura-notificacoes')} />
+          <>
+            <Row title="Lançar pelas notificações" icon="bell.badge" onPress={() => router.push('/captura-notificacoes')} />
+            <Row title="A confirmar" subtitle="Lançamentos capturados das notificações" icon="tray.full" onPress={() => router.push('/finance/capturas')} />
+          </>
         ) : null}
       </Section>
 
