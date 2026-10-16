@@ -452,7 +452,11 @@ cadastros já recebia (`scripts/probe_resposta_ao_cadastro.py`, 4/4 no Gemini re
 - **Lembrete pendente (`notes_draft`) só preenche a peça que faltava.** `_com_campos_do_lembrete` herda data,
   hora e repetição do pendente apenas quando a ação devolvida não traz `content` ou traz o MESMO (comparado
   normalizado); conteúdo diferente é lembrete novo, avaliado sozinho, e o pendente é descartado com uma linha
-  ("Deixei de lado o lembrete de *X*, que estava sem hora."). O turno humano manda o modelo devolver o
+  ("Deixei de lado o lembrete de *X*, que estava sem hora."). **Cada ação pareia com o pendente de MESMO
+  texto** (`_pares_com_pendentes`, lembrete e nota; sem texto, o próximo livre na ordem) e **todo pendente
+  que a resposta não respondeu é avisado**, de qualquer tipo ("…a nota *X*, que estava sem pasta.").
+  Comparar tudo com o PRIMEIRO pendente fazia "9h nos dois" avisar que a Amazon foi deixada de lado com as
+  duas na confirmação, e um lembrete sumia calado quando a resposta era só a pasta de uma nota (15/10/2026). O turno humano manda o modelo devolver o
   `content` do pedido novo.
 - **Frase de cadastro de série**: frequência em palavras (`descreve_rrule`, a mesma do "repete todo dia 14" das
   finanças), nunca RRULE crua; lançamento recorrente é DATA (sem "às 00:00"); "próximo envio" é de lembrete: na

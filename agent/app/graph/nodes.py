@@ -856,15 +856,15 @@ def _cancelado(pendentes: list[dict]) -> str:
             else "Lembrete cancelado. Não salvei nada.")
 
 
-def _lembretes_e_pendentes(acoes: list, pendentes: list[dict]) -> list[tuple]:
-    """Cada `create_reminder` devolvido com o pendente que ele responde: o de MESMO título (normalizado)
-    ou, sem título, o próximo pendente ainda livre, na ordem. Com DOIS pendentes ("9h nos dois"), comparar
-    tudo com o primeiro fazia o segundo parecer pedido novo, e o primeiro saía como "deixado de lado"
-    (WhatsApp, 15/10/2026). `None` = lembrete novo."""
-    livres = [p for p in pendentes if p.get("type") == "create_reminder"]
+def _pares_com_pendentes(acoes: list, pendentes: list[dict], tipo: str) -> list[tuple]:
+    """Cada ação do `tipo` (`create_reminder` | `create_note`) com o pendente que ela responde: o de MESMO
+    texto (normalizado) ou, sem texto, o próximo pendente ainda livre, na ordem. Com DOIS pendentes ("9h nos
+    dois"), comparar tudo com o primeiro fazia o segundo parecer pedido novo, e o primeiro saía como
+    "deixado de lado" (WhatsApp, 15/10/2026). `None` = pedido novo."""
+    livres = [p for p in pendentes if p.get("type") == tipo]
     pares = []
     for a in acoes:
-        if a.type.value != "create_reminder":
+        if a.type.value != tipo:
             continue
         if a.content:
             par = next((p for p in livres if normalize(p.get("content") or "") == normalize(a.content)), None)
@@ -876,16 +876,20 @@ def _lembretes_e_pendentes(acoes: list, pendentes: list[dict]) -> list[tuple]:
     return pares
 
 
+def _resumo_da_nota(conteudo: str | None) -> str:
+    """A primeira linha da nota, curta: o aviso cita a nota, não a reproduz."""
+    linha = next((l.strip().lstrip("#-*[] ").strip() for l in (conteudo or "").splitlines() if l.strip()), "")
+    return linha if len(linha) <= 40 else linha[:39].rstrip() + "…"
+
+
 def _com_campos_do_lembrete(acoes: list, pendentes: list[dict]) -> list:
     """A resposta à pergunta do lembrete só completa o que faltava (14/10/2026): o `create_reminder`
     devolvido herda do pendente o que o modelo omitiu (título, repetição válida, data). Resposta só com
     a HORA ("09:00") ganha a data do pendente — estrutura, não leitura da frase."""
-    nota = next((p for p in pendentes if p.get("type") == "create_note"), None)
-    if nota:  # a resposta à pergunta da pasta herda o texto da nota
-        for a in acoes:
-            if a.type.value == "create_note" and not a.content:
-                a.content = nota.get("content")
-    for a, antigo in _lembretes_e_pendentes(acoes, pendentes):
+    for a, nota in _pares_com_pendentes(acoes, pendentes, "create_note"):
+        if nota is not None and not a.content:  # a resposta à pergunta da pasta herda o texto DAQUELA nota
+            a.content = nota.get("content")
+    for a, antigo in _pares_com_pendentes(acoes, pendentes, "create_reminder"):
         if antigo is None:
             continue  # outro lembrete, completo por si: não herda data nem repetição do pendente (14/10/2026)
         a.content = a.content or antigo.get("content")
@@ -956,15 +960,18 @@ async def notes_node(state: AgentState) -> dict:
                 "results": [*state.get("results", []), _cancelado(pendentes)]}
     acoes = _com_campos_do_lembrete(acoes, pendentes)
     prontas, incompletas, perguntas, avisos = [], [], [], []
-    pares = _lembretes_e_pendentes(acoes, pendentes)
-    if any(p is None for _, p in pares):
-        # pedido novo no lugar do pendente (resource_draft: o novo descarta o velho): a pessoa fica sabendo
-        # UMA vez — com SIM, em `avisos` (antes da pergunta); sem SIM, em `results`. Nos dois, o `results`
-        # sobrevivia ao resume e o aviso saía de novo junto do "Ok, não fiz nada" (WhatsApp, 14/10/2026).
-        # Só o pendente que nenhum lembrete da resposta respondeu foi deixado de lado.
-        respondidos = [id(p) for _, p in pares if p is not None]
-        for antigo in (p for p in pendentes if p.get("type") == "create_reminder" and id(p) not in respondidos):
+    # Pendente que nenhuma ação da resposta respondeu sai de `notes_draft` (o reducer troca a lista): a
+    # pessoa fica sabendo UMA vez — com SIM, em `avisos` (antes da pergunta); sem SIM, em `results`. Nos dois,
+    # o `results` sobrevivia ao resume e o aviso saía de novo junto do "Ok, não fiz nada" (WhatsApp,
+    # 14/10/2026). Vale para lembrete E nota, de qualquer tipo de resposta: um lembrete pendente sumia sem
+    # aviso quando a resposta era só a pasta de uma nota (15/10/2026).
+    respondidos = [id(p) for tipo in ("create_reminder", "create_note")
+                   for _, p in _pares_com_pendentes(acoes, pendentes, tipo) if p is not None]
+    for antigo in (p for p in pendentes if id(p) not in respondidos):
+        if antigo.get("type") == "create_reminder":
             avisos.append(f"Deixei de lado o lembrete de *{antigo.get('content')}*, que estava sem hora.")
+        elif antigo.get("type") == "create_note":
+            avisos.append(f"Deixei de lado a nota *{_resumo_da_nota(antigo.get('content'))}*, que estava sem pasta.")
     for a in acoes:
         await _congela_pasta_da_regra(state["workspace_id"], a)
         if a.type.value == "create_note":

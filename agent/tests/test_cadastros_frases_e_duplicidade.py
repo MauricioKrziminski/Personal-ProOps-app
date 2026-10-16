@@ -285,3 +285,49 @@ async def test_dois_pendentes_e_um_respondido_com_outro_novo_avisa_so_o_que_fico
     avisos = [*ret.get("results", []), *ret["avisos"]]
     assert avisos.count("Deixei de lado o lembrete de *Cancelar a Amazon Prime*, que estava sem hora.") == 1
     assert not any("Disney" in r and "Deixei" in r for r in avisos)
+
+
+async def test_dois_lembretes_pendentes_e_so_um_respondido_avisa_o_outro(notas):
+    notas(NotesAction(type="create_reminder", content="Cancelar a Disney+", remind_at="2026-11-13T09:00:00"))
+    ret = await nodes.notes_node(estado_dois("a da disney às 9"))
+    avisos = [*ret.get("results", []), *ret["avisos"]]
+    assert avisos.count("Deixei de lado o lembrete de *Cancelar a Amazon Prime*, que estava sem hora.") == 1
+
+
+NOTA_SEM_PASTA = {"type": "create_note", "content": "- [ ] pão\n- [ ] leite", "folder": None,
+                  "_pergunta": "Em qual pasta: Casa/Mercado ou Trabalho/Mercado?"}
+NOTA_SEM_PASTA_2 = {"type": "create_note", "content": "# Ideias do app\n- tema escuro", "folder": None,
+                    "_pergunta": "Em qual pasta: Projetos ou Pessoal/Projetos?"}
+
+
+@pytest.fixture
+def sem_pergunta_de_pasta(monkeypatch):
+    async def nenhuma(*_a, **_k):
+        return None
+    monkeypatch.setattr(nodes.notes_tools, "pergunta_da_pasta", nenhuma)
+
+
+async def test_lembrete_pendente_some_com_aviso_quando_a_resposta_e_so_a_pasta_da_nota(notas, sem_pergunta_de_pasta):
+    notas(NotesAction(type="create_note", folder="Casa/Mercado"))
+    st = {**estado("casa"), "notes_draft": [dict(PENDENTE), dict(NOTA_SEM_PASTA)]}
+    ret = await nodes.notes_node(st)
+    (nota,) = ret["notes_actions"]
+    assert nota["content"] == NOTA_SEM_PASTA["content"] and nota["folder"] == "Casa/Mercado"
+    assert [*ret.get("results", []), *ret["avisos"]].count(AVISO) == 1
+
+
+async def test_duas_notas_pendentes_cada_resposta_herda_o_texto_da_sua(notas, sem_pergunta_de_pasta):
+    notas(NotesAction(type="create_note", folder="Casa/Mercado"), NotesAction(type="create_note", folder="Projetos"))
+    st = {**estado("casa e projetos"), "notes_draft": [dict(NOTA_SEM_PASTA), dict(NOTA_SEM_PASTA_2)]}
+    ret = await nodes.notes_node(st)
+    assert [(a["content"], a["folder"]) for a in ret["notes_actions"]] == [
+        (NOTA_SEM_PASTA["content"], "Casa/Mercado"), (NOTA_SEM_PASTA_2["content"], "Projetos")]
+    assert not any("Deixei de lado" in r for r in [*ret.get("results", []), *ret["avisos"]])
+
+
+async def test_duas_notas_pendentes_e_so_uma_respondida_avisa_a_outra_pelo_titulo(notas, sem_pergunta_de_pasta):
+    notas(NotesAction(type="create_note", content=NOTA_SEM_PASTA["content"], folder="Casa/Mercado"))
+    st = {**estado("a do mercado na casa"), "notes_draft": [dict(NOTA_SEM_PASTA), dict(NOTA_SEM_PASTA_2)]}
+    ret = await nodes.notes_node(st)
+    avisos = [*ret.get("results", []), *ret["avisos"]]
+    assert avisos == ["Deixei de lado a nota *Ideias do app*, que estava sem pasta."]
