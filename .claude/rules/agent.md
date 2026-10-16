@@ -563,8 +563,10 @@ e diz "Depois eu pergunto o que falta de *uber*."; `_rascunho` leva as OUTRAS in
 elas: nenhuma chegou ao SIM, o gate as bloqueia, então nada é proposto duas vezes). Completar o rascunho roda
 `[ação, *fila]` pelo caminho normal (`conversation`, a próxima pergunta sai dele); "esquece" roda a fila. O
 financiamento vindo do rascunho avisa o que da fila não entrou. **Lote parado por erro** (`correction_error`, cartão
-que não existe) diz o que estava pronto e não foi registrado ("Ainda não registrei *mercado*…") — ali nada vai ao
-SIM e não há fila.
+que não existe): nada vai ao SIM, então a fila leva TODAS as outras de finanças, as prontas também; o mesmo erro em
+dois itens sai UMA vez ("Sobre *mercado* e *uber*: não achei…"), a conta escolhida vale para a fila que citou o MESMO
+nome (uma resposta resolve "no cartão bradesco" das duas compras) e a frase diz "Resolvido isso, eu sigo com *café*".
+Sem rascunho (erro que não é de conta), "Ainda não registrei *X*: me manda de novo".
 
 **UMA pergunta por turno.** "comprei uma tv em 10x no itau" respondia *"faltou o
 valor"* **e** *"não achei o cartão itau"* no mesmo balão, e a pessoa não sabe qual das

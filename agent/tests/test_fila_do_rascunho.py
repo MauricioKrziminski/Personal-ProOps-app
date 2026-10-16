@@ -66,8 +66,36 @@ async def test_lote_parado_por_erro_diz_o_que_estava_pronto_e_nao_entrou():
     }
     ret = await nodes.gate(estado)
     assert ret["halted"] and not ret["approved"]
-    assert ret["results"] == ["Não achei o cartão bradesco.",
+    assert ret["results"] == ["Sobre *uber*: Não achei o cartão bradesco.",
                               "Ainda não registrei *mercado*: me manda de novo depois disso."]
+
+
+@pytest.mark.asyncio
+async def test_mesmo_erro_nas_duas_sai_uma_vez_e_com_rascunho_a_pronta_segue():
+    erro = "🤔 Não achei conta com o nome *cartão bradesco*."
+    estado = {
+        **_estado("gastei 30 no mercado, 100 no uber e 20 de café no cartão bradesco"),
+        "finance_actions": [
+            {"type": "create_expense", "description": "mercado", "amount_cents": 3000, "account": "cartão bradesco"},
+            {"type": "create_expense", "description": "uber", "amount_cents": 10000, "account": "cartão bradesco"},
+            {"type": "create_expense", "description": "café", "amount_cents": 2000},
+        ],
+        "targets": [{"correction_error": erro, "account_error": erro}, {"correction_error": erro, "account_error": erro}, {}],
+        "draft": {"action": {"description": "mercado"}},
+    }
+    ret = await nodes.gate(estado)
+    assert ret["results"] == [f"Sobre *mercado* e *uber*: {erro}", "Resolvido isso, eu sigo com *café*."]
+
+
+def test_lote_parado_leva_todas_as_outras_na_fila_inclusive_as_prontas():
+    erro = "🤔 Não achei conta com o nome *cartão bradesco*."
+    acoes = [FinanceAction(type="create_expense", description="mercado", amount_cents=3000, account="cartão bradesco"),
+             FinanceAction(type="create_expense", description="uber", amount_cents=10000, account="cartão bradesco"),
+             FinanceAction(type="create_expense", description="café", amount_cents=2000)]
+    alvos = [{"correction_error": erro, "account_error": erro}, {"correction_error": erro, "account_error": erro}, {}]
+    r = nodes._rascunho(_estado(), acoes, alvos)
+    assert r["slot"] == "account" and r["action"]["description"] == "mercado"
+    assert [a["description"] for a in r["action"]["_fila"]] == ["uber", "café"]
 
 
 # --- o turno seguinte: completar roda a fila junto; esquecer pergunta o próximo -----------------------------
@@ -143,3 +171,30 @@ async def test_esquecer_com_fila_pergunta_o_proximo(turno):
     r = await conversation.run_turn(SESSAO, source_message_id="w2", conteudo={"text": "esquece o mercado"})
     assert rodados == [[UBER]]
     assert r == "👍 Beleza, esqueci aquele lançamento.\n\nQual o valor do uber?"
+
+
+@pytest.mark.asyncio
+async def test_conta_escolhida_vale_para_a_mesma_citacao_na_fila(turno):
+    monkeypatch, rodados = turno
+    rasc = {**RASCUNHO, "slot": "account", "missing": "Qual é a conta?",
+            "action": {"type": "create_expense", "description": "mercado", "amount_cents": 3000, "account": "cartão bradesco",
+                       "_fila": [{"type": "create_expense", "description": "uber", "amount_cents": 10000,
+                                  "account": "Cartão Bradesco"},
+                                 {"type": "create_expense", "description": "café", "amount_cents": 2000, "account": "pix"}]}}
+
+    async def rascunho(_sessao_id):
+        return rasc
+
+    async def interpretar(texto, r, uso=None):
+        return {"acao": "completar", "slot": "account", "account": "Nubank Cartão"}
+
+    async def cartao(sessao, r, decidido):
+        return decidido, None
+
+    monkeypatch.setattr(db, "open_draft", rascunho)
+    monkeypatch.setattr(draft, "interpretar", interpretar)
+    monkeypatch.setattr(conversation, "_cartao_do_rascunho", cartao)
+    await conversation.run_turn(SESSAO, source_message_id="w2", conteudo={"text": "nubank cartão"})
+    (acoes,) = rodados
+    assert [(a["description"], a["account"]) for a in acoes] == [
+        ("mercado", "Nubank Cartão"), ("uber", "Nubank Cartão"), ("café", "pix")]

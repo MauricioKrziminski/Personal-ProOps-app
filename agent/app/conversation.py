@@ -24,6 +24,7 @@ from langgraph.types import Command
 from app import db
 from app.config import get_settings
 from app.domain import confirm, draft, matching
+from app.domain.categories import normalize
 from app.domain.money import cents_to_brl
 from app.graph.state import CHAVE_MIDIA, marca_da_midia
 from app.security import effective_thread_id, sanitize_untrusted
@@ -515,6 +516,11 @@ async def _run_turn(
             # as outras incompletas do mesmo pedido (`nodes._rascunho`): rodam de novo junto, e a próxima pergunta
             # sai do caminho normal
             fila = acao.pop("_fila", None) or []
+            citada = (rascunho["action"] or {}).get("account")
+            if decidido.get("slot") == "account" and citada:
+                # "no cartão bradesco" valia para as duas compras: a conta escolhida vale para a mesma citação
+                fila = [{**f, "account": acao.get("account")} if normalize(f.get("account") or "") == normalize(citada)
+                        else f for f in fila]
             # Ainda falta outro slot? Guarda de novo e pergunta o próximo, em vez
             # de executar pela metade.
             from app.graph.schemas import FinanceAction
