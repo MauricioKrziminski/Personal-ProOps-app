@@ -1440,9 +1440,29 @@ def _incompletas(state: AgentState, acoes: list) -> dict[int, str]:
     }
 
 
+def _nome_do_pedido(acao) -> str:
+    """Como a frase chama um item do lote: o nome que a pessoa deu, senão a categoria."""
+    nome = (getattr(acao, "description", None) or getattr(acao, "category", None) or getattr(acao, "content", None)
+            or getattr(acao, "name", None) or "")
+    nome = " ".join(str(nome).split())
+    return f"*{nome if len(nome) <= 40 else nome[:39].rstrip() + '…'}*" if nome else "o outro pedido"
+
+
 def _esclarecimentos(state: AgentState, acoes: list) -> list[str]:
-    return [*state.get("results", []),
-            *(pergunta for _, pergunta in _incompletas(state, acoes).values())]
+    """UMA pergunta por turno (15/10/2026). Com duas incompletas ("gastei no mercado e no uber", sem valores) o
+    agente perguntava as duas e o rascunho guardava só a primeira: a resposta do uber não tinha onde cair e
+    ninguém avisava. Hoje pergunta a primeira, diz que as outras vêm depois, e elas viajam na fila do
+    rascunho (`_rascunho`, `_fila`) para a pergunta seguinte."""
+    incompletas = list(_incompletas(state, acoes).items())
+    if not incompletas:
+        return [*state.get("results", [])]
+    (primeira, (_, pergunta)), *resto = incompletas
+    # com outro item no lote (na fila, ou indo ao SIM na mesma mensagem), "Quanto foi?" não diz de qual
+    if len(acoes) > 1:
+        pergunta = f"Sobre {_nome_do_pedido(acoes[primeira])}: {pergunta}"
+    depois = [f"Depois eu pergunto o que falta de {', '.join(_nome_do_pedido(acoes[i]) for i, _ in resto)}."] \
+        if resto else []
+    return [*state.get("results", []), pergunta, *depois]
 
 
 def _rascunho(state: AgentState, acoes: list, alvos: list[dict] | None = None) -> dict:
@@ -1466,9 +1486,13 @@ def _rascunho(state: AgentState, acoes: list, alvos: list[dict] | None = None) -
     """
     if par_de_substituicao(acoes, alvos or []):
         return {}
-    for i, (slot, pergunta) in _incompletas(state, acoes).items():
+    incompletas = _incompletas(state, acoes)
+    for i, (slot, pergunta) in incompletas.items():
+        # As OUTRAS incompletas vão na fila: nenhuma chegou ao SIM (o gate as bloqueia), então completar
+        # esta e rodar as da fila de novo (`conversation`) nunca propõe duas vezes a mesma coisa.
+        fila = [acoes[j].model_dump(mode="json") for j in incompletas if j != i]
         return {
-            "action": acoes[i].model_dump(mode="json"),
+            "action": {**acoes[i].model_dump(mode="json"), **({"_fila": fila} if fila else {})},
             "raw_text": state.get("text", ""),
             "missing": pergunta,
             "slot": slot,
@@ -1729,8 +1753,14 @@ async def _gate(state: AgentState) -> dict:
         return {"approved": False, "halted": True, "draft": {},
                 "results": [*state.get("results", []), *correction_errors, fim]}
     if correction_errors:
+        # Nada do lote vai ao SIM. O que estava pronto não pode sumir calado (15/10/2026: "30 no mercado e 100
+        # no uber no cartão bradesco", sem Bradesco, perdia o mercado sem dizer nada).
+        com_erro = {i for i, (a, t) in enumerate(zip(acoes, alvos)) if t.get("correction_error") or erro_de_correcao(a, t)}
+        prontas = [a for i, a in enumerate(acoes) if i not in com_erro and i not in _incompletas(state, acoes)]
+        ficou = [f"Ainda não registrei {', '.join(_nome_do_pedido(a) for a in prontas)}: me manda de novo depois disso."] \
+            if prontas else []
         return {"approved": False, "halted": True,
-                "results": [*state.get("results", []), *correction_errors]}
+                "results": [*state.get("results", []), *correction_errors, *ficou]}
 
     # 0) Valor numa compra parcelada: "total ou cada parcela?" antes de qualquer SIM.
     #    Posição fixa (antes do empate) para a ordem dos interrupts não mudar no replay.

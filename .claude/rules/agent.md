@@ -556,6 +556,16 @@ de slot `account`. A partir daí tudo que já existia vale: a pergunta vira list
 botões, a resposta digitada cai em `draft.interpretar`, e um nome que não existe vira
 oferta de cadastro. Mesmo formato que `resource_node` já usava para cadastro incompleto.
 
+**Duas incompletas no mesmo pedido têm FILA** (15/10/2026). "gastei no mercado e no uber" (sem valores)
+perguntava os dois valores e o rascunho guardava só o mercado: a resposta do uber não tinha onde cair. Hoje
+`_esclarecimentos` pergunta a primeira ("Sobre *mercado*: …" — o item é nomeado sempre que o lote tem mais de um)
+e diz "Depois eu pergunto o que falta de *uber*."; `_rascunho` leva as OUTRAS incompletas em `action._fila` (só
+elas: nenhuma chegou ao SIM, o gate as bloqueia, então nada é proposto duas vezes). Completar o rascunho roda
+`[ação, *fila]` pelo caminho normal (`conversation`, a próxima pergunta sai dele); "esquece" roda a fila. O
+financiamento vindo do rascunho avisa o que da fila não entrou. **Lote parado por erro** (`correction_error`, cartão
+que não existe) diz o que estava pronto e não foi registrado ("Ainda não registrei *mercado*…") — ali nada vai ao
+SIM e não há fila.
+
 **UMA pergunta por turno.** "comprei uma tv em 10x no itau" respondia *"faltou o
 valor"* **e** *"não achei o cartão itau"* no mesmo balão, e a pessoa não sabe qual das
 duas responder. `contas_citadas` recebe `pular` com os índices que `_incompletas` já

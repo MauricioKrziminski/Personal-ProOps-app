@@ -484,6 +484,14 @@ async def _run_turn(
             )
         if decidido and decidido["acao"] == "descartar":
             await db.delete_draft(sessao["id"])
+            fila = (rascunho["action"] or {}).get("_fila") or []
+            if fila:
+                # o próximo da fila tem a sua pergunta: esquecer este não esquece os outros
+                resposta = await _rodar_com_acoes(
+                    sessao, source_message_id, {**conteudo, "text": rascunho["raw_text"]}, fila, thread, config, uso,
+                    prompt_history=prompt_history,
+                )
+                return _com_avisos(resposta, ["👍 Beleza, esqueci aquele lançamento."])
             return await _fechar(sessao, uso, "👍 Beleza, esqueci aquele lançamento.")
         if decidido and decidido["acao"] == "financiamento":
             return await _financiamento_do_rascunho(
@@ -504,6 +512,9 @@ async def _run_turn(
 
         if decidido and decidido["acao"] == "completar":
             acao = draft.mesclar(rascunho["action"], decidido)
+            # as outras incompletas do mesmo pedido (`nodes._rascunho`): rodam de novo junto, e a próxima pergunta
+            # sai do caminho normal
+            fila = acao.pop("_fila", None) or []
             # Ainda falta outro slot? Guarda de novo e pergunta o próximo, em vez
             # de executar pela metade.
             from app.graph.schemas import FinanceAction
@@ -517,7 +528,7 @@ async def _run_turn(
                     thread_id=thread, phone=sessao["phone"],
                     user_id=UUID(str(sessao["user_id"])),
                     workspace_id=UUID(str(sessao["workspace_id"])),
-                    action=acao, raw_text=rascunho["raw_text"],
+                    action={**acao, **({"_fila": fila} if fila else {})}, raw_text=rascunho["raw_text"],
                     missing=pergunta, slot=slot,
                 )
                 return await _fechar(
@@ -529,7 +540,7 @@ async def _run_turn(
             # segurança (HITL de valor alto, alvo, propriedade) valem igual
             conteudo = {**conteudo, "text": rascunho["raw_text"]}
             resposta = await _rodar_com_acoes(
-                sessao, source_message_id, conteudo, [acao], thread, config, uso,
+                sessao, source_message_id, conteudo, [acao, *fila], thread, config, uso,
                 prompt_history=prompt_history,
             )
             return resposta
@@ -640,7 +651,12 @@ async def _financiamento_do_rascunho(
         estado = await graph().ainvoke(estado_inicial, config=config)
     await db.delete_draft(sessao["id"])
     await _audit(sessao, estado, uso)
-    return await _resposta_do_estado(sessao, estado, thread)
+    resposta = await _resposta_do_estado(sessao, estado, thread)
+    # o resto do mesmo pedido não vira financiamento: a pessoa fica sabendo que ele não entrou
+    fila = [f"*{a.get('description') or a.get('category')}*" for a in compra.get("_fila") or []
+            if a.get("description") or a.get("category")]
+    return _com_avisos(resposta, [f"Ainda não registrei {', '.join(fila)}: me manda de novo depois disso."]) \
+        if fila else resposta
 
 
 async def _cartao_do_rascunho(
