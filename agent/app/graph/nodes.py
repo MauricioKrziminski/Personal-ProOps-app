@@ -1925,10 +1925,15 @@ async def _gate(state: AgentState) -> dict:
                                             f"💳 Me manda de novo dizendo o cartão. {NADA_DO_PAR}"],
                             }
                         pergunta = f"💳 Qual outro cartão você prefere usar para esta compra de {cents_to_brl(acao.amount_cents)}?"
+                        # o lote para aqui (nada é gravado): as outras compras do pedido vão na fila do rascunho
+                        # e voltam quando o cartão for escolhido, em vez de sumir (15/10/2026)
+                        fila = [a.model_dump(mode="json") for j, a in enumerate(acoes)
+                                if j != i and isinstance(a, FinanceAction)]
                         return {
                             "approved": False,
                             "draft": {
-                                "action": acao.model_copy(update={"account": None}).model_dump(mode="json"),
+                                "action": {**acao.model_copy(update={"account": None}).model_dump(mode="json"),
+                                           **({"_fila": fila} if fila else {})},
                                 "raw_text": state.get("text", ""),
                                 "missing": pergunta,
                                 "slot": "account",
@@ -1944,6 +1949,15 @@ async def _gate(state: AgentState) -> dict:
                     ):
                         avisos_confirmados.add(i)
                         continue
+                    if not par and len(acoes) > 1:
+                        # Recusar o aviso de UMA compra não descarta as outras do mesmo pedido (15/10/2026: elas
+                        # sumiam caladas). Sai só esta, e o gate recomeça com as outras — cada uma com o seu SIM.
+                        return {
+                            "finance_actions": [a for j, a in enumerate(state.get("finance_actions") or []) if j != i],
+                            "targets": [t for j, t in enumerate(alvos) if j != i],
+                            "approved": False, "revision_pending": True,
+                            "results": [*state.get("results", []), f"👍 Beleza, não registrei {_nome_do_pedido(acao)}."],
+                        }
                     return {
                         "approved": False,
                         "results": [*state.get("results", []), "👍 Beleza, não registrei a compra."],

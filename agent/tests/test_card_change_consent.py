@@ -106,3 +106,38 @@ async def test_warning_approval_does_not_approve_unshown_sibling(graph):
     assert second["__interrupt__"][0].value["summary"] == "criar conta Reserva"
     final = await graph.ainvoke(Command(resume=False), config)
     assert "WROTE" not in final["results"]
+
+
+def _duas_compras():
+    st = state()
+    st["text"] = "gastei 30 no mercado e 100 no uber no nubank"
+    st["finance_actions"] = [
+        {"type": "create_expense", "amount_cents": 3000, "account": "Nubank", "description": "mercado"},
+        {"type": "create_expense", "amount_cents": 10000, "account": "Nubank", "description": "uber"},
+    ]
+    return st
+
+
+@pytest.mark.asyncio
+async def test_recusar_o_aviso_de_uma_compra_nao_descarta_a_outra(graph):
+    # 15/10/2026: "não registrei a compra" encerrava o lote e o uber sumia calado
+    config = {"configurable": {"thread_id": "duas"}}
+    first = await graph.ainvoke(_duas_compras(), config)
+    assert "mercado" in first["__interrupt__"][0].value["summary"]
+    second = await graph.ainvoke(Command(resume=False), config)
+    aviso = second["__interrupt__"][0].value
+    assert aviso["kind"] == "soft_warning" and "uber" in aviso["summary"]
+    final = await graph.ainvoke(Command(resume=True), config)
+    assert final["results"].count("WROTE") == 1
+    assert "👍 Beleza, não registrei *mercado*." in final["results"]
+    assert [a["description"] for a in final["finance_actions"]] == ["uber"]
+
+
+@pytest.mark.asyncio
+async def test_trocar_de_cartao_sem_dizer_qual_leva_a_outra_compra_na_fila(graph):
+    config = {"configurable": {"thread_id": "troca-duas"}}
+    await graph.ainvoke(_duas_compras(), config)
+    last = await graph.ainvoke(Command(resume=parse_click("pa:p:c:change_card", "p")), config)
+    assert "WROTE" not in last["results"]
+    assert last["draft"]["action"]["description"] == "mercado"
+    assert [a["description"] for a in last["draft"]["action"]["_fila"]] == ["uber"]
