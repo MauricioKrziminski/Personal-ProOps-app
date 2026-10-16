@@ -259,3 +259,12 @@ async def test_listar_lembretes_pelo_cadastro_vira_a_lista_completa(monkeypatch)
                                      "domains": ["cadastros"], "user_id": "u", "workspace_id": "w",
                                      "source_message_id": "m"})
     assert ret["resource_actions"] == [] and ret["notes_actions"][0]["type"] == "query_reminders"
+
+
+@pytest.mark.asyncio
+async def test_gasto_de_uma_vez_diz_no_vencimento(portao):
+    perguntas, respostas = portao
+    respostas += [{"approved": True, "candidate_id": "vinculo:solto"}]
+    dentista = {"alvo": "transaction", "id": "t-1", "nome": "Dentista", "regra": None, "vence": "2026-10-25"}
+    await nodes.gate(_estado(_lembrete(), {"canal": "both", "vinculos": [dentista]}))
+    assert "(te aviso no vencimento)" in perguntas[0]["summary"] and "(vence 25/10/2026)" in perguntas[0]["summary"]

@@ -1788,8 +1788,9 @@ def _perguntar_vinculo(state: AgentState, i: int, acao, alvo: dict) -> tuple[dic
         return _com_vinculo(acao, alvo, cands[0]), None
     nome = " ".join((acao.content or "isso").split())
     if len(cands) == 1:
+        cada = "no vencimento" if cands[0]["alvo"] == "transaction" else "a cada vencimento"
         summary = (f"Achei o lançamento {notes_tools.rotulo_do_vinculo(cands[0])}. Quer o lembrete de *{nome}* vinculado "
-                   "a ele (te aviso a cada vencimento) ou solto?")
+                   f"a ele (te aviso {cada}) ou solto?")
         opcoes = [{"id": f"vinculo:{cands[0]['id']}", "label": f"Vinculado a {cands[0]['nome']}"}]
     else:
         summary = (f"Achei mais de um lançamento para o lembrete de *{nome}*. Vinculo a qual"
