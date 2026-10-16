@@ -248,3 +248,40 @@ async def test_escolha_como_gasto_sem_valor_pede_o_valor_e_nao_a_ajuda(monkeypat
     monkeypatch.setattr(nodes, "_ajuda_do_catalogo", nunca)
     saida = await nodes.compose({"results": [], "messages": [], "dominio_escolhido": "financas"})
     assert "Não achei o valor" in saida["reply"] and "Ainda não registrei nada" in saida["reply"]
+
+
+DOIS = [
+    {"type": "create_reminder", "content": "Cancelar a Amazon Prime", "remind_at": "2027-01-13", "recurrence": None,
+     "_pergunta": "Que horas eu te lembro de Cancelar a Amazon Prime?"},
+    {"type": "create_reminder", "content": "Cancelar a Disney+", "remind_at": "2026-11-13", "recurrence": None,
+     "_pergunta": "Que horas eu te lembro de Cancelar a Disney+?"},
+]
+
+
+def estado_dois(texto):
+    return {"workspace_id": "w1", "timezone": SP, "text": texto, "messages": None, "notes_draft": [dict(d) for d in DOIS]}
+
+
+async def test_dois_pendentes_respondidos_juntos_nao_deixam_nenhum_de_lado(notas):
+    # "9h da manhã nos dois" (WhatsApp, 15/10/2026): a Disney era comparada com a Amazon e a Amazon "saía"
+    notas(NotesAction(type="create_reminder", content="Cancelar a Amazon Prime", remind_at="2027-01-13T09:00:00"),
+          NotesAction(type="create_reminder", content="Cancelar a Disney+", remind_at="2026-11-13T09:00:00"))
+    ret = await nodes.notes_node(estado_dois("9h da manhã nos dois"))
+    assert [a["content"] for a in ret["notes_actions"]] == ["Cancelar a Amazon Prime", "Cancelar a Disney+"]
+    assert not any("Deixei de lado" in r for r in [*ret.get("results", []), *ret["avisos"]])
+
+
+async def test_dois_pendentes_so_com_a_hora_cada_um_ganha_a_sua_data(notas):
+    notas(NotesAction(type="create_reminder", remind_at="09:00"), NotesAction(type="create_reminder", remind_at="09:00"))
+    ret = await nodes.notes_node(estado_dois("9h nos dois"))
+    datas = {a["content"]: a["remind_at"][:16] for a in ret["notes_actions"]}
+    assert datas == {"Cancelar a Amazon Prime": "2027-01-13T09:00", "Cancelar a Disney+": "2026-11-13T09:00"}
+
+
+async def test_dois_pendentes_e_um_respondido_com_outro_novo_avisa_so_o_que_ficou(notas):
+    notas(NotesAction(type="create_reminder", content="Cancelar a Disney+", remind_at="2026-11-13T09:00:00"),
+          NotesAction(type="create_reminder", content="ligar pra mãe", remind_at="2027-01-15T18:00:00"))
+    ret = await nodes.notes_node(estado_dois("disney às 9 e me lembra de ligar pra mãe 15/01 às 18h"))
+    avisos = [*ret.get("results", []), *ret["avisos"]]
+    assert avisos.count("Deixei de lado o lembrete de *Cancelar a Amazon Prime*, que estava sem hora.") == 1
+    assert not any("Disney" in r and "Deixei" in r for r in avisos)
