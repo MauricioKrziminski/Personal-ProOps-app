@@ -84,6 +84,7 @@ import {
   EXPENSE_PATTERN_FILTER_OPTIONS, EXPENSE_NECESSITY_FILTER_OPTIONS,
   type ExpensePatternFilter, type ExpenseNecessityFilter,
 } from '@/lib/expense-classification-filters';
+import { useAcaoDePadrao } from '@/hooks/use-acao-de-padrao';
 
 /**
  * Lançamentos — "cadê aquele lançamento, e o que entrou e saiu neste mês?".
@@ -654,6 +655,7 @@ export default function TransactionsScreen() {
   }, [summary.data, previstasVisiveis]);
 
   const accounts = useAccounts(undefined, true);
+  const padrao = useAcaoDePadrao();
   const categories = useCategoriesUsed();
   // Só o extrato de UMA conta mostra saldo: sem conta filtrada não há por que ir ao banco.
   const saldos = useAccountBalances(accountId !== undefined && accountId !== NO_ACCOUNT);
@@ -1137,6 +1139,7 @@ export default function TransactionsScreen() {
                     icon: 'pencil' as const,
                     onPress: () => router.push(`/finance/accounts?edit=${contaDoFiltro.id}`),
                   },
+                  ...(contaDoFiltro.archived ? [] : [padrao(contaDoFiltro)]),
                 ]
               : []),
             {

@@ -65,6 +65,7 @@ import { AccountPicker } from '@/components/finance/account-picker';
 import { rotuloDaCompra } from '@/lib/data-da-compra';
 import { hrefDoLancamento, hrefDoLancar } from '@/lib/lancar';
 import { faltaDepoisDeDesfazer, mensagemDeDesfazer, naOrdemDoPagamento, nomeDoPagamento } from '@/lib/pagamentos-da-fatura';
+import { useAcaoDePadrao } from '@/hooks/use-acao-de-padrao';
 
 /**
  * Fatura — "o que tem nesta fatura, e como eu marco como paga?".
@@ -180,6 +181,7 @@ export default function InvoiceScreen() {
   // O nome pinta a face (a cor do emissor sai dele). Os cartões da Carteira já estão em cache;
   // as contas talvez não — sem este segundo caminho o cartão chegaria cinza e trocaria de cor.
   const resumoDosCartoes = useCardSummary();
+  const padrao = useAcaoDePadrao();
   const nomeDoCartao =
     cartao?.name ??
     (resumoDosCartoes.data ?? []).find((c) => c.account_id === fatura?.account_id)?.name ??
@@ -685,6 +687,7 @@ export default function InvoiceScreen() {
                     icon: 'square.and.arrow.down',
                     onPress: () => router.push({ pathname: '/import', params: { conta: fatura.account_id } }),
                   },
+                  padrao({ id: fatura.account_id, name: nomeDoCartao, type: 'credit_card' }),
                   { label: lembreteDaFatura ? 'Editar lembrete' : 'Lembrar', icon: 'bell' as const,
                     onPress: () => router.push(hrefDoLembrete({ tipo: 'fatura', invoiceId: fatura.id }, `Fatura ${nomeDoCartao}`)) },
                   ...(pagamentos.length > 0 && !adiada

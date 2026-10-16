@@ -21,5 +21,6 @@ test('accounts tablet support does not duplicate ledger sections', () => {
 
   assert.doesNotMatch(decisionSupport, /accountSections/);
   assert.match(decisionSupport, /hero/);
-  assert.match(decisionSupport, /defaultAccount/);
+  // O padrão se define no menu da própria conta (16/10/2026): sem seção de padrão no painel.
+  assert.doesNotMatch(decisionSupport, /defaultAccount|defaultCard/);
 });

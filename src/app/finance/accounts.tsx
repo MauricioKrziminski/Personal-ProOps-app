@@ -28,6 +28,7 @@ import { HeroLabel } from '@/components/ui/section-head';
 import { Skeleton, SkeletonRow } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { Motion, Radius, Space, tabular } from '@/design/tokens';
+import { useAcaoDePadrao } from '@/hooks/use-acao-de-padrao';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import {
   ACCOUNT_TYPES,
@@ -35,14 +36,10 @@ import {
   useAccountBalances,
   useAccounts,
   useArchiveAccount,
-  useDefaultAccount,
-  useDefaultCard,
   useSaveAccount,
   useCreateAccount,
   type CreateAccountResult,
   useContaTemLancamentos,
-  useSetDefaultAccount,
-  useSetDefaultCard,
   type Account,
   type AccountBalance,
 } from '@/hooks/use-finance';
@@ -116,10 +113,7 @@ export default function AccountsScreen() {
   const toast = useToast();
   const balances = useAccountBalances();
   const accounts = useAccounts();
-  const contaPadrao = useDefaultAccount();
-  const definirPadrao = useSetDefaultAccount();
-  const cartaoPadrao = useDefaultCard();
-  const definirCartaoPadrao = useSetDefaultCard();
+  const padrao = useAcaoDePadrao();
   const save = useSaveAccount();
   const createAccount = useCreateAccount();
   const savingRef = useRef(false);
@@ -179,8 +173,6 @@ export default function AccountsScreen() {
 
   const contaDe = (id: string | null) => (accounts.data ?? []).find((a) => a.id === id);
   /** Candidatas a conta padrão: guardar dinheiro é requisito, e o banco também exige. */
-  const guardamDinheiro = (accounts.data ?? []).filter((a) => a.type !== 'credit_card');
-  const cartoesAtivos = (accounts.data ?? []).filter((a) => a.type === 'credit_card');
 
   // erro de contas NÃO é lista vazia: sem esta guarda a tela mandava cadastrar conta para quem
   // já tem cinco cadastradas e só perdeu a rede
@@ -300,6 +292,8 @@ export default function AccountsScreen() {
           : `${brl(previsto)} a receber`
         : null;
 
+    const acaoPadrao = padrao({ id: saldo.account_id, name: saldo.name, type: saldo.type });
+
     return (
       <ItemLink
         key={saldo.account_id}
@@ -323,6 +317,7 @@ export default function AccountsScreen() {
             disabled: !conta,
             onPress: () => conta && abrirEdicao(conta),
           },
+          acaoPadrao,
           {
             label: 'Arquivar',
             icon: 'archivebox',
@@ -339,9 +334,10 @@ export default function AccountsScreen() {
               .filter(Boolean)
               .join(' · ')}
             icon={ICONE[saldo.type]}
+            badge={acaoPadrao.selected ? { label: 'Padrão', tone: 'textSecondary' } : undefined}
             // o valor negativo não pode ser comunicado só pela cor — e o previsto precisa
             // estar aqui também, senão o leitor de tela esconde o que a tela mostra
-            accessibilityLabel={`${saldo.name}, ${tipo}, ${negativo ? 'deve' : 'tem'} ${brl(Math.abs(cents))}${previstoTexto ? `, ${previstoTexto}` : ''}`}
+            accessibilityLabel={`${saldo.name}, ${tipo}, ${negativo ? 'deve' : 'tem'} ${brl(Math.abs(cents))}${acaoPadrao.selected ? ', padrão' : ''}${previstoTexto ? `, ${previstoTexto}` : ''}`}
             onLongPress={onLongPress}
             trailing={
               <Money
@@ -418,54 +414,6 @@ export default function AccountsScreen() {
     </>
   );
 
-  const defaultAccount = guardamDinheiro.length > 0 ? (
-    <Section title="Conta padrão">
-      <Row
-        title="Não definir"
-        onPress={() => definirPadrao.mutate(null)}
-        chevron={false}
-        accessibilityState={{ selected: contaPadrao.data == null }}
-        trailing={
-          contaPadrao.data == null ? <Icon name="checkmark" size="sm" color="tint" /> : undefined
-        }
-      />
-      {guardamDinheiro.map((a) => (
-        <Row
-          key={a.id}
-          title={a.name}
-          onPress={() => definirPadrao.mutate(a.id)}
-          chevron={false}
-          accessibilityState={{ selected: contaPadrao.data === a.id }}
-          trailing={
-            contaPadrao.data === a.id ? <Icon name="checkmark" size="sm" color="tint" /> : undefined
-          }
-        />
-      ))}
-    </Section>
-  ) : null;
-
-  const defaultCard = cartoesAtivos.length > 0 ? (
-    <Section title="Cartão padrão">
-      <Row
-        title="Não definir"
-        onPress={() => definirCartaoPadrao.mutate(null)}
-        chevron={false}
-        accessibilityState={{ selected: cartaoPadrao.data == null }}
-        trailing={cartaoPadrao.data == null ? <Icon name="checkmark" size="sm" color="tint" /> : undefined}
-      />
-      {cartoesAtivos.map((a) => (
-        <Row
-          key={a.id}
-          title={a.name}
-          onPress={() => definirCartaoPadrao.mutate(a.id)}
-          chevron={false}
-          accessibilityState={{ selected: cartaoPadrao.data === a.id }}
-          trailing={cartaoPadrao.data === a.id ? <Icon name="checkmark" size="sm" color="tint" /> : undefined}
-        />
-      ))}
-    </Section>
-  ) : null;
-
   const noAccount = semConta && Number(semConta.balance_cents) !== 0 ? (
     <Section>
       <Row
@@ -510,8 +458,6 @@ export default function AccountsScreen() {
       {accountsError}
       {accountSections}
       {/* Como no tablet: com o esqueleto na tela, nada aparece embaixo dele (25/09/2026). */}
-      {!balances.isLoading ? defaultAccount : null}
-      {!balances.isLoading ? defaultCard : null}
       {noAccount}
       {!balances.isLoading ? arquivadas : null}
       {empty}
@@ -539,8 +485,6 @@ export default function AccountsScreen() {
       {balances.isLoading ? <Skeleton height={120} radius={Radius.lg} /> : null}
       {!balances.isLoading ? hero : null}
       {accountsError}
-      {!balances.isLoading ? defaultAccount : null}
-      {!balances.isLoading ? defaultCard : null}
     </View>
   );
 

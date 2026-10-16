@@ -1427,7 +1427,9 @@ domínio nova; o que o agente NÃO faz de cada um está em `docs/AGENTE-PARIDADE
 ### Conta padrão e cartão padrão (15/10/2026)
 
 `workspaces.default_account_id` (não-cartão) e `default_card_id` (cartão de crédito ativo), ambos do
-próprio espaço (`20260909035000`, `20261015150000`), definidos em Contas. O formulário único os usa só
+próprio espaço (`20260909035000`, `20261015150000`), definidos pelo "Definir como padrão" no menu de quem mostra
+UMA conta ou cartão (`useAcaoDePadrao`: extrato, fatura, faturas, linhas de Contas e de Cartões; selo "Padrão" na linha de Contas
+e no card de Cartões). As seções "Conta padrão"/"Cartão padrão" no fim de Contas saíram (16/10/2026, *"horrível esse menu em baixo"*). O formulário único os usa só
 **ao criar do zero** (`abertoDoZero`: a rota sem nada além de tipo e mês) e a regra é pura
 (`contaSugerida`, `lib/conta-sugerida.ts`): **contexto > forma > padrão**. Conta passada pela rota,
 cópia, favorito, voz, captura e "Aplicar" valem como vieram; forma crédito -> cartão padrão; Pix,

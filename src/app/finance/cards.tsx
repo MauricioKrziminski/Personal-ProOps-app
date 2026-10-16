@@ -35,6 +35,8 @@ import {
   parcialDaFatura,
   prazoLabel,
 } from '@/lib/card-status';
+import { useAcaoDePadrao } from '@/hooks/use-acao-de-padrao';
+import { useTheme } from '@/hooks/use-theme';
 
 /**
  * Cartões — "quanto vou pagar de cartão, e quando?".
@@ -154,6 +156,8 @@ export default function CardsScreen() {
   const abrirNaCarteira = useAbrirNaCarteira();
   const toast = useToast();
   const archive = useArchiveAccount();
+  const padrao = useAcaoDePadrao();
+  const theme = useTheme();
   // Editar e arquivar ONDE o cartão está (25/09/2026) — só existiam em Contas.
   const arquivar = (card: CardSummary) =>
     confirmDestructive(
@@ -299,15 +303,23 @@ export default function CardsScreen() {
                 ...(podePagar && totalFatura > 0
                   ? [{ label: 'Paguei', icon: 'checkmark.circle' as const, arrasto: 'direita' as const, onPress: () => irParaFatura(card, true) }]
                   : []),
+                padrao({ id: card.account_id, name: card.name, type: 'credit_card' }),
                 { label: 'Editar cartão', icon: 'pencil', onPress: () => router.push(`/finance/accounts?edit=${card.account_id}`) },
                 { label: 'Arquivar cartão', curto: 'Arquivar', icon: 'archivebox', destructive: true, arrasto: 'esquerda', onPress: () => arquivar(card) },
               ]}
-              accessibilityLabel={`${card.name}, ${estado ? `fatura ${estado.toLowerCase()}` : 'sem fatura aberta'}, ${brl(totalFatura)}${parcial ? `, falta ${brl(parcial.falta)}` : ''}${card.due_date ? `, ${prazoLabel(card.due_date, 'vence')}` : ''}`}>
+              accessibilityLabel={`${card.name}${padrao({ id: card.account_id, name: card.name, type: 'credit_card' }).selected ? ', padrão' : ''}, ${estado ? `fatura ${estado.toLowerCase()}` : 'sem fatura aberta'}, ${brl(totalFatura)}${parcial ? `, falta ${brl(parcial.falta)}` : ''}${card.due_date ? `, ${prazoLabel(card.due_date, 'vence')}` : ''}`}>
               <View style={styles.cardHead}>
                 <Miniatura card={card} onPress={() => abrirNaCarteira(card)} />
-                <ThemedText type="smallBold" style={styles.cardName}>
-                  {card.name}
-                </ThemedText>
+                <View style={styles.cardName}>
+                  <ThemedText type="smallBold" style={styles.cardNameText}>
+                    {card.name}
+                  </ThemedText>
+                  {padrao({ id: card.account_id, name: card.name, type: 'credit_card' }).selected ? (
+                    <View style={[styles.selo, { backgroundColor: theme.backgroundElement }]}>
+                      <ThemedText type="caption" themeColor="textSecondary">Padrão</ThemedText>
+                    </View>
+                  ) : null}
+                </View>
                 {/* estado como PALAVRA, nunca só cor */}
                 <View style={styles.badge}>
                   {estado === 'Atrasada' ? (
@@ -541,9 +553,15 @@ const styles = StyleSheet.create({
   },
   cardName: {
     flexGrow: 1,
-    flexShrink: 0,
-    maxWidth: '100%',
+    flexShrink: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: Space.xs,
   },
+  cardNameText: { flexShrink: 0, maxWidth: '100%' },
+  // A mesma pílula do `badge` da `Row` (Contas), para o padrão ter um desenho só.
+  selo: { paddingHorizontal: Space.xs + 2, paddingVertical: 1, borderRadius: Radius.xs, borderCurve: 'continuous' },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',

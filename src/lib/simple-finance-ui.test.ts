@@ -475,6 +475,7 @@ function screen(file: string, options: { realMoney?: boolean; planningState?: an
       } };
       if (name === '@/hooks/use-rascunho') return load('src/hooks/use-rascunho.ts');
       if (name === '@/hooks/use-conta-sugerida') return load('src/hooks/use-conta-sugerida.ts');
+      if (name === '@/hooks/use-acao-de-padrao') return load('src/hooks/use-acao-de-padrao.tsx');
       if (name === '@/lib/conta-sugerida') return load('src/lib/conta-sugerida.ts');
       // Import relativo dentro de `src/lib` (o `rascunho.ts` importa `./escrita.ts`): o módulo de verdade.
       if (name.startsWith('./') && path.startsWith('src/lib/')) return load(`src/lib/${name.slice(2)}`);
@@ -2618,14 +2619,14 @@ test('Fatura: a compra arrasta Editar e Apagar', () => {
   assert.deepEqual(ladosDoLink(itemLinks(ui)[0]), { direita: ['Editar'], esquerda: ['Apagar'], mais: false, pontaDireita: 'Editar', pontaEsquerda: 'Apagar' });
 });
 
-test('Contas: a conta arrasta Editar e Arquivar (Ver extrato é o toque)', () => {
+test('Contas: a conta arrasta Editar e Arquivar (Ver extrato é o toque; o padrão mora no Mais)', () => {
   const ui = screen('src/app/finance/accounts.tsx', {
     balances: [{ account_id: 'a1', name: 'Nubank', type: 'checking', balance_cents: 10000, cleared_cents: 10000, pending_in_cents: 0, pending_out_cents: 0 }],
     forecastAccounts: [{ id: 'a1', name: 'Nubank', type: 'checking', archived: false }],
   });
   const [link] = itemLinks(ui);
   assert.ok(link, 'a conta está num ItemLink');
-  assert.deepEqual(ladosDoLink(link), { direita: ['Editar'], esquerda: ['Arquivar'], mais: false, pontaDireita: 'Editar', pontaEsquerda: 'Arquivar' });
+  assert.deepEqual(ladosDoLink(link), { direita: ['Editar'], esquerda: ['Arquivar'], mais: true, pontaDireita: 'Editar', pontaEsquerda: 'Arquivar' });
 });
 
 test('Projeção: a conta prevista arrasta Paguei à direita; Editar mora no Mais (a esquerda só tira da lista)', () => {
@@ -9085,19 +9086,23 @@ test('Conta padrão: o hospedeiro só pede a sugestão ao abrir do zero', () => 
   assert.equal(lancar.nodes().find((n: any) => n.type === 'FormularioDoLancamento').props.sugerirConta, false, 'criar outro mantém o que tem');
 });
 
-test('Contas: "Cartão padrão" só com cartão ativo e grava/limpa a escolha', () => {
-  const sem = screen('src/app/finance/accounts.tsx', { params: {}, forecastAccounts: [padraoContas[0]] });
-  assert.equal(sem.nodes().some((n: any) => n.type === 'Section' && n.props.title === 'Cartão padrão'), false);
-  const ui = screen('src/app/finance/accounts.tsx', { params: {}, forecastAccounts: padraoContas, cartaoPadrao: 'k1' });
-  const secao = () => ui.nodes().find((n: any) => n.type === 'Section' && n.props.title === 'Cartão padrão');
-  assert.ok(secao());
-  const linhas = () => {
-    const i = ui.nodes().indexOf(secao());
-    return ui.nodes().slice(i).filter((n: any) => n.type === 'Row' && ['Não definir', 'Nubank'].includes(n.props.title) && n.props.chevron === false);
-  };
-  ui.interact(() => linhas().find((n: any) => n.props.title === 'Não definir').props.onPress());
-  assert.deepEqual(ui.writes.at(-1), { operation: 'setDefaultCard', value: null });
-  ui.interact(() => linhas().find((n: any) => n.props.title === 'Nubank').props.onPress());
+test('Contas: o padrão se define pelo menu da linha e aparece como selo; as seções do fim saíram', () => {
+  const linha = (id: string, name: string, type: string) => ({ account_id: id, name, type, balance_cents: 0, cleared_cents: 0, pending_in_cents: 0, pending_out_cents: 0 });
+  const ui = screen('src/app/finance/accounts.tsx', { params: {}, forecastAccounts: padraoContas, contaPadrao: 'cc', cartaoPadrao: null,
+    balances: [linha('cc', 'Itaú', 'checking'), linha('cc2', 'Inter', 'checking'), linha('k1', 'Nubank', 'credit_card')] });
+  assert.equal(ui.nodes().some((n: any) => n.type === 'Section' && ['Conta padrão', 'Cartão padrão'].includes(n.props.title)), false);
+  const acao = (titulo: string) => ui.nodes().find((n: any) => n.type === 'ItemLink' && n.props.title === titulo)
+    .props.actions.find((a: any) => /padrão/.test(a.label));
+  // A linha mora no filho-função do ItemLink, que o harness não chama: chama-se aqui.
+  const selo = (titulo: string) => ui.nodes().find((n: any) => n.type === 'ItemLink' && n.props.title === titulo)
+    .props.children({ onLongPress: () => {} }).props.badge?.label;
+  assert.equal(acao('Itaú').label, 'Deixar de ser padrão');
+  assert.equal(selo('Itaú'), 'Padrão');
+  assert.equal(selo('Inter'), undefined);
+  ui.interact(() => acao('Itaú').onPress());
+  assert.deepEqual(ui.writes.at(-1), { operation: 'setDefaultAccount', value: null });
+  assert.equal(acao('Nubank').label, 'Definir como padrão');
+  ui.interact(() => acao('Nubank').onPress());
   assert.deepEqual(ui.writes.at(-1), { operation: 'setDefaultCard', value: 'k1' });
 });
 

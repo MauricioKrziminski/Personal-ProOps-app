@@ -29,6 +29,7 @@ import { formatDateBR, localISODate } from '@/hooks/use-items';
 import { showItemActions } from '@/lib/item-actions';
 import { useTheme } from '@/hooks/use-theme';
 import { hrefDoLancar } from '@/lib/lancar';
+import { useAcaoDePadrao } from '@/hooks/use-acao-de-padrao';
 
 /**
  * Faturas — o arquivo do cartão.
@@ -107,6 +108,7 @@ export default function InvoicesScreen() {
   const tablet = windowClass !== 'compact';
   const params = useLocalSearchParams<{ account?: string }>();
   const accounts = useAccounts();
+  const padrao = useAcaoDePadrao();
   const [cartaoId, setCartaoId] = useState<string | undefined>(params.account);
   const [mesSelecionado, setMesSelecionado] = useState<string | null>(null);
 
@@ -490,6 +492,7 @@ export default function InvoicesScreen() {
                   icon: 'pencil',
                   onPress: () => router.push(`/finance/accounts?edit=${atual.id}`),
                 },
+                padrao(atual),
               ]
             : []
         }
