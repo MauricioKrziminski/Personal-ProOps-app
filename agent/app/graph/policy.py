@@ -38,6 +38,7 @@ from app.domain.correcao_plano import (
     plano_travado,
 )
 from app.domain.dates import format_date_br
+from app.domain.lembrete import ROTULO_DO_CANAL, frase_dos_dias
 from app.domain.matching import sem_conta_explicita
 from app.domain.money import cents_to_brl
 from app.domain.recurrence import descreve_rrule
@@ -839,6 +840,16 @@ def describe_for_confirmation(
         pasta = " fora das pastas" if action.sem_pasta else f" na pasta {action.folder}{nova}" if action.folder else ""
         return f"criar a nota {previa_da_nota(action.content)}{pasta}"
     if tipo == "create_reminder":
+        t = target or {}
+        canal = f", por {ROTULO_DO_CANAL[t['canal']]}" if t.get("canal") in ROTULO_DO_CANAL else ""
+        if t.get("vinculo"):
+            # ligado: o dia é o de cada vencimento do lançamento; a repetição do modelo não vale aqui
+            v = t["vinculo"]
+            regra = v.get("regra") if v.get("alvo") == "recurring" else None
+            cada = "de cada vencimento" if v.get("alvo") != "transaction" else "do vencimento"
+            dias = frase_dos_dias(int(t.get("dias_antes") or 0)).replace("do vencimento", cada)
+            return (f"criar o lembrete vinculado ao lançamento *{v.get('nome')}*"
+                    + (f" ({regra})" if regra else "") + f": te aviso {dias}, às {t.get('hora')}{canal}")
         quando = ""
         if action.remind_at:
             hora = str(action.remind_at)[11:16]
@@ -849,6 +860,6 @@ def describe_for_confirmation(
             elif hoje and dia == (date.fromisoformat(hoje) + timedelta(days=1)).isoformat():
                 rotulo = "amanhã"
             quando = f" para {rotulo}" + (f" às {hora}" if hora else "")
-        repete = " (repete)" if action.recurrence else ""
-        return f"criar o lembrete *{action.content or ''}*{quando}{repete}"
+        repete = f", repete {descreve_rrule(action.recurrence)}" if action.recurrence else ""
+        return f"criar o lembrete *{action.content or ''}*{quando}{repete}{canal}"
     return f"salvar {alvo}"

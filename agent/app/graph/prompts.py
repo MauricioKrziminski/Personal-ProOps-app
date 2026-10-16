@@ -419,6 +419,16 @@ Tipos:
   ⚠️ Fim de mês explícito é BYMONTHDAY=-1. "Dia 30" e "dia 31" são dias FIXOS;
   o agendador ajusta ao último dia disponível em meses mais curtos. Não inferir
   fim de mês só porque o número escolhido é o último dia do mês atual.
+  Lembrete de uma CONTA, lançamento, parcela ou dívida ("me lembra de pagar o DAS",
+  "lembrete do aluguel"): search_term = o NOME dela como a pessoa disse ("DAS", "aluguel");
+  lembrete que não cita conta nenhuma, search_term vazio. vinculo = "lancamento" só se a pessoa
+  DIZ que quer o lembrete LIGADO/vinculado ao lançamento ("vinculado ao DAS", "ligado à conta de luz",
+  "no lançamento do aluguel"); "solto" só se DIZ que é sem vínculo ("solto", "avulso", "não vincula",
+  "sem ligar a lançamento"). Pedir o lembrete de uma conta NÃO é dizer: "me lembra de pagar o DAS
+  todo dia 20" -> search_term="DAS", vinculo vazio — o sistema pergunta. dias_antes = "2 dias antes do
+  vencimento" -> 2, "no dia do vencimento" -> 0; não dito, vazio.
+  channel só se a pessoa disser por onde: "pelo app"/"notificação"/"push" -> push; "pelo
+  WhatsApp"/"no zap" -> whatsapp; "nos dois", "app e WhatsApp" -> both. Não dito, vazio: vale o Perfil.
 - delete_reminder: cancelar um lembrete. search_term identifica qual.
 - query_reminders: LISTAR lembretes — "quais meus lembretes?", "o que eu tinha pra lembrar
   essa semana?", "tenho algum lembrete do dentista?". search_term filtra por título e

@@ -424,8 +424,8 @@ cadastros já recebia (`scripts/probe_resposta_ao_cadastro.py`, 4/4 no Gemini re
   finanças: não precisa de migration. **Limite conhecido:** com um rascunho de FINANÇAS aberto ao
   mesmo tempo, a resposta ("às 9") vai primeiro ao classificador do rascunho (`draft.interpretar`).
 - **Cadastro de lembrete** (`resource_create reminders`): `next_run_at` só com data também pergunta a
-  hora (`Level1Error` → `resource_draft`), a frase mostra o instante na hora DELA (era ISO em UTC) e o
-  canal (`push`, o padrão do app) já saía na frase.
+  hora (`Level1Error` → `resource_draft`), a frase mostra o instante na hora DELA (era ISO em UTC). Desde 16/10/2026 o
+  lembrete NOVO pedido aqui vai ao nó de notas (canal do Perfil e vínculo, abaixo).
 - **Recorrente criada pelo agente**: a data DITA é o início (antes `occurred_at` era ignorado e valia
   o minuto da mensagem); sem data, HOJE (a primeira da regra de hoje em diante, 14/10/2026 à tarde). A primeira ocorrência é congelada no alvo
   (`resolve.primeira_ocorrencia`) e a frase diz ", repete todo dia 5, primeira em 05/11/2026"; a tool
@@ -441,6 +441,30 @@ cadastros já recebia (`scripts/probe_resposta_ao_cadastro.py`, 4/4 no Gemini re
   foi dito (principal, saldo ou taxa ⇒ com juros; senão parcela fixa), a pergunta de campo faltante vem
   antes do SIM e a frase diz "parcelas fixas, juros incluídos… taxa não informada", então não é
   silencioso.
+
+**Lembrete: canal do Perfil e lembrete LIGADO a um lançamento (16/10/2026, dono do produto).**
+
+- **Lembrete NOVO tem um dono só: o nó de notas**, também quando o roteador manda o pedido aos cadastros
+  (`resource_create reminders` vai ao `notes_node`, que relê a frase). Era assim que "lembrete vinculado ao
+  lançamento DAS" nascia solto, só no push, e a correção antes do SIM caía no `confirm.MANTIDA`.
+- **Canal**: o dito (`NotesAction.channel`) vence; senão o do Perfil (`notes.canal_padrao`,
+  `lembrete.canal_do_perfil`: só push → push, só WhatsApp → whatsapp, os dois ou nenhum → os dois). Congelado no
+  alvo (`canal`) em `resolve_node`, dito na frase do SIM ("por notificação no app e WhatsApp") e gravado pela
+  tool. O envio continua obedecendo `alerts_whatsapp_enabled`.
+- **Ligado ou solto**: `resolve_node` procura o que o lembrete cita (`notes.lancamentos_do_lembrete`: série de
+  gasto ativa, compra com parcela em aberto, dívida em aberto, gasto avulso a vencer; nome pelo `search_term`
+  que o modelo tira da frase, ou o nome inteiro no texto, nunca palavra solta: `lembrete.casa_com_lembrete`). Achou
+  e a pessoa não disse → `kind=choice, purpose=lembrete_vinculo` antes do SIM ("Vinculado a X | Solto, sem vínculo": a palavra da pessoa, que o classificador da escolha casa).
+  Disse "vinculado" com UM candidato → não pergunta; com vários → pergunta qual, sem "solto"; disse "vinculado" e
+  nada casa → `correction_error`. Disse "solto" → não procura.
+- **Ligado = `bill_reminders`** pela MESMA `save_bill_reminder` do app, sob `auth.uid()` (`db.sob_rls`), somando os
+  avisos que a pessoa já tinha naquele alvo. Só a HORA é perguntada; o dia é o de cada vencimento, `dias_antes`
+  o dito ou o que o dia pedido dá contra o próximo vencimento (até 30), senão 0. A repetição do modelo não vale.
+- **Corrigir antes do SIM** ("notificação no app e no WhatsApp", "deixa solto"): `revise_proposal` refaz o pedido
+  com o lembrete da proposta SEMEADO em `notes_draft` (`conversation._lembretes_da_proposta`, com a escolha do
+  vínculo): o texto do turno da pergunta pode ser só "às 9h", e refazer com ele perdia o lembrete.
+- "Quais meus lembretes?" lista também os ligados (`bill_reminders_overview`, sob RLS). Editar e apagar um
+  lembrete ligado continua no app (`docs/AGENTE-PARIDADE-COM-O-APP.md`).
 
 **Staging, 14/10/2026 (chat real, Haiku): quatro defeitos de cadastro e lembrete.**
 

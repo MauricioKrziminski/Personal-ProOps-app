@@ -167,6 +167,11 @@ async def _lembrete(texto):
     return next((a for a in acoes if a.get("type") == "create_reminder"), None)
 
 
+def _cita_das(a):
+    """O nome da conta chega à busca: no `search_term` ou escrito como no cadastro no texto do lembrete."""
+    return "das" in (a.get("search_term") or "").lower() or "DAS" in (a.get("content") or "")
+
+
 def _sem_hora(a):
     """Lembrete SEM hora inventada: `remind_at` vazio ou só a data (YYYY-MM-DD)."""
     return bool(a) and len((a.get("remind_at") or "").strip()) <= 10
@@ -656,6 +661,30 @@ def secoes():
             ("todo dia às 8h me lembra de tomar o remédio",
              lambda a: bool(a) and "T08:00" in (a.get("remind_at") or "") and "DAILY" in (a.get("recurrence") or ""),
              "08:00 diário", lambda: _lembrete("todo dia às 8h me lembra de tomar o remédio")),
+        ],
+        # 16/10/2026: o nome da conta vai em search_term (o sistema procura o lançamento e pergunta "ligado ou
+        # solto?"); vínculo, dias antes e canal só quando ditos.
+        "notas/lembrete/vínculo e canal": [
+            (t, checa, rotulo, lambda t=t: _lembrete(t))
+            for t, checa, rotulo in [
+                ("me lembra de pagar o DAS todo dia 20 às 9h",
+                 lambda a: bool(a) and _cita_das(a) and not a.get("vinculo") and not a.get("channel"),
+                 "cita DAS, sem vínculo nem canal"),
+                ("cria um lembrete vinculado ao lançamento DAS às 9h",
+                 lambda a: bool(a) and a.get("vinculo") == "lancamento" and _cita_das(a), "vinculo=lancamento"),
+                ("me lembra do aluguel todo dia 5 às 8h, solto, sem ligar a lançamento nenhum",
+                 lambda a: bool(a) and a.get("vinculo") == "solto", "vinculo=solto"),
+                ("me lembra de pagar a conta de luz 2 dias antes do vencimento às 10h",
+                 lambda a: bool(a) and a.get("dias_antes") == 2 and "luz" in (a.get("search_term") or "").lower(),
+                 "dias_antes=2, search_term=luz"),
+                ("me lembra amanhã às 9 de ligar pro dentista pelo whatsapp",
+                 lambda a: bool(a) and a.get("channel") == "whatsapp", "channel=whatsapp"),
+                ("todo dia às 8h me lembra de tomar o remédio, no app e no whatsapp",
+                 lambda a: bool(a) and a.get("channel") == "both", "channel=both"),
+                ("me lembra amanhã às 10 de buscar as crianças na escola",
+                 lambda a: bool(a) and not a.get("search_term") and not a.get("channel") and not a.get("vinculo"),
+                 "sem conta, sem canal, sem vínculo"),
+            ]
         ],
         "notas/fixar": [
             (t, _campo("notes", "pinned", "true"), "notes.pinned=true",

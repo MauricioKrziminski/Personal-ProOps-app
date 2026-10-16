@@ -25,7 +25,7 @@ from app.domain.matching import ultimo_dia_do_mes
 from app.graph.schemas import ResourceAction, ResourceActionType as Op, ResourceField
 from app.tools.base import ExecContext, ToolResult, ensure_owned, request_id
 from app.tools.guards import Level1Error, clean_rrule
-from app.domain import matching
+from app.domain import lembrete, matching
 
 # table, identifying column, deletion semantics, editable columns
 CATALOG = {
@@ -334,9 +334,7 @@ ROTULO_DE_ENUM = {
     "expense": "gasto",
     "income": "receita",
     "transfer": "transferência",
-    "push": "notificação no app",
-    "whatsapp": "WhatsApp",
-    "both": "notificação no app e WhatsApp",
+    **lembrete.ROTULO_DO_CANAL,
     "contains": "contém o termo",
     "merchant": "estabelecimento",
     # modo da dívida: as palavras do seletor do formulário do app

@@ -77,6 +77,15 @@ def grafo(monkeypatch):
         ]
 
     monkeypatch.setattr(nodes.resolve, "conta_padrao", conta_padrao_falsa)
+
+    async def canal_falso(user_id):  # o Perfil com só o push ligado
+        return "push"
+
+    async def sem_lancamento(*a, **k):
+        return []
+
+    monkeypatch.setattr(nodes.notes_tools, "canal_padrao", canal_falso)
+    monkeypatch.setattr(nodes.notes_tools, "lancamentos_do_lembrete", sem_lancamento)
     monkeypatch.setattr(nodes, "route", router_falso)
     async def notas_falso(state):
         return {}
@@ -147,7 +156,8 @@ async def test_lembrete_pede_sim_e_recusa_nao_grava(grafo):
                                            "remind_at": "2026-09-22T09:00:00"}]},
         config=config,
     )
-    assert _pausa(estado)["summary"] == "criar o lembrete *pagar aluguel* para 22/09/2026 às 09:00"
+    assert _pausa(estado)["summary"] == ("criar o lembrete *pagar aluguel* para 22/09/2026 às 09:00, "
+                                         "por notificação no app")
     recusado = await grafo.ainvoke(Command(resume=False), config=config)
     assert "EXECUTOU" not in recusado["reply"]
 

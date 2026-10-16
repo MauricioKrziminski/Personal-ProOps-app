@@ -275,7 +275,8 @@ def _estado_base(
         "resource_actions": [],
         "resource_prepared": [],
         "resource_draft": None,
-        "notes_draft": None,
+        # None preserva o do checkpoint; a correção de um lembrete antes do SIM semeia a proposta (`_lembretes_da_proposta`)
+        "notes_draft": conteudo.get("notes_draft"),
         "reply": "",
         "targets": [],
         "chosen_id": "",
@@ -292,6 +293,29 @@ def _estado_base(
         "approved": False,
         "halted": False,
     }
+
+
+def _lembretes_da_proposta(valores: dict, resumo: str) -> list[dict]:
+    """A proposta de LEMBRETE que a pessoa corrigiu antes do SIM, como PENDENTE do nó de notas (16/10/2026).
+
+    O texto do turno da pergunta pode ser só a última resposta ("às 9h da manhã"): refazer com ele e a correção
+    ("no app e no WhatsApp") perdia o lembrete. O pendente leva o lembrete inteiro e a escolha "ligado ou solto"
+    já feita, e o modelo devolve o MESMO lembrete com a correção (`nodes._com_campos_do_lembrete` herda o resto).
+    """
+    acoes = valores.get("notes_actions") or []
+    inicio = len(valores.get("finance_actions") or []) + len(valores.get("finance_queries") or [])
+    alvos = (valores.get("targets") or [])[inicio:inicio + len(acoes)]
+    pendentes = []
+    for acao, alvo in zip(acoes, [*alvos, *([{}] * len(acoes))]):
+        if acao.get("type") != "create_reminder":
+            continue
+        item = {**acao, "_pergunta": f"Confirma {resumo}?"}
+        if (alvo or {}).get("vinculo"):
+            item.update(vinculo="lancamento", search_term=alvo["vinculo"].get("nome"))
+        elif (alvo or {}).get("solto"):
+            item["vinculo"] = "solto"
+        pendentes.append(item)
+    return pendentes
 
 
 async def run_turn(
@@ -381,7 +405,8 @@ async def _run_turn(
         # ele que o grafo leu; `pending_actions` só guarda o resumo.
         snapshot = await graph().aget_state(
             {"configurable": {"thread_id": pendente["thread_id"]}})
-        original = ((getattr(snapshot, "values", None) or {}).get("text") or "").strip()
+        valores = getattr(snapshot, "values", None) or {}
+        original = (valores.get("text") or "").strip()
         if not original:
             # pedido que era só anexo (foto, PDF): a URL da mídia já expirou e a
             # correção sozinha não diz o que registrar — mantém a proposta
@@ -391,7 +416,8 @@ async def _run_turn(
         correcao = conteudo.get("text", "")
         conteudo = {**conteudo, "text": f"{original}\n{correcao}",
                     "raw_texts": [original, correcao],
-                    "corrigindo": pendente.get("summary") or "a proposta anterior"}
+                    "corrigindo": pendente.get("summary") or "a proposta anterior",
+                    "notes_draft": _lembretes_da_proposta(valores, pendente.get("summary") or "") or None}
         pendente = None
 
     if pendente:
@@ -1035,7 +1061,8 @@ def _pergunta(pausa: dict, candidatos: list[dict], pendente: dict | None) -> dic
 
     numerado = "\n".join(f"{i}) {c['label']}" for i, c in enumerate(candidatos, 1))
 
-    if pausa.get("purpose") in ("amount_unit", "recorrente_pagas", "forma_pix_credito"):
+    if pausa.get("purpose") in ("amount_unit", "recorrente_pagas", "forma_pix_credito") or (
+            pausa.get("purpose") == "lembrete_vinculo" and len(candidatos) <= 2):  # 3 botões: 2 opções + Cancelar
         # A pessoa já disse QUAL compra: a saída aqui é desistir, não "nenhuma dessas"
         # nem "me diz pelo valor ou pela data", que são textos de busca.
         corpo = f"🤔 {pausa['summary']}"

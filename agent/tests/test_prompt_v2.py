@@ -30,7 +30,7 @@ from app.services import consumo, embeddings, ia
 PIN_ROUTER = "dfda2343"  # 14/10/2026: critério de frase solta x pergunta, exemplos fora das avaliações
 PIN_FINANCE = "fb4c0d49"  # 14/10/2026: categoria_dita (a regra do usuário só vale onde a pessoa não disse)
 PIN_FINANCE_QUERY = "5d4cc1d7"
-PIN_NOTES = "393802e3"  # 15/10/2026: pasta é CAMINHO "mãe / filha"
+PIN_NOTES = "97ef157c"  # 16/10/2026: lembrete diz o nome da conta, o vínculo e o canal (só o que a pessoa disse)
 PIN_SCHEMA_ROUTER = "290d403c0f22daf5"
 PIN_TURNO_SIMPLES = "02e5e46b1513deff"
 PIN_TURNO_COMPLETO = "c949a009cb0e3d7a"  # 15/10/2026: lista de pastas por caminho

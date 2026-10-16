@@ -30,7 +30,7 @@ from app.graph.schemas import NotesAction
 from app.tools import guards
 from app.tools.base import ExecContext, ToolResult
 from app.tools.guards import Level1Error
-from app.domain import matching
+from app.domain import lembrete, matching
 
 log = logging.getLogger(__name__)
 
@@ -495,8 +495,157 @@ def pergunta_do_lembrete(titulo: str | None, remind_at: str | None, recurrence: 
     return f"Que horas eu te lembro de {nome}{onde}?"
 
 
+def pergunta_da_hora(titulo: str | None, remind_at: str | None) -> str | None:
+    """Lembrete LIGADO a um lançamento só precisa da hora: o dia sai de cada vencimento."""
+    hora = (remind_at or "").strip()[11:16] if len((remind_at or "").strip()) > 10 else ""
+    if re.fullmatch(r"\d{2}:\d{2}", hora):
+        return None
+    return f"Que horas eu te lembro de *{(titulo or 'isso').strip()}*?"
+
+
+async def canal_padrao(user_id) -> str:
+    """O canal do Perfil (`lembrete.canal_do_perfil`): o lembrete nasce por onde a pessoa escolheu ser avisada."""
+    p = await db.fetch_one(
+        "select alerts_push_enabled as push, alerts_whatsapp_enabled as zap from public.profiles where id = %s", user_id)
+    return lembrete.canal_do_perfil(bool(p and p["push"]), bool(p and p["zap"]))
+
+
+# alvo do lembrete de conta -> coluna de `bill_reminders` e tabela do registro (allowlist literal)
+ALVOS_DO_LEMBRETE = {
+    "recurring": ("recurring_id", "recurring_transactions"),
+    "plan": ("installment_plan_id", "installment_plans"),
+    "debt": ("debt_id", "debts"),
+    "transaction": ("transaction_id", "transactions"),
+}
+
+
+async def lancamentos_do_lembrete(workspace_id, termo: str | None, conteudo: str | None,
+                                  timezone_name: str) -> list[dict]:
+    """Os registros a que um lembrete pode se ligar e que ele cita (16/10/2026): série de gasto ativa, compra
+    parcelada com parcela em aberto, dívida em aberto e gasto avulso que ainda vai vencer. As mesmas réguas
+    de `save_bill_reminder` (só conta a pagar). Até 5, os de nome igual ao dito primeiro."""
+    hoje = local_iso_date(timezone_name)
+    valores = {"ws": workspace_id, "hoje": hoje, "fuso": timezone_name}
+    sql = (
+        """
+        select 'recurring' as alvo, r.id::text as id, coalesce(r.description, r.merchant, r.category) as nome,
+               r.rrule as regra,
+               coalesce((select min(coalesce(t.due_at, t.occurred_at)) from public.transactions t
+                         where t.recurring_id = r.id and t.status = 'pending' and t.invoice_id is null
+                           and coalesce(t.due_at, t.occurred_at) >= %(hoje)s::date),
+                        (r.next_run_at at time zone %(fuso)s)::date) as vence
+        from public.recurring_transactions r
+        where r.workspace_id = %(ws)s and r.kind = 'expense' and r.active
+          and (r.end_date is null or r.end_date >= %(hoje)s::date)
+        union all
+        select 'plan', p.id::text, coalesce(p.description, p.merchant, p.category), null,
+               (select min(coalesce(ci.due_date, t.due_at, t.occurred_at)) from public.transactions t
+                left join public.card_invoices ci on ci.id = t.invoice_id
+                where t.installment_plan_id = p.id
+                  and ((t.invoice_id is null and t.status = 'pending')
+                       or (t.invoice_id is not null and ci.status not in ('paid', 'rolled')))
+                  and coalesce(ci.due_date, t.due_at, t.occurred_at) >= %(hoje)s::date)
+        from public.installment_plans p
+        where p.workspace_id = %(ws)s
+        union all
+        select 'debt', d.id::text, d.name, null,
+               (select min(s.due_date) from private.debt_schedule_for(d.id) s where s.due_date >= %(hoje)s::date)
+        from public.debts d
+        where d.workspace_id = %(ws)s and not d.archived and d.remaining_cents > 0
+        union all
+        select * from (
+          select 'transaction', t.id::text, coalesce(t.description, t.merchant, t.category), null,
+                 coalesce(t.due_at, t.occurred_at)
+          from public.transactions t
+          where t.workspace_id = %(ws)s and t.kind = 'expense' and t.status = 'pending' and t.invoice_id is null
+            and t.recurring_id is null and t.installment_plan_id is null and t.debt_id is null
+            and t.pays_invoice_id is null and t.pix_fee_for_transaction_id is null
+            and coalesce(t.due_at, t.occurred_at) >= %(hoje)s::date
+          order by coalesce(t.due_at, t.occurred_at) limit 300) avulsos
+        """
+    )
+    # `db.fetch` só aceita parâmetros posicionais: os nomes acima viram %s, na ordem em que aparecem
+    linhas = await db.fetch(re.sub(r"%\(\w+\)s", "%s", sql), *[valores[n] for n in re.findall(r"%\((\w+)\)s", sql)])
+    achados = [l for l in linhas
+               if not (l["alvo"] == "plan" and l["vence"] is None)  # compra toda paga não tem o que lembrar
+               and lembrete.casa_com_lembrete(l["nome"], termo, conteudo)]
+    dito = matching.normalize(termo)
+    achados.sort(key=lambda l: (matching.normalize(l["nome"]) != dito, str(l["vence"] or "9999")))
+    return [{"alvo": l["alvo"], "id": l["id"], "nome": l["nome"],
+             "regra": descreve_rrule(l["regra"]) if l["regra"] else None,
+             "vence": l["vence"].isoformat() if l["vence"] else None} for l in achados[:5]]
+
+
+def rotulo_do_vinculo(c: dict) -> str:
+    """"*Aluguel* (todo dia 20)", "*TV* (compra parcelada)", "*Dentista* (vence 20/10/2026)"."""
+    if c["alvo"] == "recurring":
+        extra = c.get("regra") or "recorrente"
+    elif c["alvo"] == "plan":
+        extra = "compra parcelada"
+    elif c["alvo"] == "debt":
+        extra = "financiamento"
+    else:
+        extra = f"vence {format_date_br(c['vence'])}" if c.get("vence") else "conta a pagar"
+    return f"*{c['nome']}* ({extra})"
+
+
+async def _gravar_lembrete_ligado(ctx: ExecContext, vinculo: dict, dias: int, hora: str, canal: str):
+    """Pela MESMA RPC do formulário do app (`save_bill_reminder`, sob `auth.uid()` = a pessoa): ela é quem
+    recusa receita, conta paga, dívida quitada. Ela SUBSTITUI os avisos daquele alvo, então os que a pessoa já
+    tinha vão junto. Devolve o id do aviso criado."""
+    import json
+
+    coluna, _ = ALVOS_DO_LEMBRETE[vinculo["alvo"]]
+    filtro = f"user_id = %s and {coluna} = %s" + (" and debt_installment_no is null" if vinculo["alvo"] == "debt" else "")
+    antes = await db.fetch(
+        f"select days_before, to_char(at_time, 'HH24:MI') as at_time from public.bill_reminders where {filtro}",  # noqa: S608
+        ctx.user_id, vinculo["id"])
+    avisos = [{"days_before": a["days_before"], "at_time": a["at_time"]} for a in antes]
+    if not any(a["days_before"] == dias and a["at_time"] == hora for a in avisos):
+        avisos.append({"days_before": dias, "at_time": hora})
+    await db.fetch_one("select public.save_bill_reminder(%s::jsonb, %s::jsonb, %s)",
+                       json.dumps({coluna: vinculo["id"]}), json.dumps(avisos), canal)
+    return await db.fetch_one(
+        f"select id from public.bill_reminders where {filtro} and days_before = %s and at_time = %s::time",  # noqa: S608
+        ctx.user_id, vinculo["id"], dias, hora)
+
+
+async def _criar_lembrete_ligado(ctx: ExecContext, alvo: dict, action: NotesAction, canal: str) -> ToolResult:
+    import psycopg
+
+    from app.tools.base import ensure_owned
+
+    vinculo = alvo["vinculo"]
+    _, tabela = ALVOS_DO_LEMBRETE[vinculo["alvo"]]
+    await ensure_owned(tabela, vinculo["id"], ctx.workspace_id)
+    hora = alvo.get("hora") or (action.remind_at or "")[11:16]
+    if not re.fullmatch(r"\d{2}:\d{2}", hora or ""):
+        raise Level1Error(f"❌ {pergunta_da_hora(action.content, None)} Ainda não criei o lembrete.")
+    dias = int(alvo.get("dias_antes") or 0)
+    try:
+        # bloco aninhado: a recusa do banco desfaz só ele (o `except` segue em frente)
+        async with db.unidade_de_trabalho():
+            if db.rls_ativo():
+                row = await _gravar_lembrete_ligado(ctx, vinculo, dias, hora, canal)
+            else:
+                async with db.sob_rls(ctx.user_id):
+                    row = await _gravar_lembrete_ligado(ctx, vinculo, dias, hora, canal)
+    except psycopg.errors.RaiseException as err:
+        return ToolResult(f"❌ {err.diag.message_primary}. Ainda não criei o lembrete.", read_only=True)
+    return ToolResult(
+        f"⏰ Lembrete vinculado a {rotulo_do_vinculo(vinculo)}: te aviso {lembrete.frase_dos_dias(dias)}, às {hora}, "
+        f"por {lembrete.ROTULO_DO_CANAL[canal]}.",
+        result_id=row["id"] if row else None,
+    )
+
+
 async def create_reminder(ctx: ExecContext, action: NotesAction) -> ToolResult:
     titulo = guards.require_text(action.content, o_que="o que lembrar", maximo=200)
+    alvo = ctx.target or {}
+    # o canal congelado antes do SIM (o dito ou o do Perfil); checkpoint antigo, sem ele: o de antes
+    canal = alvo.get("canal") or lembrete.canal_dito(action.channel) or "push"
+    if alvo.get("vinculo"):
+        return await _criar_lembrete_ligado(ctx, alvo, action, canal)
     rrule = guards.clean_rrule(action.recurrence)
 
     quando = instante_do_lembrete(action.remind_at, rrule, ctx.timezone)
@@ -509,17 +658,18 @@ async def create_reminder(ctx: ExecContext, action: NotesAction) -> ToolResult:
     row = await db.fetch_one(
         """
         insert into public.reminders
-          (user_id, workspace_id, title, recurrence, next_run_at, timezone, source)
-        values (%s, %s, %s, %s, %s, %s, 'whatsapp')
+          (user_id, workspace_id, title, recurrence, next_run_at, timezone, channel, source)
+        values (%s, %s, %s, %s, %s, %s, %s, 'whatsapp')
         returning id
         """,
-        ctx.user_id, ctx.workspace_id, titulo, rrule, quando, ctx.timezone,
+        ctx.user_id, ctx.workspace_id, titulo, rrule, quando, ctx.timezone, canal,
     )
-    repete = " (e se repete)" if rrule else ""
+    repete = f", {descreve_rrule(rrule)}" if rrule else ""
     # no fuso da pessoa: `quando` é UTC, e das 21h à meia-noite a data UTC já é o dia seguinte
     local = quando.astimezone(tz(ctx.timezone))
     return ToolResult(
-        f"⏰ Lembrete criado: *{titulo}* em {format_date_br(local.date())} às {local:%H:%M}{repete}.",
+        f"⏰ Lembrete criado: *{titulo}* em {format_date_br(local.date())} às {local:%H:%M}{repete}, "
+        f"por {lembrete.ROTULO_DO_CANAL[canal]}.",
         result_id=row["id"] if row else None,
     )
 
@@ -580,7 +730,8 @@ async def query_reminders(ctx: ExecContext, action: NotesAction) -> ToolResult:
         if not em_pausa(hoje_local, r.get("paused_from"), r.get("paused_until"))
         and not em_pausa(local_iso_date(ctx.timezone, r["next_run_at"]), r.get("paused_from"), r.get("paused_until"))
     ]
-    if not rows:
+    ligados = await _lembretes_ligados(ctx, termo, action.query_from, action.query_to)
+    if not rows and not ligados:
         alvo = f' com "{termo}"' if termo else ""
         return ToolResult(
             f"⏰ Nenhum lembrete{alvo} por aqui. Tenta "
@@ -591,7 +742,7 @@ async def query_reminders(ctx: ExecContext, action: NotesAction) -> ToolResult:
     hoje = local_iso_date(ctx.timezone)
     amanha = local_iso_date(ctx.timezone, now_utc() + timedelta(days=1))
 
-    linhas = ["⏰ *Seus lembretes*"]
+    linhas = ["⏰ *Seus lembretes*"] if rows else []
     for r in rows:
         dia = local_iso_date(ctx.timezone, r["next_run_at"])
         hora = local_now(ctx.timezone, r["next_run_at"]).strftime("%H:%M")
@@ -603,5 +754,36 @@ async def query_reminders(ctx: ExecContext, action: NotesAction) -> ToolResult:
             quando = f"{format_date_br(dia)} às {hora}"
         repete = descreve_rrule(r["recurrence"]) if r["recurrence"] else ""
         sufixo = f" · {repete}" if repete and repete != "sem recorrência" else ""
-        linhas.append(f"  • {r['title']} — {quando}{sufixo}")
-    return ToolResult("\n".join(linhas), read_only=True)
+        canal = lembrete.ROTULO_CURTO_DO_CANAL.get(r.get("channel") or "")
+        linhas.append(f"  • {r['title']} — {quando}{sufixo}" + (f" · {canal}" if canal else ""))
+    if ligados:
+        linhas += ["", "🔗 *Vinculados a lançamentos*" if rows else "🔗 *Seus lembretes vinculados a lançamentos*"]
+        for l in ligados:
+            avisos = ", ".join(f"{lembrete.frase_dos_dias(a['days_before'])} às {a['at_time']}" for a in l["avisos"])
+            prox = f" · próximo vencimento {format_date_br(l['next_due'])}" if l["next_due"] else ""
+            canal = lembrete.ROTULO_CURTO_DO_CANAL.get(l["channel"] or "")
+            linhas.append(f"  • {l['title']} — {avisos}{prox}" + (f" · {canal}" if canal else ""))
+    return ToolResult("\n".join(linhas).strip(), read_only=True)
+
+
+async def _lembretes_ligados(ctx: ExecContext, termo: str, de: str | None, ate: str | None) -> list[dict]:
+    """Os lembretes de conta DA PESSOA (`bill_reminders_overview`, a lista do app, sob `auth.uid()`). Falhar
+    nunca derruba a lista dos lembretes soltos."""
+    sql = "select title, channel, avisos, next_due from public.bill_reminders_overview()"
+    try:
+        if db.rls_ativo():
+            linhas = await db.fetch(sql)
+        else:
+            async with db.unidade_de_trabalho():
+                async with db.sob_rls(ctx.user_id):
+                    linhas = await db.fetch(sql)
+    except Exception:  # noqa: BLE001
+        log.warning("lembretes de conta não lidos", exc_info=True)
+        return []
+    dito = matching.normalize(termo)
+    return [
+        l for l in linhas
+        if (not dito or dito in matching.normalize(l["title"]))
+        and (not de or (l["next_due"] and l["next_due"].isoformat() >= de))
+        and (not ate or (l["next_due"] and l["next_due"].isoformat() <= ate))
+    ]

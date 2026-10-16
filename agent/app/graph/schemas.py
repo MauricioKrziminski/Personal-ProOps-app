@@ -352,12 +352,16 @@ class NotesAction(BaseModel):
     content: str | None = Field(None, description="Texto da nota ou o que lembrar.")
     folder: str | None = Field(None, description="Pasta da nota: nome curto e minúsculo, ou caminho 'mãe / filha'.")
     sem_pasta: bool = Field(False, description="true só se a pessoa pede a nota FORA de qualquer pasta.")
-    search_term: str | None = Field(None, description="Trecho que ACHA a nota/lembrete.")
+    search_term: str | None = Field(None, description="Trecho que ACHA a nota/lembrete; em create_reminder, o nome da conta citada.")
     append_text: str | None = Field(None, description="Texto a ACRESCENTAR numa nota existente.")
     remind_at: str | None = Field(None, description="Quando lembrar, ISO local do usuário.")
     recurrence: str | None = Field(None, description="RRULE quando o lembrete se repete.")
     query_from: str | None = Field(None, description="Início do período, YYYY-MM-DD.")
     query_to: str | None = Field(None, description="Fim do período, YYYY-MM-DD.")
+    # Lembrete: só o que a pessoa DISSE (16/10/2026). Strings, não Enum: um segundo enum derruba o schema.
+    channel: str | None = Field(None, description="Canal do lembrete, só se dito: push, whatsapp ou both.")
+    vinculo: str | None = Field(None, description="Só se a pessoa DISSER: lancamento (vinculado/ligado) ou solto.")
+    dias_antes: int | None = Field(None, description="Lembrete ligado: quantos dias antes do vencimento, se dito.")
 
 
 class NotesPlan(BaseModel):

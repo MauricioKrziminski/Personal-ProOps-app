@@ -299,9 +299,11 @@ reject: desistência sem novo pedido.
 change_card: escolheu outro cartão ("quero usar outro cartão", "troca para o Inter", "usa Inter em vez do Nubank"). new_account só contém o nome explicitamente informado. Isso NÃO aprova a compra.
 revise_scope: mudou o limite das parcelas ("não, só as 8 anteriores" -> installment_scope="first:8"). Isso NÃO aprova a baixa anterior.
 revise_proposal: a pessoa CORRIGE ou COMPLETA um detalhe desta mesma proposta — valor, conta,
-cartão, forma de pagamento, número de parcelas, data, nome, categoria ou qual registro:
+cartão, forma de pagamento, número de parcelas, data, hora, nome, categoria, qual registro, por onde
+o lembrete avisa ou se ele fica ligado a um lançamento:
 "comprei em 2x no cartão", "não foi à vista, foi no cartão", "sim, mas muda para 24 parcelas",
-"foi 50, não 45", "era ontem", "na verdade no Inter", "não, é o do mercado". Nunca aprova.
+"foi 50, não 45", "era ontem", "na verdade no Inter", "não, é o do mercado",
+"notificação no app e no whatsapp", "só pelo whatsapp", "deixa solto". Nunca aprova.
 new_intent: pedido ou pergunta claramente independente da proposta, sobre OUTRA coisa ("gastei 30 no uber",
 "quanto gastei hoje?"), sem prender a resposta à proposta.
 unclear: dúvida, ou resposta que não diz o que muda. Nunca aprove condições.
@@ -522,6 +524,11 @@ def _relembrar_opcoes(pendente: dict) -> str:
     if (pendente.get("action") or {}).get("purpose") == "forma_pix_credito":
         return (
             "🤔 Ainda não registrei nada — preciso saber se foi Pix no crédito ou uma compra no cartão de crédito.\n"
+            f"{numerado}\nResponde com o número, ou *NÃO* para cancelar."
+        )
+    if (pendente.get("action") or {}).get("purpose") == "lembrete_vinculo":
+        return (
+            "🤔 Ainda não criei o lembrete — preciso saber se ele fica vinculado ao lançamento ou solto.\n"
             f"{numerado}\nResponde com o número, ou *NÃO* para cancelar."
         )
     if (pendente.get("action") or {}).get("purpose") == "amount_unit":
