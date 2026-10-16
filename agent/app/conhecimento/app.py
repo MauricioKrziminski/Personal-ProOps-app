@@ -295,8 +295,8 @@ CATALOGO: tuple[Entrada, ...] = (
         "lembretes", "Lembretes",
         ("como crio um lembrete?", "onde vejo meus lembretes?", "como faço um lembrete que repete?",
          "como me avisam de uma conta?"),
-        "Diga: \"me lembra de pagar o aluguel todo dia 5 às 9h\". Os lembretes ficam em *Hoje* e "
-        "na lista de lembretes do app, e chegam por notificação e WhatsApp.",
+        "Diga: \"me lembra de pagar o aluguel todo dia 5 às 9h\". Os do dia aparecem em *Hoje*; a "
+        "lista inteira (criar, editar, pausar) fica em *Perfil → Lembretes*. Chegam por notificação e WhatsApp.",
         "/reminders", "Lembretes",
     ),
     Entrada(
