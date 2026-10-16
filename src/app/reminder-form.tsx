@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useAbrirPaywallSemAssinatura } from '@/hooks/use-acesso';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { Keyboard, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -34,6 +34,9 @@ import { Elevation, Motion, Radius, Space, Type, tabular } from '@/design/tokens
 import { GlassBackdrop, supportsLiquidGlass } from '@/components/ui/glass-backdrop';
 import { useAdaptiveWindow } from '@/hooks/use-adaptive-window';
 import { useApagarComAlcance } from '@/hooks/use-apagar-com-alcance';
+import { useAlertPreferences } from '@/hooks/use-push';
+import { useSession } from '@/hooks/use-session';
+import { canalDoPerfil } from '@/lib/canal-do-lembrete';
 import { useScheme, useTheme } from '@/hooks/use-theme';
 import {
   useDeleteReminder,
@@ -349,6 +352,8 @@ export function ReminderForm({
   const toggle = useToggleReminder();
   const remove = useDeleteReminder();
   const { apagar } = useApagarComAlcance(() => router.back());
+  const { session } = useSession();
+  const prefs = useAlertPreferences(session?.user.id);
 
   // Ler o relógio a cada render é impuro (React Compiler) e o modal é efêmero.
   const [now] = useState(() => {
@@ -361,7 +366,7 @@ export function ReminderForm({
     };
   });
 
-  const { control, handleSubmit, setValue, getValues, formState } = useForm<FormValues>({
+  const { control, handleSubmit, setValue, getValues, getFieldState, formState } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       title: editing?.title ?? fallbackTitle ?? '',
@@ -369,15 +374,20 @@ export function ReminderForm({
       time: now.time,
       recurrence: editing?.recurrence ?? null,
       /*
-        **`push`, não `both`** (08/09/2026). O default da coluna no banco sempre foi `push`; era
-        esta tela que sobrescrevia para `both`, e com isso todo lembrete criado no app nascia
-        mandando também um template PAGO de WhatsApp — sem ninguém ter pedido esse canal. O canal
-        proativo principal do produto é push (`whatsapp.md`: template Utility é complemento), e
-        quem quer WhatsApp marca aqui.
+        **O canal do Perfil** (16/10/2026, dono do produto; era `push` fixo desde 08/09/2026). O
+        `both` antigo mandava template PAGO de WhatsApp a quem nunca pediu; hoje o WhatsApp só sai
+        com ele ligado no Perfil (o envio confere), e o padrão é o que a pessoa ligou lá
+        (`canalDoPerfil`, a mesma régua do agente).
       */
-      channel: editing?.channel ?? 'push',
+      channel: editing?.channel ?? canalDoPerfil(prefs.data),
     },
   });
+
+  // As preferências chegando depois de abrir: o lembrete NOVO que a pessoa ainda não mexeu segue o Perfil.
+  useEffect(() => {
+    if (editing || !prefs.data || getFieldState('channel').isDirty) return;
+    setValue('channel', canalDoPerfil(prefs.data));
+  }, [editing, prefs.data, getFieldState, setValue]);
 
   const date = useWatch({ control, name: 'date' });
 

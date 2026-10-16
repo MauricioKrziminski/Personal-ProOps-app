@@ -450,7 +450,7 @@ cadastros já recebia (`scripts/probe_resposta_ao_cadastro.py`, 4/4 no Gemini re
 - **Canal**: o dito (`NotesAction.channel`) vence; senão o do Perfil (`notes.canal_padrao`,
   `lembrete.canal_do_perfil`: só push → push, só WhatsApp → whatsapp, os dois ou nenhum → os dois). Congelado no
   alvo (`canal`) em `resolve_node`, dito na frase do SIM ("por notificação no app e WhatsApp") e gravado pela
-  tool. O envio continua obedecendo `alerts_whatsapp_enabled`.
+  tool. O envio continua obedecendo `alerts_whatsapp_enabled`. Os formulários de lembrete do app usam a MESMA régua (`src/lib/canal-do-lembrete.ts`).
 - **Ligado ou solto**: `resolve_node` procura o que o lembrete cita (`notes.lancamentos_do_lembrete`: série de
   gasto ativa, compra com parcela em aberto, dívida em aberto, gasto avulso a vencer; nome pelo `search_term`
   que o modelo tira da frase, ou o nome inteiro no texto, nunca palavra solta: `lembrete.casa_com_lembrete`). Achou

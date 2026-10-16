@@ -18,6 +18,7 @@ import { Space } from '@/design/tokens';
 import { useBillReminderFor, useBillReminders, useSaveBillReminder } from '@/hooks/use-bill-reminders';
 import { useAlertPreferences } from '@/hooks/use-push';
 import { useSession } from '@/hooks/use-session';
+import { canalDoPerfil } from '@/lib/canal-do-lembrete';
 import { financeErrorMessage } from '@/lib/finance-form';
 import { AVISO_PADRAO, alvoDoParam, quandoDoAviso, type Aviso } from '@/lib/lembrete-de-conta';
 
@@ -51,7 +52,7 @@ export function BillReminderForm({ conta, todas, nome }: { conta: string; todas?
 
   // Nunca vazio: o lembrete sem aviso se tira em "Remover lembrete", e só se tira um aviso havendo outro.
   const lista = avisos ?? (existente?.avisos.length ? existente.avisos : [AVISO_PADRAO]);
-  const canalAtual = canal ?? existente?.channel ?? 'push';
+  const canalAtual = canal ?? existente?.channel ?? canalDoPerfil(prefs.data);
   const mudar = (i: number, parte: Partial<Aviso>) => setAvisos(lista.map((a, j) => (j === i ? { ...a, ...parte } : a)));
   const alternar = (i: number, parte: 'dias' | 'hora') => {
     Haptics.selectionAsync();
