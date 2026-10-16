@@ -127,9 +127,11 @@ async def test_recusar_o_aviso_de_uma_compra_nao_descarta_a_outra(graph):
     second = await graph.ainvoke(Command(resume=False), config)
     aviso = second["__interrupt__"][0].value
     assert aviso["kind"] == "soft_warning" and "uber" in aviso["summary"]
+    # a recusa aparece JUNTO da pergunta seguinte (em `avisos`), não depois dela
+    assert "👍 Beleza, não registrei *mercado*." in second["avisos"]
     final = await graph.ainvoke(Command(resume=True), config)
     assert final["results"].count("WROTE") == 1
-    assert "👍 Beleza, não registrei *mercado*." in final["results"]
+    assert "👍 Beleza, não registrei *mercado*." not in final["results"]
     assert [a["description"] for a in final["finance_actions"]] == ["uber"]
 
 

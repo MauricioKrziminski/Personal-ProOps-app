@@ -1952,11 +1952,16 @@ async def _gate(state: AgentState) -> dict:
                     if not par and len(acoes) > 1:
                         # Recusar o aviso de UMA compra não descarta as outras do mesmo pedido (15/10/2026: elas
                         # sumiam caladas). Sai só esta, e o gate recomeça com as outras — cada uma com o seu SIM.
+                        # A frase vai em `avisos` quando vem outro SIM (a pergunta esconde `results`, e o "cancela"
+                        # parecia ignorado); sem pergunta à frente, em `results`. Nunca nos dois.
+                        ack = f"👍 Beleza, não registrei {_nome_do_pedido(acao)}."
+                        vem_sim = any(j != i and j not in _incompletas(state, acoes) for j in range(len(acoes)))
                         return {
                             "finance_actions": [a for j, a in enumerate(state.get("finance_actions") or []) if j != i],
                             "targets": [t for j, t in enumerate(alvos) if j != i],
                             "approved": False, "revision_pending": True,
-                            "results": [*state.get("results", []), f"👍 Beleza, não registrei {_nome_do_pedido(acao)}."],
+                            **({"avisos": [*(state.get("avisos") or []), ack]} if vem_sim
+                               else {"results": [*state.get("results", []), ack]}),
                         }
                     return {
                         "approved": False,
